@@ -3,26 +3,25 @@
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { MetricOrb } from "@/components/metrics/MetricOrb"
+import { Chip } from "@/components/corsia/Chip"
+import { Metric, type MetricProps } from "@/components/corsia/Metric"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AIChatBox, type Message as ChatMessage } from "@/components/AIChatBox"
 import { trpc } from "@/lib/trpc"
-import { toast } from "sonner"
 import {
-  Brain,
-  Sparkles,
-  Target,
-  HeartPulse,
-  Activity,
-  AlertTriangle,
-} from "lucide-react"
+  formatDayMonthYear,
+  formatDistance as formatDistanceValue,
+  formatDurationParts,
+  formatInteger,
+  NO_VALUE,
+} from "@/lib/format"
+import { toast } from "sonner"
+import { Sparkles, AlertTriangle } from "lucide-react"
 import { useLocation } from "wouter"
 
-
-
+const sectionTitle = "text-[17px] font-bold"
 type WorkoutSection = {
   title: string
   exercises: WorkoutExercise[]
@@ -51,33 +50,33 @@ type GeneratedWorkout = {
   coachNotes: string[]
 }
 
+/** «1,5 km» / «800 m», null without a distance. */
 const formatDistance = (meters?: number | null) => {
-  if (!meters) return null
-  if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`
-  return `${meters} m`
+  const value = formatDistanceValue(meters)
+  return value === NO_VALUE ? null : value
 }
 
+/** «50 min» / «1:02 h», null without a duration. */
 const formatTime = (seconds?: number | null) => {
-  if (!seconds) return null
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`
-  }
-  return `${minutes}:${secs.toString().padStart(2, "0")}`
+  const parts = formatDurationParts(seconds)
+  return parts ? `${parts.value} ${parts.unit}` : null
 }
 
+/** «12 mar 2025», null without a valid date. */
 const formatDate = (date?: string | null) => {
-  if (!date) return null
-  return new Date(date).toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
+  const value = formatDayMonthYear(date)
+  return value === NO_VALUE ? null : value
 }
+
+/** «12 mar 2025 · 1,5 km · 50 min» from a session analysis row (missing parts skipped). */
+const sessionMeta = (entry: any) =>
+  [
+    formatDate(entry.activity_date),
+    formatDistance(entry.activity_distance_meters),
+    formatTime(entry.activity_duration_seconds),
+  ]
+    .filter(Boolean)
+    .join(" · ")
 
 const parseBulletsSafe = (value: any): string[] => {
   if (!value) return []
@@ -124,7 +123,7 @@ const getFocusLabel = (
   efficiency?: number | null
 ) => {
   const candidates = [
-    { label: "Performance", value: performance },
+    { label: "Prestazione", value: performance },
     { label: "Costanza", value: consistency },
     { label: "Recupero", value: recovery },
     { label: "Efficienza", value: efficiency },
@@ -157,6 +156,78 @@ const sanitizeChatMessages = (messages: ChatMessage[]): ChatMessage[] =>
     .slice(-CHAT_MAX_HISTORY)
 
 const scopedStorageKey = (baseKey: string, userId: number) => `${baseKey}:u:${userId}`
+
+/** One generated workout (pool or dry-land): meta, section picker, first three exercises. */
+function WorkoutDetail({
+  workout,
+  kicker,
+  activeIndex,
+  onSelect,
+  activeSection,
+  moreLabel,
+}: {
+  workout: GeneratedWorkout
+  kicker: string
+  activeIndex: number
+  onSelect: (index: number) => void
+  activeSection: WorkoutSection | null
+  moreLabel: string
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs text-muted-foreground">{kicker}</p>
+        <h3 className="mt-1 text-base font-bold text-foreground">{workout.title}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {[workout.duration, workout.difficulty].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+      <p className="text-sm text-muted-foreground">{workout.description}</p>
+      <div role="group" aria-label="Parti dell'allenamento" className="flex flex-wrap gap-2">
+        {workout.sections.map((section, idx) => (
+          <Button
+            key={idx}
+            type="button"
+            size="sm"
+            variant={idx === activeIndex ? "default" : "outline"}
+            aria-pressed={idx === activeIndex}
+            onClick={() => onSelect(idx)}
+          >
+            {section.title}
+          </Button>
+        ))}
+      </div>
+      {activeSection ? (
+        <div className="rounded-xl bg-raised p-4">
+          <h4 className="text-sm font-semibold text-foreground">{activeSection.title}</h4>
+          {activeSection.notes && (
+            <p className="mt-1 text-xs text-muted-foreground">{activeSection.notes}</p>
+          )}
+          <ul className="mt-3 divide-y divide-border">
+            {activeSection.exercises.slice(0, 3).map((exercise, exIdx) => (
+              <li key={exIdx} className="py-3 text-sm first:pt-0 last:pb-0">
+                <p className="font-medium text-foreground">{exercise.name}</p>
+                <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {getExerciseDetails(exercise).map((detail, detailIdx) => (
+                    <span key={detailIdx}>{detail}</span>
+                  ))}
+                </p>
+                {exercise.notes && (
+                  <p className="mt-2 text-xs text-muted-foreground">{exercise.notes}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+          {activeSection.exercises.length > 3 && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              +{activeSection.exercises.length - 3} esercizi aggiuntivi. {moreLabel}
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 export default function Coach() {
   const [location] = useLocation()
@@ -217,7 +288,7 @@ export default function Coach() {
       // Also refetch to ensure consistency
       await utils.aiCoach.getWorkouts.refetch()
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Generazione workout non riuscita."
+      const message = error instanceof Error ? error.message : "Generazione allenamenti non riuscita."
       toast.error(message)
       console.error("Generation failed:", error)
     } finally {
@@ -253,12 +324,12 @@ export default function Coach() {
       "Come imposto la prossima seduta in base al mio recupero?",
       "Guardando i miei dati, cosa devo migliorare prima?",
       "Mi prepari 2 obiettivi concreti per questa settimana?",
-      `Che lavoro faccio per alzare il mio ${getFocusLabel(
+      `Che lavoro faccio per migliorare in ${getFocusLabel(
         advanced?.performanceIndex,
         advanced?.consistencyScore,
         advanced?.recoveryReadinessScore,
         advanced?.swimmingEfficiencyIndex
-      )}?`,
+      ).toLowerCase()}?`,
     ],
     [advanced]
   )
@@ -274,7 +345,7 @@ export default function Coach() {
     return insights.map((text, index) => {
       const metricMatch = text.match(/(-?\d+(?:\.\d+)?%?)/)
       return {
-        title: `Insight ${index + 1}`,
+        title: `Consiglio ${index + 1}`,
         description: text.replace(/\*\*/g, ""),
         metric: metricMatch?.[1] ?? null,
       }
@@ -286,60 +357,42 @@ export default function Coach() {
     : 0
   const activeInsight = insightCards[safeInsightIndex]
 
-  const keyMetricCards = useMemo(() => {
-    const performance = advanced?.performanceIndex ?? 0
-    const consistency = advanced?.consistencyScore ?? 0
-    const recovery = advanced?.recoveryReadinessScore ?? null
-    const streakCurrent = advanced?.streak?.current ?? 0
-    const streakRecord = advanced?.streak?.record ?? 0
-
-    return [
-      {
-        title: "Performance",
-        value: `${Math.round(performance)}`,
-        helper: `${Math.round(performance)}%`,
-      },
-      {
-        title: "Consistency",
-        value: `${Math.round(consistency)}`,
-        helper: `${Math.round(consistency)}%`,
-      },
-      {
-        title: "Recovery",
-        value:
-          recovery === null || recovery === undefined
-            ? "—"
-            : `${Math.round(recovery)}`,
-        helper:
-          recovery === null || recovery === undefined
-            ? "N/D"
-            : `${Math.round(recovery)}%`,
-      },
-      {
-        title: "Streak",
-        value: `${streakCurrent}`,
-        helper: `Record ${streakRecord}`,
-      },
+  const keyMetrics = useMemo((): Array<MetricProps & { id: string }> => {
+    if (!advanced) return []
+    const recovery = advanced.recoveryReadinessScore ?? null
+    const streakCurrent = advanced.streak?.current ?? 0
+    const metrics: Array<MetricProps & { id: string }> = [
+      { id: "performance", value: formatInteger(advanced.performanceIndex ?? 0), unit: "/100", label: "Prestazione" },
+      { id: "consistency", value: formatInteger(advanced.consistencyScore ?? 0), unit: "/100", label: "Costanza" },
     ]
+    if (recovery !== null) {
+      metrics.push({ id: "recovery", value: formatInteger(recovery), unit: "/100", label: "Recupero" })
+    }
+    metrics.push({
+      id: "streak",
+      value: formatInteger(streakCurrent),
+      unit: streakCurrent === 1 ? "giorno" : "giorni",
+      label: `Serie, record ${formatInteger(advanced.streak?.record ?? 0)}`,
+    })
+    return metrics
   }, [advanced])
 
-  const advancedMetrics = useMemo(() => {
-    const metrics = [
-      { key: "SEI", value: advanced?.swimmingEfficiencyIndex },
-      { key: "TCI", value: advanced?.technicalConsistencyIndex },
-      { key: "SER", value: advanced?.strokeEfficiencyRating },
-      { key: "ACS", value: advanced?.aerobicCapacityScore },
-      { key: "RRS", value: advanced?.recoveryReadinessScore },
-      { key: "POI", value: advanced?.progressiveOverloadIndex },
-    ]
-    return metrics.map((metric) => ({
-      ...metric,
-      display:
-        metric.value === null || metric.value === undefined
-          ? "—"
-          : Math.round(metric.value),
-    }))
-  }, [advanced])
+  // Advanced scores with a value only: a metric without data is not shown.
+  const advancedMetrics = useMemo(
+    () =>
+      [
+        { key: "SEI", value: advanced?.swimmingEfficiencyIndex },
+        { key: "TCI", value: advanced?.technicalConsistencyIndex },
+        { key: "SER", value: advanced?.strokeEfficiencyRating },
+        { key: "ACS", value: advanced?.aerobicCapacityScore },
+        { key: "RRS", value: advanced?.recoveryReadinessScore },
+        { key: "POI", value: advanced?.progressiveOverloadIndex },
+      ].filter(
+        (metric): metric is { key: string; value: number } =>
+          metric.value !== null && metric.value !== undefined && Number.isFinite(metric.value)
+      ),
+    [advanced]
+  )
 
   const sessionEntries = useMemo(() => {
     const data = sessionInsightsQuery.data ?? []
@@ -453,10 +506,10 @@ export default function Coach() {
     [advanced?.recoveryReadinessScore]
   )
 
-  const lastSyncLabel = useMemo(() => {
-    if (!latestSessionInsight?.activity_date) return "—"
-    return formatDate(latestSessionInsight.activity_date) ?? "—"
-  }, [latestSessionInsight])
+  const lastSyncLabel = useMemo(
+    () => formatDate(latestSessionInsight?.activity_date),
+    [latestSessionInsight]
+  )
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -599,478 +652,257 @@ export default function Coach() {
     }
   }
 
+  const summaryItems = [
+    { label: "Focus di oggi", value: focusLabel },
+    ...(advanced?.recoveryReadinessScore !== null && advanced?.recoveryReadinessScore !== undefined
+      ? [{ label: "Condizione", value: conditionLabel }]
+      : []),
+    { label: "Nuotate analizzate", value: formatInteger(sessionInsightsQuery.data?.length ?? 0) },
+  ]
+
   return (
     <AppLayout>
-      <div className="compact-shell relative space-y-4 lg:space-y-2">
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
-          <div className="h-full w-full bg-[linear-gradient(132deg,#101820_0%,#182733_46%,#101a22_100%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(68%_72%_at_20%_10%,rgba(25,151,240,0.12),transparent_72%),radial-gradient(48%_60%_at_84%_22%,rgba(34,211,238,0.10),transparent_76%)]" />
-        </div>
-        <section className="surface-panel p-6 glass-panel">
-          <div className="p-6 space-y-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-3">
-                  <Brain className="h-8 w-8 text-action-text" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-3xl font-display font-bold neon-gradient-text">
-                      AI Coach
-                    </h1>
-                    <Badge variant="neon">Premium</Badge>
-                  </div>
-                  <p className="text-muted-foreground">
-                    Analisi e allenamenti personalizzati basati sui tuoi dati reali.
-                  </p>
-                </div>
+      <div className="space-y-4">
+        <section aria-label="Riepilogo del coach" className="surface-panel p-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+            {summaryItems.map((item) => (
+              <div key={item.label} className="min-w-0">
+                <dt className="text-xs font-medium text-muted-foreground">{item.label}</dt>
+                <dd className="mt-1 truncate text-[15px] font-semibold text-foreground">{item.value}</dd>
               </div>
-              <Badge variant="outline" className="text-xs border-primary/40 text-action-text">
-                Ultimo sync: {lastSyncLabel}
-              </Badge>
-            </div>
-
-            <div className="flex flex-wrap gap-4 md:justify-end">
-              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
-                <p className="text-xs text-muted-foreground">Focus oggi</p>
-                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                  <Target className="size-4 text-action-text" />
-                  {focusLabel}
-                </div>
+            ))}
+            {lastSyncLabel ? (
+              <div className="min-w-0">
+                <dt className="text-xs font-medium text-muted-foreground">Ultima analisi</dt>
+                <dd className="mt-1 truncate text-[15px] font-semibold text-foreground">{lastSyncLabel}</dd>
               </div>
-              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
-                <p className="text-xs text-muted-foreground">Condition</p>
-                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                  <HeartPulse className="size-4 text-action-text" />
-                  {conditionLabel}
-                </div>
-              </div>
-              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
-                <p className="text-xs text-muted-foreground">Attività analizzate</p>
-                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                  <Activity className="size-4 text-action-text" />
-                  {sessionInsightsQuery.data?.length ?? 0}
-                </div>
-              </div>
-            </div>
-          </div>
+            ) : null}
+          </dl>
         </section>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "insights" | "workouts" | "session-iq" | "chat")} className="space-y-3">
-          <TabsList>
-            <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsList aria-label="Sezioni del coach">
+            <TabsTrigger value="insights">Consigli</TabsTrigger>
             <TabsTrigger value="workouts">Piano</TabsTrigger>
-            <TabsTrigger value="session-iq">Session IQ</TabsTrigger>
+            <TabsTrigger value="session-iq">Analisi</TabsTrigger>
             <TabsTrigger value="chat">Chat</TabsTrigger>
           </TabsList>
 
           <TabsContent value="insights" className="mt-3">
             <div className="flex flex-col gap-4">
-              <div className="order-2 lg:order-1">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {keyMetricCards.map((metric, index) => {
-                    const helperProgress = Number(String(metric.helper).replace(/[^\d.-]/g, ""))
-                    const valueProgress = Number(String(metric.value).replace(/[^\d.-]/g, ""))
-                    const progress = Number.isFinite(helperProgress)
-                      ? Math.max(0, Math.min(100, helperProgress))
-                      : Number.isFinite(valueProgress)
-                        ? Math.max(0, Math.min(100, valueProgress))
-                        : 0
-                    const tones = ["cyan", "lime", "amber", "sky"] as const
-
-                    return (
-                      <MetricOrb
-                        key={metric.title}
-                        label={metric.title}
-                        value={metric.value}
-                        progress={progress}
-                        helper={metric.helper}
-                        tone={tones[index % tones.length]}
-                        size="sm"
-                      />
-                    )
-                  })}
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                  {advancedMetrics.map((metric, index) => {
-                    const numeric = typeof metric.display === "number" ? metric.display : Number(metric.display)
-                    const safe = Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : 0
-                    const color = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--primary)"][index % 6]
-                    const radius = 19
-                    const circumference = 2 * Math.PI * radius
-                    const offset = circumference * (1 - safe / 100)
-                    return (
-                      <div key={metric.key} className="stream-card px-2 py-2 text-center">
-                        <div className="mx-auto relative h-14 w-14">
-                          <svg viewBox="0 0 60 60" className="h-full w-full -rotate-90">
-                            <circle cx="30" cy="30" r={radius} stroke="var(--border)" strokeWidth="5" fill="none" />
-                            <circle
-                              cx="30"
-                              cy="30"
-                              r={radius}
-                              stroke={color}
-                              strokeWidth="5"
-                              fill="none"
-                              strokeLinecap="round"
-                              strokeDasharray={circumference}
-                              strokeDashoffset={offset}
-                              style={{ filter: `drop-shadow(0 0 8px ${color})` }}
-                            />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-foreground">
-                            {metric.display}
-                          </div>
-                        </div>
-                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {metric.key}
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+              {keyMetrics.length > 0 || advancedMetrics.length > 0 ? (
+                <section aria-label="Punteggi" className="surface-panel order-2 p-4 lg:order-1">
+                  {keyMetrics.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+                      {keyMetrics.map(({ id, ...metric }) => (
+                        <Metric key={id} size="responsive" {...metric} />
+                      ))}
+                    </div>
+                  ) : null}
+                  {advancedMetrics.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-3 gap-x-4 gap-y-4 border-t border-border pt-4 sm:grid-cols-6">
+                      {advancedMetrics.map((metric) => (
+                        <Metric key={metric.key} value={formatInteger(metric.value)} label={metric.key} size="sm" />
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
 
               <div className="order-1 lg:order-2">
                 {insightCards.length > 0 ? (
-                  <section className="surface-panel p-6">
-                    <div className="p-4 space-y-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {insightCards.map((_, index) => (
-                          <Button
-                            key={index}
-                            type="button"
-                            size="sm"
-                            variant={index === safeInsightIndex ? "neon" : "outline-neon"}
-                            className="h-8 w-8 rounded-full p-0"
-                            onClick={() => setActiveInsightIndex(index)}
-                          >
-                            {index + 1}
-                          </Button>
-                        ))}
-                      </div>
-                      <div className="flex items-start gap-4">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <Sparkles className="w-5 h-5 text-action-text" />
+                  <section aria-label="Consigli" className="surface-panel space-y-4 p-4">
+                    <div role="group" aria-label="Scegli il consiglio" className="flex flex-wrap items-center gap-2">
+                      {insightCards.map((_, index) => (
+                        <Button
+                          key={index}
+                          type="button"
+                          size="icon-sm"
+                          variant={index === safeInsightIndex ? "default" : "outline"}
+                          className="rounded-full tabular-nums"
+                          aria-label={`Consiglio ${index + 1}`}
+                          aria-pressed={index === safeInsightIndex}
+                          onClick={() => setActiveInsightIndex(index)}
+                        >
+                          {index + 1}
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="flex items-start gap-3 border-t border-border pt-4">
+                      <Sparkles className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h2 className="text-base font-bold text-foreground">
+                            {activeInsight?.title ?? "Consiglio"}
+                          </h2>
+                          {activeInsight?.metric ? <Chip>{activeInsight.metric}</Chip> : null}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-medium text-foreground">
-                              {activeInsight?.title ?? "Insight"}
-                            </h3>
-                            {activeInsight?.metric ? (
-                              <Badge variant="neon">{activeInsight.metric}</Badge>
-                            ) : null}
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {activeInsight?.description ?? "Seleziona un insight per leggerlo."}
-                          </p>
-                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {activeInsight?.description ?? "Scegli un consiglio da leggere."}
+                        </p>
                       </div>
                     </div>
                   </section>
                 ) : (
-                  <section className="surface-panel p-6">
-                    <div className="p-6 text-sm text-muted-foreground">
-                      Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
-                    </div>
+                  <section className="surface-panel p-4 text-sm text-muted-foreground">
+                    Nessun consiglio disponibile. Sincronizza nuove attività per ricevere i consigli del coach.
                   </section>
                 )}
               </div>
-
             </div>
           </TabsContent>
 
           <TabsContent value="workouts" className="mt-3 space-y-3">
-            <section className="surface-panel p-4 lg:p-5">
-              <div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="font-display">Allenamenti AI</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Allenamenti personalizzati in base alle tue statistiche.
-                      {generatedAtLabel && (
-                        <span className="ml-1">Generati il {generatedAtLabel}.</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Button
-                      variant="neon"
-                      size="sm"
-                      onClick={handleGenerate}
-                      disabled={!canGenerate || isGenerating}
-                    >
-                      <Sparkles
-                        className={`mr-2 h-4 w-4 ${isGenerating ? "animate-spin" : ""}`}
-                      />
-                      {isGenerating ? "Generazione in corso..." : "Genera workouts"}
-                    </Button>
-                    {cooldownLabel && (
-                      <span className="text-xs text-muted-foreground">{cooldownLabel}</span>
+            <section aria-labelledby="coach-workouts-title" className="surface-panel space-y-4 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 id="coach-workouts-title" className={sectionTitle}>Allenamenti AI</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Allenamenti personalizzati in base alle tue statistiche.
+                    {generatedAtLabel && (
+                      <span className="ml-1">Generati il {generatedAtLabel}.</span>
                     )}
-                    {!canGenerate && !cooldownLabel && generationBlockedReason && (
-                      <span className="text-xs text-muted-foreground">{generationBlockedReason}</span>
-                    )}
-                  </div>
+                  </p>
                 </div>
-              </div>
-              <div>
-                <div className="space-y-4 mt-4">
-                  {(poolWorkout || drylandWorkout) ? (
-                    <>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={activeWorkout === "pool" ? "neon" : "outline-neon"}
-                          onClick={() => setActiveWorkout("pool")}
-                        >
-                          Allenamento in Vasca
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={activeWorkout === "dryland" ? "neon" : "outline-neon"}
-                          onClick={() => setActiveWorkout("dryland")}
-                        >
-                          Allenamento Dryland
-                        </Button>
-                      </div>
-
-                      {activeWorkout === "pool" ? (
-                        poolWorkout ? (
-                          <>
-                            <div className="text-sm text-muted-foreground">
-                              Generato dall&apos;AI
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                              <span className="font-semibold text-foreground">
-                                {poolWorkout.title}
-                              </span>
-                              <span>• {poolWorkout.duration}</span>
-                              <span>• {poolWorkout.difficulty}</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {poolWorkout.description}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {poolWorkout.sections.map((section, idx) => (
-                                <Button
-                                  key={idx}
-                                  type="button"
-                                  size="sm"
-                                  variant={idx === activePoolSectionIndex ? "default" : "outline"}
-                                  onClick={() => setActivePoolSectionIndex(idx)}
-                                >
-                                  {section.title}
-                                </Button>
-                              ))}
-                            </div>
-                            {activePoolSection ? (
-                              <div className="rounded-lg border border-border bg-background/60 p-4">
-                                <div className="mb-2 flex flex-wrap items-center gap-2">
-                                  <Badge variant="neon">{activePoolSection.title}</Badge>
-                                  {activePoolSection.notes && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {activePoolSection.notes}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="space-y-3">
-                                  {activePoolSection.exercises.slice(0, 3).map((exercise, exIdx) => (
-                                    <div
-                                      key={exIdx}
-                                      className="rounded-md bg-background/80 p-3 text-sm"
-                                    >
-                                      <div className="font-medium text-foreground">
-                                        {exercise.name}
-                                      </div>
-                                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                        {getExerciseDetails(exercise).map(
-                                          (detail, detailIdx) => (
-                                            <span key={detailIdx}>{detail}</span>
-                                          )
-                                        )}
-                                      </div>
-                                      {exercise.notes && (
-                                        <p className="mt-2 text-xs text-muted-foreground">
-                                          {exercise.notes}
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                                {activePoolSection.exercises.length > 3 && (
-                                  <p className="mt-3 text-xs text-muted-foreground">
-                                    +{activePoolSection.exercises.length - 3} esercizi aggiuntivi. Apri l&apos;allenamento completo nel dettaglio sessione.
-                                  </p>
-                                )}
-                              </div>
-                            ) : null}
-                          </>
-                        ) : (
-                          <div className="text-sm text-muted-foreground">
-                            Allenamento in vasca non disponibile. Sincronizza nuove attività.
-                          </div>
-                        )
-                      ) : drylandWorkout ? (
-                        <>
-                          <div className="text-sm text-muted-foreground">
-                            Forza, core e mobilità
-                          </div>
-                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                            <span className="font-semibold text-foreground">
-                              {drylandWorkout.title}
-                            </span>
-                            <span>• {drylandWorkout.duration}</span>
-                            <span>• {drylandWorkout.difficulty}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {drylandWorkout.description}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {drylandWorkout.sections.map((section, idx) => (
-                              <Button
-                                key={idx}
-                                type="button"
-                                size="sm"
-                                variant={idx === activeDrySectionIndex ? "default" : "outline"}
-                                onClick={() => setActiveDrySectionIndex(idx)}
-                              >
-                                {section.title}
-                              </Button>
-                            ))}
-                          </div>
-                          {activeDrySection ? (
-                            <div className="rounded-lg border border-border bg-background/60 p-4">
-                              <div className="mb-2 flex flex-wrap items-center gap-2">
-                                <Badge variant="neon">{activeDrySection.title}</Badge>
-                                {activeDrySection.notes && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {activeDrySection.notes}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="space-y-3">
-                                {activeDrySection.exercises.slice(0, 3).map((exercise, exIdx) => (
-                                  <div
-                                    key={exIdx}
-                                    className="rounded-md bg-background/80 p-3 text-sm"
-                                  >
-                                    <div className="font-medium text-foreground">
-                                      {exercise.name}
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                      {getExerciseDetails(exercise).map(
-                                        (detail, detailIdx) => (
-                                          <span key={detailIdx}>{detail}</span>
-                                        )
-                                      )}
-                                    </div>
-                                    {exercise.notes && (
-                                      <p className="mt-2 text-xs text-muted-foreground">
-                                        {exercise.notes}
-                                      </p>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                              {activeDrySection.exercises.length > 3 && (
-                                <p className="mt-3 text-xs text-muted-foreground">
-                                  +{activeDrySection.exercises.length - 3} esercizi aggiuntivi. Apri la scheda completa dal coach.
-                                </p>
-                              )}
-                            </div>
-                          ) : null}
-                        </>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">
-                          Allenamento dryland non disponibile. Sincronizza nuove attività.
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center gap-3 py-8 text-center">
-                      <Sparkles className="h-10 w-10 text-muted-foreground/40" />
-                      <p className="text-sm text-muted-foreground">
-                        Nessun allenamento generato. Premi il pulsante per creare i tuoi allenamenti personalizzati.
-                      </p>
-                    </div>
+                <div className="flex flex-col items-start gap-1 sm:items-end">
+                  <Button
+                    size="sm"
+                    onClick={handleGenerate}
+                    disabled={!canGenerate || isGenerating}
+                  >
+                    <Sparkles
+                      className={`size-4 ${isGenerating ? "animate-spin" : ""}`}
+                      aria-hidden
+                    />
+                    {isGenerating ? "Generazione in corso…" : "Genera allenamenti"}
+                  </Button>
+                  {cooldownLabel && (
+                    <span className="text-xs text-muted-foreground">{cooldownLabel}</span>
+                  )}
+                  {!canGenerate && !cooldownLabel && generationBlockedReason && (
+                    <span className="text-xs text-muted-foreground">{generationBlockedReason}</span>
                   )}
                 </div>
               </div>
+
+              {(poolWorkout || drylandWorkout) ? (
+                <div className="space-y-4 border-t border-border pt-4">
+                  <div role="group" aria-label="Tipo di allenamento" className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeWorkout === "pool" ? "default" : "outline"}
+                      aria-pressed={activeWorkout === "pool"}
+                      onClick={() => setActiveWorkout("pool")}
+                    >
+                      In vasca
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeWorkout === "dryland" ? "default" : "outline"}
+                      aria-pressed={activeWorkout === "dryland"}
+                      onClick={() => setActiveWorkout("dryland")}
+                    >
+                      A secco
+                    </Button>
+                  </div>
+
+                  {activeWorkout === "pool" ? (
+                    poolWorkout ? (
+                      <WorkoutDetail
+                        workout={poolWorkout}
+                        kicker="Generato dall'AI"
+                        activeIndex={activePoolSectionIndex}
+                        onSelect={setActivePoolSectionIndex}
+                        activeSection={activePoolSection}
+                        moreLabel="Apri l'allenamento completo nel dettaglio sessione."
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Allenamento in vasca non disponibile. Sincronizza nuove attività.
+                      </p>
+                    )
+                  ) : drylandWorkout ? (
+                    <WorkoutDetail
+                      workout={drylandWorkout}
+                      kicker="Forza, core e mobilità"
+                      activeIndex={activeDrySectionIndex}
+                      onSelect={setActiveDrySectionIndex}
+                      activeSection={activeDrySection}
+                      moreLabel="Apri la scheda completa dal coach."
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Allenamento a secco non disponibile. Sincronizza nuove attività.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 border-t border-border py-8 text-center">
+                  <Sparkles className="size-8 text-muted-foreground" aria-hidden />
+                  <p className="text-sm text-muted-foreground">
+                    Nessun allenamento generato. Tocca «Genera allenamenti» per creare i tuoi allenamenti personalizzati.
+                  </p>
+                </div>
+              )}
             </section>
           </TabsContent>
 
           <TabsContent value="session-iq" className="mt-3 space-y-3">
-            <section className="surface-panel p-6">
+            <section aria-labelledby="coach-sessions-title" className="surface-panel space-y-4 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-display">Session IQ</h3>
-                  <p>
-                    Analisi dell&apos;ultima sessione sincronizzata
+                  <h2 id="coach-sessions-title" className={sectionTitle}>Analisi delle nuotate</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    L&apos;analisi dell&apos;ultima nuotata sincronizzata.
                   </p>
                 </div>
                 <Button
-                  variant="outline-neon"
+                  variant="outline"
                   size="sm"
+                  aria-expanded={showSessionArchive}
                   onClick={() => setShowSessionArchive((prev) => !prev)}
                 >
                   {showSessionArchive ? "Chiudi archivio" : "Apri archivio"}
                 </Button>
               </div>
-              <div>
-                {latestSessionInsight ? (
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="rounded-full bg-primary/10 px-2 py-1 text-action-text">
-                        Ultima sessione
-                      </span>
-                      {formatDate(latestSessionInsight.activity_date) && (
-                        <span>📅 {formatDate(latestSessionInsight.activity_date)}</span>
-                      )}
-                      {formatDistance(latestSessionInsight.activity_distance_meters) && (
-                        <span>
-                          🏊 {formatDistance(latestSessionInsight.activity_distance_meters)}
-                        </span>
-                      )}
-                      {formatTime(latestSessionInsight.activity_duration_seconds) && (
-                        <span>
-                          ⏱ {formatTime(latestSessionInsight.activity_duration_seconds)}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">
-                      {latestSessionInsight.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {latestSessionInsight.summary}
-                    </p>
-                    {parsedSessionBullets.length > 0 && (
-                      <ul className="space-y-2 text-sm text-foreground">
-                        {parsedSessionBullets.map((bullet: string, idx: number) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-action-text">•</span>
-                            <span>{bullet}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+
+              {latestSessionInsight ? (
+                <div className="space-y-3 border-t border-border pt-4">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Chip>Ultima nuotata</Chip>
+                    {sessionMeta(latestSessionInsight) ? (
+                      <span className="tabular-nums">{sessionMeta(latestSessionInsight)}</span>
+                    ) : null}
                   </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
-                  </div>
-                )}
-              </div>
+                  <h3 className="text-base font-bold text-foreground">
+                    {latestSessionInsight.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {latestSessionInsight.summary}
+                  </p>
+                  {parsedSessionBullets.length > 0 && (
+                    <ul className="list-disc space-y-2 pl-5 text-sm text-foreground marker:text-muted-foreground">
+                      {parsedSessionBullets.map((bullet: string, idx: number) => (
+                        <li key={idx}>{bullet}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <p className="border-t border-border pt-4 text-sm text-muted-foreground">
+                  Nessuna analisi disponibile. Sincronizza una nuova nuotata per ricevere l&apos;analisi.
+                </p>
+              )}
 
               {showSessionArchive ? (
-                <div className="mt-4 rounded-xl border border-border/70 bg-background/40 p-4 space-y-3">
+                <div className="space-y-3 border-t border-border pt-4">
                   <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-sm font-semibold text-foreground">Archivio Session IQ</h4>
-                    <Badge variant="outline">
-                      {filteredArchiveEntries.length}/{sessionEntries.length} sessioni
-                    </Badge>
+                    <h3 className="text-sm font-semibold text-foreground">Archivio analisi</h3>
+                    <Chip className="tabular-nums">
+                      {filteredArchiveEntries.length}/{sessionEntries.length}
+                    </Chip>
                   </div>
 
                   {sessionEntries.length > 0 ? (
@@ -1078,11 +910,11 @@ export default function Coach() {
                       <Input
                         value={archiveSearchTerm}
                         onChange={(event) => setArchiveSearchTerm(event.target.value)}
-                        placeholder="Cerca in titolo, summary o insight..."
-                        className="bg-background/60"
+                        placeholder="Cerca nelle analisi…"
+                        aria-label="Cerca nelle analisi"
                       />
                       <Select value={archiveRange} onValueChange={(value) => setArchiveRange(value as "all" | "7d" | "30d" | "90d")}>
-                        <SelectTrigger className="bg-background/60">
+                        <SelectTrigger aria-label="Periodo">
                           <SelectValue placeholder="Periodo" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1098,7 +930,7 @@ export default function Coach() {
                           setArchiveSort(value as "recent" | "oldest" | "distance" | "duration")
                         }
                       >
-                        <SelectTrigger className="bg-background/60">
+                        <SelectTrigger aria-label="Ordina">
                           <SelectValue placeholder="Ordina" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1112,41 +944,33 @@ export default function Coach() {
                   ) : null}
 
                   {filteredArchiveEntries.length > 0 ? (
-                    <div className="max-h-[42dvh] space-y-2 overflow-y-auto pr-1">
+                    <ul className="max-h-[42dvh] space-y-2 overflow-y-auto pr-1">
                       {filteredArchiveEntries.map((entry: any) => {
                         const bullets = parseBulletsSafe(entry.bullets).slice(0, 2)
+                        const meta = sessionMeta(entry)
                         return (
-                          <article key={entry.id} className="rounded-lg border border-border/70 bg-card/40 p-3">
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                              {formatDate(entry.activity_date) && <span>📅 {formatDate(entry.activity_date)}</span>}
-                              {formatDistance(entry.activity_distance_meters) && (
-                                <span>🏊 {formatDistance(entry.activity_distance_meters)}</span>
-                              )}
-                              {formatTime(entry.activity_duration_seconds) && (
-                                <span>⏱ {formatTime(entry.activity_duration_seconds)}</span>
-                              )}
-                            </div>
+                          <li key={entry.id} className="rounded-xl bg-raised p-3">
+                            {meta ? (
+                              <p className="text-xs text-muted-foreground tabular-nums">{meta}</p>
+                            ) : null}
                             <p className="mt-1 text-sm font-semibold text-foreground">{entry.title}</p>
-                            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{entry.summary}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{entry.summary}</p>
                             {bullets.length > 0 ? (
-                              <ul className="mt-2 space-y-1 text-xs text-foreground">
+                              <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-foreground marker:text-muted-foreground">
                                 {bullets.map((bullet: string, idx: number) => (
-                                  <li key={idx} className="flex items-start gap-2">
-                                    <span className="text-action-text">•</span>
-                                    <span className="line-clamp-1">{bullet}</span>
-                                  </li>
+                                  <li key={idx} className="line-clamp-1">{bullet}</li>
                                 ))}
                               </ul>
                             ) : null}
-                          </article>
+                          </li>
                         )
                       })}
-                    </div>
+                    </ul>
                   ) : (
                     <p className="text-xs text-muted-foreground">
                       {sessionEntries.length === 0
-                        ? "Archivio vuoto. Verrà popolato dopo la prima analisi disponibile."
-                        : "Nessun risultato con i filtri correnti."}
+                        ? "Archivio vuoto. Si riempie dopo la prima analisi."
+                        : "Nessun risultato con questi filtri."}
                     </p>
                   )}
                 </div>
@@ -1154,69 +978,61 @@ export default function Coach() {
             </section>
           </TabsContent>
 
-          <TabsContent value="chat" className="mt-3">
-            <section className="surface-panel p-6">
-              <div className="p-4 space-y-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-medium text-foreground">Coach Chat</p>
-                    <p className="text-xs text-muted-foreground">
-                      Risposte generate sui tuoi dati reali (sessioni, metriche e Session IQ).
-                    </p>
-                    {chatProvider === "gemini" && (
-                      <div className="mt-1">
-                        <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-300">
-                          Provider attivo: Gemini
-                        </Badge>
-                      </div>
-                    )}
-                    {chatProvider === "rule_based" && (
-                      <div className="mt-1">
-                        <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-300">
-                          <AlertTriangle className="mr-1 h-3 w-3" />
-                          Modalità base (AI cloud non raggiungibile)
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline-neon"
-                    disabled={chatMessages.length === 0 || chatMutation.isPending}
-                    onClick={clearChat}
-                  >
-                    Svuota chat
-                  </Button>
+          <TabsContent value="chat" className="mt-3 space-y-3">
+            <section aria-labelledby="coach-chat-title" className="surface-panel space-y-3 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 id="coach-chat-title" className={sectionTitle}>Chat con il coach</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Risposte basate sui tuoi dati reali (nuotate, metriche e analisi).
+                  </p>
+                  {chatProvider === "gemini" && (
+                    <Chip className="mt-2">Provider attivo: Gemini</Chip>
+                  )}
+                  {chatProvider === "rule_based" && (
+                    <Chip className="mt-2">
+                      <AlertTriangle className="size-3.5 text-warning" aria-hidden />
+                      Modalità base (AI cloud non raggiungibile)
+                    </Chip>
+                  )}
                 </div>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <Input
-                    value={chatGoal}
-                    onChange={(e) => setChatGoal(e.target.value)}
-                    placeholder="Obiettivo attuale (es. migliorare il passo sui 100m)"
-                    maxLength={120}
-                    className="bg-background/60"
-                  />
-                  <Input
-                    value={chatConstraints}
-                    onChange={(e) => setChatConstraints(e.target.value)}
-                    placeholder="Vincoli (es. 2 sedute, spalla delicata)"
-                    maxLength={240}
-                    className="bg-background/60"
-                  />
-                </div>
-                <AIChatBox
-                  messages={chatMessages}
-                  onSendMessage={handleSendChatMessage}
-                  isLoading={chatMutation.isPending}
-                  placeholder="Scrivi al Coach AI (es. 'Come imposto la seduta di domani?')"
-                  emptyStateMessage="Parti da una domanda operativa sul tuo allenamento."
-                  suggestedPrompts={suggestedChatPrompts}
-                  maxInputLength={CHAT_MAX_MESSAGE_CHARS}
-                  height={520}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={chatMessages.length === 0 || chatMutation.isPending}
+                  onClick={clearChat}
+                >
+                  Svuota chat
+                </Button>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                <Input
+                  value={chatGoal}
+                  onChange={(e) => setChatGoal(e.target.value)}
+                  placeholder="Obiettivo attuale (es. migliorare il passo sui 100 m)"
+                  aria-label="Obiettivo attuale"
+                  maxLength={120}
+                />
+                <Input
+                  value={chatConstraints}
+                  onChange={(e) => setChatConstraints(e.target.value)}
+                  placeholder="Vincoli (es. 2 nuotate, spalla delicata)"
+                  aria-label="Vincoli"
+                  maxLength={240}
                 />
               </div>
             </section>
+            <AIChatBox
+              messages={chatMessages}
+              onSendMessage={handleSendChatMessage}
+              isLoading={chatMutation.isPending}
+              placeholder="Scrivi al coach (es. «Come imposto la nuotata di domani?»)"
+              emptyStateMessage="Parti da una domanda concreta sul tuo allenamento."
+              suggestedPrompts={suggestedChatPrompts}
+              maxInputLength={CHAT_MAX_MESSAGE_CHARS}
+              height={520}
+            />
           </TabsContent>
         </Tabs>
       </div>
