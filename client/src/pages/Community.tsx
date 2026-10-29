@@ -353,7 +353,7 @@ export default function Community() {
               aria-label="Cerca persone"
               value={userSearch}
               onChange={(event) => setUserSearch(event.target.value)}
-              placeholder="Nome, username o email"
+              placeholder="Nome o username"
               className="pl-9"
             />
           </div>
