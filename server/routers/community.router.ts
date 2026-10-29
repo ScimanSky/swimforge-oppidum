@@ -401,6 +401,7 @@ export const communityRouter = router({
             postId: z.number(),
         }))
         .mutation(async ({ ctx, input }) => {
+            await requirePostReadable(ctx.user.id, input.postId);
             const splashResult = await toggleSplash(ctx.user.id, input.postId);
             let actionXp = null;
             if (splashResult?.splashed) {
@@ -423,6 +424,7 @@ export const communityRouter = router({
             content: z.string().min(1).max(1000),
         }))
         .mutation(async ({ ctx, input }) => {
+            await requirePostReadable(ctx.user.id, input.postId);
             const commentId = await addComment(ctx.user.id, input.postId, input.content);
             const actionXp = await awardActionXp({
                 userId: ctx.user.id,
@@ -440,7 +442,8 @@ export const communityRouter = router({
         .input(z.object({
             postId: z.number(),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            await requirePostReadable(ctx.user.id, input.postId);
             return getComments(input.postId);
         }),
 
