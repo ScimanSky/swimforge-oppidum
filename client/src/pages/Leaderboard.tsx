@@ -7,8 +7,8 @@ import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import { Pager } from "@/components/corsia/Pager";
 import { RankBadge, RankRow, RankValue } from "@/components/corsia/RankRow";
-import { formatInteger, getInitials } from "@/lib/format";
-import { competitionRanks } from "@/lib/ranking";
+import { NO_VALUE, formatInteger, getInitials } from "@/lib/format";
+import { rankEntries } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 import { Award, TrendingUp, Trophy, Zap } from "lucide-react";
 import { Link, Redirect } from "wouter";
@@ -99,13 +99,13 @@ export default function Leaderboard() {
 
   // Normalize all entries
   const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
-  // Ties share a position (1, 1, 3); the list arrives sorted by the shown value.
-  const ranks = competitionRanks(normalizedLeaderboard.map(numericValue));
-  // No podium for a ranking nobody has scored in yet (everyone at 0).
-  const podiumOffset =
-    normalizedLeaderboard.length >= 3 && numericValue(normalizedLeaderboard[0]) > 0 ? 3 : 0;
-  const podium = normalizedLeaderboard.slice(0, podiumOffset);
-  const restEntries = normalizedLeaderboard.slice(podiumOffset);
+  // The list arrives sorted by the shown value: ties share a position (1, 1, 3), swimmers at 0
+  // (every weekly row on a Monday) have none and come last.
+  const rankedEntries = rankEntries(normalizedLeaderboard, numericValue);
+  // The podium holds only swimmers with a result: none while nobody has scored yet.
+  const podium = rankedEntries.slice(0, 3).filter(({ rank }) => rank !== null);
+  const podiumOffset = podium.length;
+  const restEntries = rankedEntries.slice(podiumOffset);
   const {
     page: listPage,
     setPage: setListPage,
@@ -122,8 +122,7 @@ export default function Leaderboard() {
   const isMe = (entry: NormalizedEntry) => user != null && String(entry.userId) === String(user.id);
   const totalPlayers = normalizedLeaderboard.length;
   const atLimit = totalPlayers >= LEADERBOARD_LIMIT;
-  const myIndex = normalizedLeaderboard.findIndex(isMe);
-  const me = myIndex >= 0 ? normalizedLeaderboard[myIndex] : null;
+  const me = rankedEntries.find(({ entry }) => isMe(entry)) ?? null;
   const myValueLabel =
     orderBy === "badges" ? "I tuoi badge" : orderBy === "level" ? "Il tuo livello" : "I tuoi XP";
 
@@ -180,11 +179,15 @@ export default function Leaderboard() {
                 />
                 {me ? (
                   <>
-                    <Metric size="responsive" value={`${ranks[myIndex]}°`} label="La tua posizione" />
+                    <Metric
+                      size="responsive"
+                      value={me.rank !== null ? `${me.rank}°` : NO_VALUE}
+                      label="La tua posizione"
+                    />
                     <Metric
                       size="responsive"
                       tone={orderBy === "totalXp" ? "xp" : "default"}
-                      value={valueParts(me).value}
+                      value={valueParts(me.entry).value}
                       unit={orderBy === "totalXp" ? "XP" : undefined}
                       label={myValueLabel}
                     />
@@ -201,16 +204,18 @@ export default function Leaderboard() {
 
             {podium.length > 0 ? (
               <ol aria-label="Podio" className="surface-panel grid grid-cols-3 items-end gap-2 p-3">
-                {podium.map((entry, index) => {
-                  const rank = ranks[index];
+                {podium.map(({ entry, rank }, index) => {
                   const current = isMe(entry);
                   const { value, unit } = valueParts(entry);
                   return (
                     <li
                       key={entry.userId}
-                      value={rank}
-                      // Placed by list position (winner in the middle), whatever the ties.
-                      className={cn("min-w-0", index === 0 ? "order-2" : index === 1 ? "order-1" : "order-3")}
+                      value={rank ?? undefined}
+                      // Placed by list position (winner in the middle, also alone), whatever the ties.
+                      className={cn(
+                        "row-start-1 min-w-0",
+                        index === 0 ? "col-start-2" : index === 1 ? "col-start-1" : "col-start-3"
+                      )}
                     >
                       <Link
                         href={`/u/${entry.userId}`}
@@ -240,18 +245,12 @@ export default function Leaderboard() {
             ) : null}
 
             {pagedRestEntries.length > 0 ? (
-              // `start` keeps the announced list position equal to the visible rank.
-              <ol
-                ref={listRef}
-                aria-label="Classifica"
-                start={podiumOffset + restOffset + 1}
-                className="scroll-mt-20 space-y-2"
-              >
-                {pagedRestEntries.map((entry, index) => {
+              // Each `value` keeps the list position equal to the visible rank; no value without one.
+              <ol ref={listRef} aria-label="Classifica" className="scroll-mt-20 space-y-2">
+                {pagedRestEntries.map(({ entry, rank }, index) => {
                   const position = podiumOffset + restOffset + index;
-                  const rank = ranks[position];
                   return (
-                    <li key={entry.id || position + 1} value={rank}>
+                    <li key={entry.id || position + 1} value={rank ?? undefined}>
                       <RankRow
                         rank={rank}
                         name={entry.userName}

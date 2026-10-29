@@ -47,7 +47,7 @@ export const formatWeekdayDayMonth = (value: DateInput | null | undefined) => {
  * A finite number from a number or a numeric string (Postgres bigint SUM/COUNT arrive as
  * «"1234"»); null for anything else, blank strings included (never 0 by accident).
  */
-const toFiniteNumber = (value: number | string | null | undefined): number | null => {
+export const toFiniteNumber = (value: unknown): number | null => {
   if (typeof value === "number") return Number.isFinite(value) ? value : null
   if (typeof value !== "string" || value.trim() === "") return null
   const parsed = Number(value)

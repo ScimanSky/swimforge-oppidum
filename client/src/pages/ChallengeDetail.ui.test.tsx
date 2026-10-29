@@ -91,11 +91,33 @@ describe("Sfida (Corsia)", () => {
     const rows = within(ranking).getAllByRole("link");
     expect(rows.map(row => row.getAttribute("href"))).toEqual(["/u/1", "/u/4", "/u/5"]);
     expect(within(rows[0]).getByText("1").className).toContain("var(--gold)");
-    expect(within(rows[2]).getByText("3").className).toContain("bg-xp/15");
+    expect(within(rows[1]).getByText("2")).toBeTruthy();
     expect(rows[1].className).toContain("border-action-text");
     expect(within(rows[1]).getByText("Tu")).toBeTruthy();
     expect(within(rows[1]).getByAltText("Delfino")).toBeTruthy();
     expect(within(rows[2]).getByText("0")).toBeTruthy();
+  });
+
+  it("chi non ha ancora nuotato non ha posizione né medaglia", () => {
+    renderDetail();
+    const items = within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("listitem");
+    expect(items.map((item) => item.getAttribute("value"))).toEqual(["1", "2", null]);
+    // luca, 0 km: «—» instead of a bronze 3.
+    expect(within(items[2]).getByText("luca")).toBeTruthy();
+    expect(within(items[2]).getByText("Senza posizione")).toBeTruthy();
+    expect(within(items[2]).queryByText("3")).toBeNull();
+  });
+
+  it("sfida nuova, nessuno ha nuotato: nessuna posizione", () => {
+    state.challenge.participants = [
+      { userId: 1, username: "anna", progress: 0 },
+      { userId: 2, username: "bea", progress: "0" },
+    ];
+    renderDetail();
+    for (const item of within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("listitem")) {
+      expect(within(item).getByText("Senza posizione")).toBeTruthy();
+      expect(within(item).queryByText("1")).toBeNull();
+    }
   });
 
   it("stati di caricamento e sfida assente", () => {
@@ -140,8 +162,11 @@ describe("Sfida (Corsia)", () => {
       { userId: 3, username: "cleo", progress: 100 },
     ];
     renderDetail();
-    const rows = within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("link");
-    expect(rows.map((row) => row.querySelector('[data-slot="badge"], span')?.textContent)).toEqual(["1", "1", "3"]);
+    const items = within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("listitem");
+    expect(items.map((item) => item.getAttribute("value"))).toEqual(["1", "1", "3"]);
+    expect(within(items[0]).getByText("1")).toBeTruthy();
+    expect(within(items[1]).getByText("1")).toBeTruthy();
+    expect(within(items[2]).getByText("3")).toBeTruthy();
   });
 
   it("sfida sul passo: vince il più basso, chi non ha nuotato in fondo", () => {
@@ -159,5 +184,8 @@ describe("Sfida (Corsia)", () => {
     expect(average.textContent).toContain("1:49");
     const rows = within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("link");
     expect(rows.map((row) => row.getAttribute("href"))).toEqual(["/u/4", "/u/1", "/u/5"]);
+    // luca has no pace yet: no position, «—» as his pace.
+    expect(within(rows[2]).getByText("Senza posizione")).toBeTruthy();
+    expect(within(rows[2]).queryByText("3")).toBeNull();
   });
 });

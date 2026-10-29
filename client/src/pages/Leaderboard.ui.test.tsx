@@ -86,6 +86,7 @@ describe("Classifiche (Corsia)", () => {
     expect(within(within(podium).getByRole("link", { name: /Nuotatore 1/ })).getByText("1")).toBeTruthy();
     expect(within(within(podium).getByRole("link", { name: /Nuotatore 2/ })).getByText("1")).toBeTruthy();
     expect(within(within(podium).getByRole("link", { name: /Nuotatore 3/ })).getByText("3")).toBeTruthy();
+    expect(within(podium).getAllByRole("listitem").map((place) => place.getAttribute("value"))).toEqual(["1", "1", "3"]);
     const list = screen.getByRole("list", { name: "Classifica" });
     const mine = within(list).getByRole("link", { name: /Nuotatore 4/ });
     expect(within(mine).getByText("3")).toBeTruthy();
@@ -94,11 +95,44 @@ describe("Classifiche (Corsia)", () => {
     expect(within(summary).getByText("3°")).toBeTruthy();
   });
 
-  it("niente podio quando il primo ha zero", () => {
-    state.rows = [row(1, 0), row(2, 0), row(3, 0)];
+  it("lunedì, tutti a zero: nessun podio, nessuna posizione né medaglia", async () => {
+    state.rows = Array.from({ length: 50 }, (_, i) => ({ ...row(i + 1, 9000 - i), periodXp: 0 }));
     renderLeaderboard();
+    await userEvent.click(screen.getByRole("tab", { name: "Settimana" }));
     expect(screen.queryByRole("list", { name: "Podio" })).toBeNull();
-    expect(within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("listitem")).toHaveLength(3);
+    const list = screen.getByRole("list", { name: "Classifica" });
+    for (const item of within(list).getAllByRole("listitem")) {
+      expect(within(item).getByText("Senza posizione")).toBeTruthy();
+      // No position number (the value column says «0»).
+      expect(within(item).queryAllByText(/^[1-9]\d*$/)).toEqual([]);
+      expect(item.hasAttribute("value")).toBe(false);
+    }
+    const summary = screen.getByRole("region", { name: "La tua posizione" });
+    expect(within(summary).getByText("—")).toBeTruthy();
+    expect(within(summary).queryByText(/°$/)).toBeNull();
+  });
+
+  it("chi è a zero non sale sul podio e resta senza posizione, dopo i classificati", async () => {
+    state.rows = [
+      { ...row(1, 9000), periodXp: 500 },
+      { ...row(2, 8000), periodXp: 300 },
+      ...Array.from({ length: 48 }, (_, i) => ({ ...row(i + 3, 7000 - i), periodXp: 0 })),
+    ];
+    renderLeaderboard();
+    await userEvent.click(screen.getByRole("tab", { name: "Settimana" }));
+    const podium = screen.getByRole("list", { name: "Podio" });
+    const places = within(podium).getAllByRole("listitem");
+    expect(places.map((place) => place.getAttribute("value"))).toEqual(["1", "2"]);
+    expect(within(podium).queryByRole("link", { name: /Nuotatore 3/ })).toBeNull();
+    const list = screen.getByRole("list", { name: "Classifica" });
+    expect(within(list).getAllByRole("listitem")[0].textContent).toContain("Nuotatore 3");
+    const third = within(list).getByRole("link", { name: /Nuotatore 3/ });
+    expect(within(third).getByText("Senza posizione")).toBeTruthy();
+    expect(within(third).queryAllByText(/^[1-9]\d*$/)).toEqual([]);
+    // I am user 4, at 0 XP this week: no position for me either.
+    const summary = screen.getByRole("region", { name: "La tua posizione" });
+    expect(within(summary).getByText("—")).toBeTruthy();
+    expect(within(summary).queryByText(/°$/)).toBeNull();
   });
 
   it("con 50 nuotatori dice onestamente «tra i primi 50»", () => {
@@ -181,13 +215,15 @@ describe("Classifiche (Corsia)", () => {
     expect(within(summary).getByText("Non sei ancora in classifica.")).toBeTruthy();
     const pages = screen.getByRole("navigation", { name: "Pagine della classifica" });
     expect(within(pages).getByText("Pagina 1 di 2")).toBeTruthy();
-    expect(screen.getByRole("list", { name: "Classifica" }).getAttribute("start")).toBe("4");
+    const positions = () =>
+      within(screen.getByRole("list", { name: "Classifica" }))
+        .getAllByRole("listitem")
+        .map((item) => item.getAttribute("value"));
+    expect(positions()).toEqual(["4", "5", "6", "7"]);
     await userEvent.click(within(pages).getByRole("button", { name: "Avanti" }));
-    const list = screen.getByRole("list", { name: "Classifica" });
-    // Screen readers announce the visible rank: the list starts at 8.
-    expect(list.getAttribute("start")).toBe("8");
-    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
-    expect(within(list).getByText("8")).toBeTruthy();
+    // Every item carries the visible rank as its list position.
+    expect(positions()).toEqual(["8", "9"]);
+    expect(within(screen.getByRole("list", { name: "Classifica" })).getByText("8")).toBeTruthy();
   });
 
   it("torna alla prima pagina cambiando periodo", async () => {

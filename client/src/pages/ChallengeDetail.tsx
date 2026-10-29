@@ -19,7 +19,7 @@ import {
   compareChallengeProgress,
 } from "@/lib/challenges";
 import { formatInteger } from "@/lib/format";
-import { competitionRanks } from "@/lib/ranking";
+import { rankEntries } from "@/lib/ranking";
 
 const sectionTitle = "text-[17px] font-bold";
 
@@ -143,13 +143,16 @@ export default function ChallengeDetail() {
   }
   if (!challenge) return <Notice>Sfida non trovata</Notice>;
 
-  // Best first: the server sorts by progress descending, which is backwards for pace.
+  // Best first, whatever the server order (for pace the lowest wins, no data goes last).
   const compare = compareChallengeProgress(challenge.objective);
+  const progressOf = (participant: { progress?: number | string | null }) =>
+    Number(participant.progress ?? 0);
   const participants = [...(challenge.participants ?? [])].sort((a, b) =>
-    compare(Number(a.progress ?? 0), Number(b.progress ?? 0))
+    compare(progressOf(a), progressOf(b))
   );
-  const progressValues = participants.map((p) => Number(p.progress ?? 0));
-  const ranks = competitionRanks(progressValues);
+  const progressValues = participants.map(progressOf);
+  // Ties share a position; who has no result yet (0, a pace without data) has none.
+  const ranking = rankEntries(participants, (participant) => progressOf(participant));
   const bestProgress = bestChallengeProgress(challenge.objective, progressValues);
   const averageProgress = averageChallengeProgress(challenge.objective, progressValues);
 
@@ -207,14 +210,14 @@ export default function ChallengeDetail() {
           </h2>
           {participants.length > 0 ? (
             <ol aria-labelledby={rankingId} className="mt-3 space-y-2">
-              {participants.map((participant, index) => {
+              {ranking.map(({ entry: participant, rank }) => {
                 const userId = Number(participant.userId);
                 const name = participant.username || "Nuotatore";
-                const { value, unit } = progressParts(Number(participant.progress || 0));
+                const { value, unit } = progressParts(progressOf(participant));
                 return (
-                  <li key={participant.userId} value={ranks[index]}>
+                  <li key={participant.userId} value={rank ?? undefined}>
                     <RankRow
-                      rank={ranks[index]}
+                      rank={rank}
                       name={name}
                       avatarUrl={participant.avatarUrl || participant.avatar_url}
                       value={value}

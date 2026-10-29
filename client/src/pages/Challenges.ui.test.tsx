@@ -215,8 +215,8 @@ describe("Sfide (Corsia)", () => {
 
   it("classifica con oro in testa e la propria riga evidenziata", async () => {
     state.leaderboard = [
-      { userId: 1, name: "Anna", totalXp: 900, totalDistanceMeters: 12000, avatarUrl: null },
-      { userId: 4, name: "Marta", totalXp: 800, totalDistanceMeters: 0 },
+      { userId: 1, name: "Anna", totalXp: 900, periodXp: 300, totalDistanceMeters: 12000, avatarUrl: null },
+      { userId: 4, name: "Marta", totalXp: 800, periodXp: 100, totalDistanceMeters: 0 },
     ];
     renderChallenges();
     await userEvent.click(screen.getByRole("tab", { name: "Classifica" }));
@@ -246,6 +246,38 @@ describe("Sfide (Corsia)", () => {
     expect(within(bea).getByText("XP")).toBeTruthy();
   });
 
+  it("classifica settimanale a zero (lunedì): nessuna posizione né medaglia", async () => {
+    state.leaderboard = [
+      { userId: 1, name: "Anna", periodXp: "0" },
+      { userId: 2, name: "Bea", periodXp: 0 },
+      { userId: 3, name: "Cleo", periodXp: null },
+    ];
+    renderChallenges();
+    await userEvent.click(screen.getByRole("tab", { name: "Classifica" }));
+    const items = within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    for (const item of items) {
+      expect(within(item).getByText("Senza posizione")).toBeTruthy();
+      expect(within(item).queryAllByText(/^[1-9]\d*$/)).toEqual([]);
+      expect(item.hasAttribute("value")).toBe(false);
+    }
+  });
+
+  it("classifica settimanale: chi è a zero va in fondo senza posizione", async () => {
+    state.leaderboard = [
+      { userId: 2, name: "Bea", periodXp: 0 },
+      { userId: 1, name: "Anna", periodXp: "500" },
+    ];
+    renderChallenges();
+    await userEvent.click(screen.getByRole("tab", { name: "Classifica" }));
+    const [first, second] = within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("listitem");
+    expect(within(first).getByText("Anna")).toBeTruthy();
+    expect(first.getAttribute("value")).toBe("1");
+    expect(within(first).getByText("1")).toBeTruthy();
+    expect(within(second).getByText("Bea")).toBeTruthy();
+    expect(within(second).getByText("Senza posizione")).toBeTruthy();
+  });
+
   it("dopo Partecipa sull'ultima pagina non resta una pagina vuota", async () => {
     state.challenges = [1, 2, 3, 4].map((id) => challenge(id));
     const { rerender } = renderChallenges();
@@ -260,13 +292,17 @@ describe("Sfide (Corsia)", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Sfida 1" })).toBeTruthy();
   });
 
-  it("classifica paginata: la lista parte dalla posizione visibile", async () => {
+  it("classifica paginata: ogni voce porta la posizione visibile", async () => {
     state.leaderboard = [1, 2, 3, 4, 5].map((userId) => ({ userId, name: `N${userId}`, periodXp: 100 - userId }));
     renderChallenges();
     await userEvent.click(screen.getByRole("tab", { name: "Classifica" }));
-    expect(screen.getByRole("list", { name: "Classifica" }).getAttribute("start")).toBe("1");
+    const positions = () =>
+      within(screen.getByRole("list", { name: "Classifica" }))
+        .getAllByRole("listitem")
+        .map((item) => item.getAttribute("value"));
+    expect(positions()).toEqual(["1", "2", "3", "4"]);
     await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
-    expect(screen.getByRole("list", { name: "Classifica" }).getAttribute("start")).toBe("5");
+    expect(positions()).toEqual(["5"]);
   });
 
   it("crea una sfida dal dialogo", async () => {

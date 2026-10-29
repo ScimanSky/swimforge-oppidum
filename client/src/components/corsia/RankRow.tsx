@@ -2,14 +2,17 @@ import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { getInitials } from "@/lib/format";
+import { NO_VALUE, getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const PODIUM = { 1: "rank-gold", 2: "rank-silver", 3: "rank-bronze" } as const;
 
-/** Position in a ranking: gold, silver and bronze pills for the podium, a plain number after. */
-export function RankBadge({ rank, className }: { rank: number; className?: string }) {
-  const variant = PODIUM[rank as keyof typeof PODIUM];
+/**
+ * Position in a ranking: gold, silver and bronze pills for the podium, a plain number after, «—»
+ * for an entry without a result (no position, no medal).
+ */
+export function RankBadge({ rank, className }: { rank: number | null; className?: string }) {
+  const variant = rank === null ? undefined : PODIUM[rank as keyof typeof PODIUM];
   if (!variant) {
     return (
       <span
@@ -18,7 +21,14 @@ export function RankBadge({ rank, className }: { rank: number; className?: strin
           className
         )}
       >
-        {rank}
+        {rank === null ? (
+          <>
+            <span aria-hidden>{NO_VALUE}</span>
+            <span className="sr-only">Senza posizione</span>
+          </>
+        ) : (
+          rank
+        )}
       </span>
     );
   }
@@ -42,7 +52,8 @@ export function RankValue({ value, unit }: { value: string; unit?: string }) {
 }
 
 export type RankRowProps = {
-  rank: number;
+  /** null: no result yet, so no position. */
+  rank: number | null;
   name: string;
   avatarUrl?: string | null;
   subtitle?: ReactNode;

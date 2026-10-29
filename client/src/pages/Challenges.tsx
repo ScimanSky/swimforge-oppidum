@@ -46,8 +46,8 @@ import {
   challengeProgressPercent,
   dayStreak,
 } from "@/lib/challenges"
-import { formatDistance, formatInteger } from "@/lib/format"
-import { competitionRanks } from "@/lib/ranking"
+import { formatDistance, formatInteger, toFiniteNumber } from "@/lib/format"
+import { rankEntries } from "@/lib/ranking"
 
 const formatDaysLeft = (endDate: string | Date) => {
   const end = new Date(endDate)
@@ -201,11 +201,15 @@ export default function Challenges() {
   const participatingChallenges = [...activeChallenges, ...pendingChallenges]
 
   const leaderboard = (leaderboardQuery.data ?? []) as any[]
+  // Weekly ranking, sorted by periodXp (a number, or a bigint string): ties share a position,
+  // swimmers without XP this week have none and come last.
+  const weeklyXp = (entry: any) => toFiniteNumber(entry.periodXp) ?? 0
+  const rankedLeaderboard = rankEntries(leaderboard, weeklyXp)
   // Switching tab starts every list from its first page; leaving or joining a challenge, or
   // crossing 1280px (page sizes change), keeps each list on a page that still exists.
   const activePaging = usePaged(participatingChallenges, isDesktopWide ? 1 : 2, [activeTab])
   const availablePaging = usePaged(availableChallenges, isDesktopWide ? 2 : 3, [activeTab])
-  const leaderboardPaging = usePaged(leaderboard, isDesktopWide ? 3 : 4, [activeTab])
+  const leaderboardPaging = usePaged(rankedLeaderboard, isDesktopWide ? 3 : 4, [activeTab])
 
   // Local calendar days (a swim at 00:30 is today, not yesterday in UTC).
   const streak = useMemo(() => {
@@ -218,8 +222,6 @@ export default function Challenges() {
   const challengesFailed = !challengesQuery.data && challengesQuery.isError
   const leaderboardLoading = leaderboardQuery.isPending
   const leaderboardFailed = !leaderboardQuery.data && leaderboardQuery.isError
-  // The weekly ranking is sorted by periodXp: ties share a position.
-  const leaderboardRanks = competitionRanks(leaderboard.map((entry) => Number(entry.periodXp ?? 0)))
 
   const myUserId = profileQuery.data?.userId
   const participatingCount = activeChallenges.length + pendingChallenges.length
@@ -562,14 +564,8 @@ export default function Challenges() {
             ) : leaderboard.length === 0 ? (
               <EmptyCard>Nessuna classifica disponibile.</EmptyCard>
             ) : (
-              <ol
-                ref={leaderboardListRef}
-                aria-label="Classifica"
-                start={leaderboardPaging.offset + 1}
-                className="scroll-mt-20 space-y-2"
-              >
-                {leaderboardPaging.pageItems.map((entry, index) => {
-                  const absoluteIndex = leaderboardPaging.offset + index
+              <ol ref={leaderboardListRef} aria-label="Classifica" className="scroll-mt-20 space-y-2">
+                {leaderboardPaging.pageItems.map(({ entry, rank }, index) => {
                   const profile = entry.profile ?? entry
                   const name = entry.name ?? profile.name ?? "Nuotatore"
                   const rawUserId = profile.userId ?? entry.userId
@@ -577,16 +573,14 @@ export default function Challenges() {
                   const hasProfileLink = Number.isFinite(userId) && userId > 0
                   const distance = Number(profile.totalDistanceMeters ?? 0)
 
-                  const rank = leaderboardRanks[absoluteIndex]
-
                   return (
-                    <li key={entry.userId ?? entry.id ?? index} value={rank}>
+                    <li key={entry.userId ?? entry.id ?? index} value={rank ?? undefined}>
                       <RankRow
                         rank={rank}
                         name={name}
                         avatarUrl={profile.avatarUrl ?? profile.profileImage}
                         subtitle={distance > 0 ? formatDistance(distance) : undefined}
-                        value={formatInteger(Number(entry.periodXp ?? 0))}
+                        value={formatInteger(weeklyXp(entry))}
                         unit="XP"
                         href={hasProfileLink ? `/u/${userId}` : undefined}
                         isCurrentUser={hasProfileLink && myUserId != null && userId === Number(myUserId)}
