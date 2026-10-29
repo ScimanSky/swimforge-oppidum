@@ -22,7 +22,12 @@ export type RepeatSet = {
 };
 
 /** Strokes whose cycles mean something for the stroke holding (not drill, kick or unknown). */
-const STROKE_HOLDING_STROKES: ReadonlySet<NormalizedStroke> = new Set(["freestyle", "backstroke", "breaststroke", "butterfly"]);
+const STROKE_HOLDING_STROKES: ReadonlySet<NormalizedStroke> = new Set<NormalizedStroke>([
+  "freestyle",
+  "backstroke",
+  "breaststroke",
+  "butterfly",
+]);
 
 function repStrokeData(run: MetricLap[]): { repDps: number[] | null; repStrokeRates: number[] | null } {
   if (!run[0].stroke || !STROKE_HOLDING_STROKES.has(run[0].stroke)) return { repDps: null, repStrokeRates: null };
