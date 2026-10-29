@@ -13,12 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Chip } from "@/components/corsia/Chip";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
 import { ClubInviteRow } from "@/components/club/ClubInviteRow";
+import { DateTimePickerField, parseDateTimeLocal } from "@/components/club/DateTimePickerField";
 import { clubAccess } from "@/lib/club-access";
 import {
   buildMeetRosterPrintHtml,
@@ -37,7 +36,7 @@ import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { publicSiteUrl } from "@/lib/public-url";
-import { Bot, Calendar as CalendarIcon, Clock3, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Users, Sparkles } from "lucide-react";
+import { Bot, Clock3, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -116,117 +115,8 @@ const formatDate = (value?: string | Date | null) => {
   return label === NO_VALUE ? "-" : label;
 };
 
-function parseDateTimeLocal(value: string) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
 function pad2(value: number) {
   return String(value).padStart(2, "0");
-}
-
-function toDateTimeLocalString(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
-function DateTimePickerField({
-  label,
-  value,
-  onChange,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-  required?: boolean;
-}) {
-  const selected = parseDateTimeLocal(value);
-  const [open, setOpen] = useState(false);
-  const triggerId = useId();
-  const timeInputId = useId();
-
-  const applyDate = (nextDate: Date | undefined) => {
-    if (!nextDate) return;
-    const base = selected ?? new Date();
-    const merged = new Date(nextDate);
-    merged.setHours(base.getHours(), base.getMinutes(), 0, 0);
-    onChange(toDateTimeLocalString(merged));
-  };
-
-  const applyTime = (time: string) => {
-    const [hh, mm] = time.split(":").map((part) => Number(part));
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
-    const base = selected ?? new Date();
-    const next = new Date(base);
-    next.setHours(hh, mm, 0, 0);
-    onChange(toDateTimeLocalString(next));
-  };
-
-  const formattedLabel = selected
-    ? selected.toLocaleString("it-IT", {
-        weekday: "short",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Seleziona data e ora";
-
-  return (
-    <div className="space-y-1">
-      <Label htmlFor={triggerId}>
-        {label}
-        {required ? " *" : ""}
-      </Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button id={triggerId} type="button" variant="outline" className="w-full justify-start font-normal">
-            <CalendarIcon aria-hidden />
-            <span className="truncate">{formattedLabel}</span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-3" align="start">
-          <div className="space-y-3">
-            <Calendar
-              mode="single"
-              selected={selected ?? undefined}
-              onSelect={applyDate}
-              initialFocus
-            />
-            <div className="space-y-1">
-              <Label htmlFor={timeInputId}>Ora</Label>
-              <Input
-                id={timeInputId}
-                type="time"
-                value={selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "09:00"}
-                onChange={(e) => applyTime(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-between gap-2">
-              {!required ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onChange("")}
-                >
-                  Rimuovi
-                </Button>
-              ) : (
-                <span />
-              )}
-              <Button type="button" size="sm" onClick={() => setOpen(false)}>
-                Conferma
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
 }
 
 const ACTIVE_MEET_ENTRY_STATUSES = new Set(["pending", "confirmed", "waitlist"]);

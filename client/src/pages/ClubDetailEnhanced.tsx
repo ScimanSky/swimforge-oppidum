@@ -5,7 +5,7 @@
 
 import { useId, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { Pin, ArrowLeft, Upload, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
+import { Pin, ArrowLeft, Upload, X as XIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChoiceGroup, type ChoiceOption } from "@/components/corsia/ChoiceGroup";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -28,6 +26,7 @@ import ClubEventsPanel, { type ClubAgendaItem } from "@/components/club/ClubEven
 import PulseBar, { type ClubWeeklyStats } from "@/components/club/PulseBar";
 import ClubCreateMenu from "@/components/club/ClubCreateMenu";
 import { ClubInviteRow } from "@/components/club/ClubInviteRow";
+import { DateTimePickerField, parseDateTimeLocal } from "@/components/club/DateTimePickerField";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
@@ -58,120 +57,6 @@ async function geocodeLocation(query: string): Promise<{ lat: number; lng: numbe
     lng,
     displayName: first.display_name ?? q,
   };
-}
-
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function toDateTimeLocalString(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
-function parseDateTimeLocal(value: string) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
-function DateTimePickerField({
-  label,
-  value,
-  onChange,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-  required?: boolean;
-}) {
-  const selected = parseDateTimeLocal(value);
-  const [open, setOpen] = useState(false);
-  const timeInputId = `event-time-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-
-  const applyDate = (nextDate: Date | undefined) => {
-    if (!nextDate) return;
-    const base = selected ?? new Date();
-    const merged = new Date(nextDate);
-    merged.setHours(base.getHours(), base.getMinutes(), 0, 0);
-    onChange(toDateTimeLocalString(merged));
-  };
-
-  const applyTime = (time: string) => {
-    const [hh, mm] = time.split(":").map((part) => Number(part));
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
-    const base = selected ?? new Date();
-    const next = new Date(base);
-    next.setHours(hh, mm, 0, 0);
-    onChange(toDateTimeLocalString(next));
-  };
-
-  const formattedLabel = selected
-    ? selected.toLocaleString("it-IT", {
-        weekday: "short",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Seleziona data e ora";
-
-  return (
-    <div className="space-y-1">
-      <Label>
-        {label}
-        {required ? " *" : ""}
-      </Label>
-      <div className="flex items-center gap-2">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="w-full justify-start font-normal">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              <span className="truncate">{formattedLabel}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-3" align="start">
-            <div className="space-y-3">
-              <Calendar
-                mode="single"
-                selected={selected ?? undefined}
-                onSelect={applyDate}
-                initialFocus
-              />
-              <div className="space-y-1">
-                <Label htmlFor={timeInputId}>Ora</Label>
-                <Input
-                  id={timeInputId}
-                  type="time"
-                  value={selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "09:00"}
-                  onChange={(e) => applyTime(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-between gap-2">
-                {!required ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onChange("")}
-                  >
-                    Rimuovi
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                <Button type="button" size="sm" onClick={() => setOpen(false)}>
-                  Conferma
-                </Button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </div>
-  );
 }
 
 export default function ClubDetailEnhanced() {

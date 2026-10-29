@@ -345,6 +345,11 @@ describe("ClubDetailEnhanced (Corsia)", () => {
       await chooseCreate("Nuovo evento");
       const dialog = await screen.findByRole("dialog", { name: "Crea evento" });
       expect(within(dialog).getByText("Limite membri: massimo 1 evento al giorno.")).toBeTruthy();
+      // The date pickers are named by their label and the chosen date.
+      expect(within(dialog).getByRole("button", { name: "Inizio Seleziona data e ora" })).toHaveAccessibleDescription(
+        "Obbligatorio"
+      );
+      expect(within(dialog).getByRole("button", { name: "Fine Seleziona data e ora" })).toBeTruthy();
     });
 
     it("«Invita» e «Nuova convocazione» aprono l'area coach dentro l'app", async () => {
