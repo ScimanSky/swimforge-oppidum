@@ -34,7 +34,7 @@ export default function QuickActionsFAB({
   if (!mounted || typeof document === "undefined") return null;
 
   const actions = [
-    { icon: PenSquare, label: "Posta", onClick: onPost, show: true },
+    { icon: PenSquare, label: "Nuovo post", onClick: onPost, show: true },
     { icon: Calendar, label: "Nuova convocazione", onClick: onCreateMeet ?? (() => {}), show: isStaff && Boolean(onCreateMeet) },
     { icon: Calendar, label: isStaff ? "Nuovo evento" : "Nuovo evento (1/g)", onClick: onCreateEvent, show: true },
     { icon: UserPlus, label: "Invita", onClick: onInvite, show: isStaff },
@@ -43,9 +43,10 @@ export default function QuickActionsFAB({
   const fab = (
     <div className="flex flex-col-reverse items-end gap-2">
       <Button
-        variant="neon"
         size="icon"
-        className={`rounded-full shadow-lg ${isMobile ? "h-12 w-12" : "h-14 w-14"}`}
+        aria-label={open ? "Chiudi azioni del club" : "Azioni del club"}
+        aria-expanded={open}
+        className={`rounded-full shadow-lg ${isMobile ? "size-12" : "size-14"}`}
         onClick={() => setOpen(!open)}
       >
         <motion.div animate={{ rotate: open ? 45 : 0 }}>
@@ -62,11 +63,14 @@ export default function QuickActionsFAB({
             transition={{ delay: i * 0.05 }}
             className="flex items-center gap-2"
           >
-            <span className="text-xs bg-black/80 text-white px-2 py-1 rounded">{action.label}</span>
+            <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-foreground shadow-sm">
+              {action.label}
+            </span>
             <Button
-              variant="outline-neon"
+              variant="outline"
               size="icon"
-              className={`rounded-full ${isMobile ? "h-9 w-9" : "h-10 w-10"}`}
+              aria-label={action.label}
+              className="size-11 rounded-full bg-card shadow-sm"
               onClick={() => { action.onClick(); setOpen(false); }}
             >
               <action.icon className="h-4 w-4" />

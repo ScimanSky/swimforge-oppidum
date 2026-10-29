@@ -1,12 +1,11 @@
 /**
- * Club Dashboard — Unified scrollable page replacing the old tab system
+ * Club page: header, pinned announcements, weekly numbers, agenda and the club feed in one
+ * scrollable page (the shell header carries the «Club» title and the back button).
  */
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useId, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { motion } from "framer-motion";
-import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +16,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Spinner } from "@/components/ui/spinner";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -124,7 +125,7 @@ function DateTimePickerField({
       <div className="flex items-center gap-2">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline-neon" className="w-full justify-start font-normal">
+            <Button type="button" variant="outline" className="w-full justify-start font-normal">
               <CalendarIcon className="mr-2 h-4 w-4" />
               <span className="truncate">{formattedLabel}</span>
             </Button>
@@ -150,7 +151,7 @@ function DateTimePickerField({
                 {!required ? (
                   <Button
                     type="button"
-                    variant="outline-neon"
+                    variant="outline"
                     size="sm"
                     onClick={() => onChange("")}
                   >
@@ -159,7 +160,7 @@ function DateTimePickerField({
                 ) : (
                   <span />
                 )}
-                <Button type="button" variant="neon" size="sm" onClick={() => setOpen(false)}>
+                <Button type="button" size="sm" onClick={() => setOpen(false)}>
                   Conferma
                 </Button>
               </div>
@@ -200,33 +201,11 @@ export default function ClubDetailEnhanced() {
     notes: "",
   });
   const [eventRoutePoints, setEventRoutePoints] = useState<RoutePoint[]>([]);
-  const mobileStickyRef = useRef<HTMLDivElement | null>(null);
-  const desktopStickyRef = useRef<HTMLDivElement | null>(null);
-  const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
-  const [isDesktop, setIsDesktop] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(min-width: 1024px)").matches;
-  });
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(max-width: 767px)").matches;
-  });
-  const [isCoarsePointer, setIsCoarsePointer] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(pointer: coarse)").matches;
-  });
-  const [isTouchCapable, setIsTouchCapable] = useState(() => {
-    if (typeof navigator === "undefined") return false;
-    return navigator.maxTouchPoints > 0;
-  });
-  const [isCompactViewport, setIsCompactViewport] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return Math.min(window.innerWidth, window.innerHeight) <= 900;
-  });
-  const [isMobileUserAgent, setIsMobileUserAgent] = useState(() => {
-    if (typeof navigator === "undefined") return false;
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
-  });
+  // Full-screen dialogs on phones; native date pickers on touch screens.
+  const isMobile = useMediaQuery("(max-width: 767px)", false);
+  const isCoarsePointer = useMediaQuery("(pointer: coarse)", false);
+  const announcementsTitleId = useId();
+  const feedId = useId();
 
   const utils = trpc.useUtils();
 
@@ -338,64 +317,11 @@ export default function ClubDetailEnhanced() {
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
-  const isLikelyMobileDevice = isMobile || isCoarsePointer || isMobileUserAgent || (isTouchCapable && isCompactViewport);
-  const useDesktopHero = isDesktop && !isLikelyMobileDevice;
-  const contentOffset = stickyHeaderHeight > 0
-    ? stickyHeaderHeight + (useDesktopHero ? 14 : 6)
-    : (useDesktopHero ? 430 : 96);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const desktopQuery = window.matchMedia("(min-width: 1024px)");
-    const mobileQuery = window.matchMedia("(max-width: 767px)");
-    const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
-    const handleQueries = () => {
-      setIsDesktop(desktopQuery.matches);
-      setIsMobile(mobileQuery.matches);
-      setIsCoarsePointer(coarsePointerQuery.matches);
-      setIsTouchCapable(typeof navigator !== "undefined" ? navigator.maxTouchPoints > 0 : false);
-      setIsCompactViewport(Math.min(window.innerWidth, window.innerHeight) <= 900);
-      setIsMobileUserAgent(
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent)
-      );
-    };
-    handleQueries();
-    desktopQuery.addEventListener("change", handleQueries);
-    mobileQuery.addEventListener("change", handleQueries);
-    coarsePointerQuery.addEventListener("change", handleQueries);
-    return () => {
-      desktopQuery.removeEventListener("change", handleQueries);
-      mobileQuery.removeEventListener("change", handleQueries);
-      coarsePointerQuery.removeEventListener("change", handleQueries);
-    };
-  }, []);
-
-  useEffect(() => {
-    const node = useDesktopHero ? desktopStickyRef.current : mobileStickyRef.current;
-    if (!node) return;
-
-    const update = () => {
-      const next = Math.ceil(node.getBoundingClientRect().height);
-      setStickyHeaderHeight((prev) => (prev === next ? prev : next));
-    };
-
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-    window.addEventListener("resize", update);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", update);
-    };
-  }, [useDesktopHero, isMember, club?.cover_image_url, club?.logo_url, club?.tagline, club?.website_url]);
 
   if (!match || !Number.isFinite(clubId)) {
     return (
       <AppLayout>
-        <div className="compact-shell max-w-5xl mx-auto">
-          <section className="surface-panel p-6 text-center text-muted-foreground">Club non trovato</section>
-        </div>
+        <p className="surface-panel p-4 text-center text-sm text-muted-foreground">Club non trovato.</p>
       </AppLayout>
     );
   }
@@ -403,8 +329,8 @@ export default function ClubDetailEnhanced() {
   if (clubQuery.isLoading) {
     return (
       <AppLayout>
-        <div className="compact-shell max-w-5xl mx-auto flex items-center justify-center py-8 lg:py-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+        <div className="flex justify-center py-16">
+          <Spinner aria-label="Caricamento" className="size-6 text-muted-foreground" />
         </div>
       </AppLayout>
     );
@@ -413,16 +339,14 @@ export default function ClubDetailEnhanced() {
   if (!club) {
     return (
       <AppLayout>
-        <div className="compact-shell max-w-5xl mx-auto flex items-center justify-center py-8 lg:py-4">
-          <div className="text-center">
-            <p className="text-muted-foreground mb-4">Club non trovato</p>
+        <div className="surface-panel p-4 text-center">
+          <p className="text-sm text-muted-foreground">Club non trovato.</p>
+          <Button variant="outline" className="mt-3" asChild>
             <Link href="/home/community">
-              <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Torna alla Community
-              </Button>
+              <ArrowLeft aria-hidden />
+              Torna alla community
             </Link>
-          </div>
+          </Button>
         </div>
       </AppLayout>
     );
@@ -536,132 +460,77 @@ export default function ClubDetailEnhanced() {
 
   return (
     <AppLayout>
-      {typeof document !== "undefined" &&
-        createPortal(
-          <div className="pointer-events-none fixed left-0 right-0 top-16 z-30 lg:pl-[88px]">
-            <div className="mx-auto max-w-[1520px] px-2 py-1.5 sm:p-3 md:p-5 lg:p-6">
-              {useDesktopHero ? (
-                <div
-                  ref={desktopStickyRef}
-                  className="pointer-events-auto grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.55fr)_minmax(0,0.95fr)] items-start gap-3"
-                >
-                  {isMember ? (
-                    <ClubEventsPanel
-                      items={agendaItems}
-                      variant="stickyDesktop"
-                      className="min-h-[186px]"
-                    />
-                  ) : (
-                    <section className="surface-panel p-3">
-                      <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">
-                        Eventi
-                      </p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Unisciti al club per vedere il calendario eventi.
-                      </p>
-                    </section>
-                  )}
-
-                  <ClubHero
-                    club={club}
-                    onOpenMembers={() => setMembersOpen(true)}
-                    onOpenSettings={() => setSettingsOpen(true)}
-                    onJoin={handleJoinClub}
-                    onLeave={() => leaveMutation.mutate({ clubId })}
-                    isJoining={joinMutation.isPending}
-                    isLeaving={leaveMutation.isPending}
-                    variant="full"
-                    eventsPageHref={firstAgendaHref}
-                    meetsPageHref={meetsPageHref}
-                    historyPageHref={historyPageHref}
-                    documentsPageHref={documentsPageHref}
-                    workoutsPageHref={workoutsPageHref}
-                    pbLeaderboardHref={pbLeaderboardHref}
-                    coachPageHref={coachAreaHref}
-                    hasActiveMeet={hasActiveMeet}
-                  />
-
-                  <PulseBar
-                    stats={statsQuery.data as any}
-                    themeColor={club.theme_color ?? "cyan"}
-                    layout="stackedCompact"
-                  />
-                </div>
-              ) : (
-                <div ref={mobileStickyRef} className="pointer-events-auto mx-auto max-w-5xl">
-                  <ClubHero
-                    club={club}
-                    onOpenMembers={() => setMembersOpen(true)}
-                    onOpenSettings={() => setSettingsOpen(true)}
-                    onJoin={handleJoinClub}
-                    onLeave={() => leaveMutation.mutate({ clubId })}
-                    isJoining={joinMutation.isPending}
-                    isLeaving={leaveMutation.isPending}
-                    variant="compactSticky"
-                    eventsPageHref={isMobile ? firstAgendaHref : null}
-                    meetsPageHref={isMobile ? meetsPageHref : null}
-                    historyPageHref={isMobile ? historyPageHref : null}
-                    documentsPageHref={isMobile ? documentsPageHref : null}
-                    workoutsPageHref={isMobile ? workoutsPageHref : null}
-                    pbLeaderboardHref={isMobile ? pbLeaderboardHref : null}
-                    coachPageHref={isMobile ? coachAreaHref : null}
-                    hasActiveMeet={isMobile && hasActiveMeet}
-                  />
-                </div>
-              )}
-            </div>
-          </div>,
-          document.body
-        )}
-
-      <div className="compact-shell max-w-5xl mx-auto space-y-3 pb-24 px-3 sm:space-y-4 sm:px-4" style={{ paddingTop: contentOffset }}>
-        {/* Spacer managed by contentOffset (fixed header above) */}
-        <div className="h-0" />
-
-        {/* Pinned Announcements */}
-        {pinnedAnnouncements.length > 0 && (
-          <div className="space-y-2">
-            {pinnedAnnouncements.slice(0, 2).map((item: any) => (
-              <motion.div
-                key={item.announcement.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="surface-panel p-3 flex items-start gap-2"
-              >
-                <Pin className="h-4 w-4 mt-0.5 shrink-0 text-action-text" />
-                <div>
-                  <p className="font-semibold text-sm">{item.announcement.title}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{item.announcement.content}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
-
-        {!useDesktopHero && !isMobile && isMember ? (
-          <PulseBar
-            stats={statsQuery.data as any}
-            themeColor={club.theme_color ?? "cyan"}
-            layout="grid"
+      {/* One column on phones (header, numbers, agenda, feed); from lg the side column holds
+          numbers and agenda next to header and feed. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_1fr] lg:gap-6">
+        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+          <ClubHero
+            club={club}
+            onOpenMembers={() => setMembersOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onJoin={handleJoinClub}
+            onLeave={() => leaveMutation.mutate({ clubId })}
+            isJoining={joinMutation.isPending}
+            isLeaving={leaveMutation.isPending}
+            eventsPageHref={firstAgendaHref}
+            meetsPageHref={meetsPageHref}
+            historyPageHref={historyPageHref}
+            documentsPageHref={documentsPageHref}
+            workoutsPageHref={workoutsPageHref}
+            pbLeaderboardHref={pbLeaderboardHref}
+            coachPageHref={coachAreaHref}
+            hasActiveMeet={hasActiveMeet}
           />
-        ) : null}
 
-        {/* Feed */}
-        {isMember && (
-            <ClubFeedTab
-              clubId={clubId}
-              isMember={isMember}
-              afterComposerSlot={!useDesktopHero && !isMobile ? (
-                <ClubEventsPanel items={agendaItems} variant="inlineFeed" />
-              ) : undefined}
-            />
+          {pinnedAnnouncements.length > 0 && (
+            <section aria-labelledby={announcementsTitleId} className="surface-panel p-4">
+              <h3 id={announcementsTitleId} className="sr-only">
+                Annunci in evidenza
+              </h3>
+              <ul>
+                {pinnedAnnouncements.slice(0, 2).map((item: any) => (
+                  <li
+                    key={item.announcement.id}
+                    className="flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+                  >
+                    <Pin className="mt-0.5 size-4 shrink-0 text-action-text" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{item.announcement.title}</p>
+                      <p className="line-clamp-2 text-sm text-muted-foreground">{item.announcement.content}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
+        </div>
+
+        <aside
+          aria-label="Attività e calendario del club"
+          className="min-w-0 space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+        >
+          <PulseBar stats={statsQuery.data as any} />
+          {isMember ? (
+            <ClubEventsPanel items={agendaItems} />
+          ) : (
+            <p className="surface-panel p-4 text-sm text-muted-foreground">
+              Unisciti al club per vedere gare ed eventi.
+            </p>
+          )}
+        </aside>
+
+        {isMember ? (
+          <div id={feedId} className="min-w-0 scroll-mt-24 lg:col-start-1 lg:row-start-2">
+            <ClubFeedTab clubId={clubId} isMember={isMember} />
+          </div>
+        ) : null}
+      </div>
 
         {/* Quick Actions FAB */}
         <QuickActionsFAB
           isMember={isMember}
           isStaff={isStaff}
-          onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          onPost={() => document.getElementById(feedId)?.scrollIntoView({ behavior: "smooth" })}
           onCreateEvent={() => setCreateEventOpen(true)}
           onCreateMeet={clubMeetsV1Enabled && isStaff ? () => { window.location.href = coachAreaHref; } : undefined}
           onInvite={isStaff ? () => { window.location.href = coachAreaHref; } : () => {}}
@@ -683,7 +552,7 @@ export default function ClubDetailEnhanced() {
         <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
           <SheetContent side="right" className="overflow-y-auto">
             <SheetHeader>
-              <SheetTitle>Impostazioni Club</SheetTitle>
+              <SheetTitle>Impostazioni del club</SheetTitle>
             </SheetHeader>
             <ClubSettingsForm
               club={club}
@@ -708,13 +577,13 @@ export default function ClubDetailEnhanced() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="max-h-64 overflow-y-auto rounded-lg border border-border/60 bg-background/40 p-3 text-sm text-foreground whitespace-pre-wrap">
+              <div className="max-h-64 overflow-y-auto rounded-xl bg-raised p-3 text-sm text-foreground whitespace-pre-wrap">
                 {club?.rules}
               </div>
               <label className="flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
-                  className="mt-0.5"
+                  className="mt-0.5 size-4 accent-primary"
                   checked={joinRulesAccepted}
                   onChange={(e) => setJoinRulesAccepted(e.target.checked)}
                 />
@@ -722,11 +591,10 @@ export default function ClubDetailEnhanced() {
               </label>
             </div>
             <DialogFooter>
-              <Button variant="outline-neon" onClick={() => setJoinRulesOpen(false)}>
+              <Button variant="outline" onClick={() => setJoinRulesOpen(false)}>
                 Annulla
               </Button>
               <Button
-                variant="neon"
                 disabled={!joinRulesAccepted || joinMutation.isPending}
                 onClick={() => joinMutation.mutate({ clubId, acceptRules: true })}
               >
@@ -797,7 +665,6 @@ export default function ClubDetailEnhanced() {
                 Annulla
               </Button>
               <Button
-                variant="neon"
                 onClick={() => {
                   const start = parseDateTimeLocal(newMeet.startDate);
                   const end = parseDateTimeLocal(newMeet.endDate);
@@ -852,7 +719,7 @@ export default function ClubDetailEnhanced() {
             </DialogHeader>
             <div className="space-y-3">
               {!isStaff ? (
-                <div className="rounded-lg border border-border/60 bg-background/50 p-2 text-xs text-muted-foreground">
+                <div className="rounded-xl bg-raised p-3 text-sm text-muted-foreground">
                   Limite membri: massimo 1 evento al giorno.
                 </div>
               ) : null}
@@ -867,7 +734,7 @@ export default function ClubDetailEnhanced() {
                   <SelectContent>
                     <SelectItem value="training">Allenamento</SelectItem>
                     <SelectItem value="race">Gara</SelectItem>
-                    <SelectItem value="social">Evento Sociale</SelectItem>
+                    <SelectItem value="social">Evento sociale</SelectItem>
                     <SelectItem value="meeting">Riunione</SelectItem>
                   </SelectContent>
                 </Select>
@@ -883,7 +750,7 @@ export default function ClubDetailEnhanced() {
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline-neon"
+                    variant="outline"
                     onClick={handleFindLocationOnMap}
                     disabled={isGeocodingLocation || !newEvent.location.trim()}
                   >
@@ -911,10 +778,10 @@ export default function ClubDetailEnhanced() {
                       }))
                     }
                     onRouteChange={setEventRoutePoints}
-                    className="h-72 w-full rounded-xl border border-border/70 sm:h-80"
+                    className="h-72 w-full rounded-xl border border-border sm:h-80"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Clicca sulla mappa per impostare il pin (modalita pin) o aggiungere waypoint numerati del percorso (modalita percorso).
+                    Tocca la mappa per mettere il pin (modalità pin) o aggiungere i waypoint numerati del percorso.
                   </p>
                   {eventRoutePoints.length > 0 ? (
                     <p className="text-xs text-muted-foreground">
@@ -973,7 +840,6 @@ export default function ClubDetailEnhanced() {
             <DialogFooter>
               <Button variant="ghost" onClick={() => setCreateEventOpen(false)}>Annulla</Button>
               <Button
-                variant="neon"
                 disabled={createEventMutation.isPending}
                 onClick={() => {
                   if (!newEvent.title.trim()) { toast.error("Inserisci un titolo"); return; }
@@ -1012,7 +878,6 @@ export default function ClubDetailEnhanced() {
             </DialogHeader>
             <div className="space-y-4">
               <Button
-                variant="neon"
                 className="w-full"
                 disabled={createInviteMutation.isPending}
                 onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
@@ -1030,7 +895,6 @@ export default function ClubDetailEnhanced() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
     </AppLayout>
   );
 }
@@ -1078,6 +942,14 @@ async function uploadToImageKit(
 }
 
 /* ---- Settings Form ---- */
+
+// Stored theme colours (server enum) shown with the Corsia token each one now maps to.
+const THEME_COLORS = [
+  { value: "cyan", label: "Azzurro", color: "var(--action-text)" },
+  { value: "lime", label: "Verde", color: "var(--success)" },
+  { value: "coral", label: "Corallo", color: "var(--danger)" },
+  { value: "violet", label: "Grigio", color: "var(--muted-foreground)" },
+] as const;
 
 function ClubSettingsForm({
   club,
@@ -1175,8 +1047,8 @@ function ClubSettingsForm({
 
       toast.success(
         kind === "logo"
-          ? "Logo AI generato (512x512, ottimizzato mobile)."
-          : "Cover AI generata (1280x640, taglio mobile-safe).",
+          ? "Logo AI generato (512×512, adatto agli smartphone)."
+          : "Copertina AI generata (1280×640, adatta agli smartphone).",
       );
       onSaved();
     } catch {
@@ -1226,26 +1098,17 @@ function ClubSettingsForm({
     }
   };
 
-  const themeColorMap: Record<string, string> = {
-    cyan: "var(--electric-cyan)", lime: "var(--electric-lime)",
-    coral: "var(--electric-coral)", violet: "var(--electric-violet)",
-  };
-  const accentColor = themeColorMap[themeColor] ?? themeColorMap.cyan;
-
   return (
     <div className="mt-4 space-y-5">
       {/* Logo */}
       <div>
         <label className="text-sm font-medium">Logo del club</label>
         <div className="flex items-center gap-3 mt-2">
-          <div
-            className="h-16 w-16 rounded-full border-2 overflow-hidden flex items-center justify-center bg-muted shrink-0"
-            style={{ borderColor: accentColor }}
-          >
+          <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-raised">
             {logoPreview ? (
-              <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+              <img src={logoPreview} alt="Logo" className="size-full object-cover" />
             ) : (
-              <span className="text-lg font-bold font-display" style={{ color: accentColor }}>
+              <span className="text-lg font-semibold text-muted-foreground">
                 {club.name.slice(0, 2).toUpperCase()}
               </span>
             )}
@@ -1258,10 +1121,10 @@ function ClubSettingsForm({
                 className="hidden"
                 onChange={(e) => { if (e.target.files?.[0]) handleFilePick(e.target.files[0], "logo"); }}
               />
-              <span className="text-sm underline" style={{ color: accentColor }}>Carica logo</span>
+              <span className="text-sm font-semibold text-action-text underline-offset-2 hover:underline">Carica logo</span>
             </label>
             {logoPreview && (
-              <button className="text-xs text-muted-foreground underline text-left" onClick={() => {
+              <button type="button" className="text-left text-sm text-muted-foreground underline-offset-2 hover:underline" onClick={() => {
                 setLogoPreview(null);
                 setPendingLogoFile(null);
                 setLogoRemoved(true);
@@ -1280,34 +1143,36 @@ function ClubSettingsForm({
           />
           <Button
             type="button"
-            variant="outline-neon"
+            variant="outline"
             disabled={generatingAssetKind !== null || saving || !isOwner}
             onClick={() => void handleGenerateAsset("logo")}
           >
             {generatingAssetKind === "logo" ? "Genero logo..." : "Genera logo AI"}
           </Button>
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Output automatico: logo PNG 512x512, leggibile su mobile e avatar circolare.
+        <p className="mt-1 text-xs text-muted-foreground">
+          Formato automatico: logo PNG 512×512, leggibile su smartphone e nell'avatar rotondo.
         </p>
       </div>
 
       {/* Cover Image */}
       <div>
         <label className="text-sm font-medium">Immagine di copertina</label>
-        <div className="mt-2 relative rounded-lg overflow-hidden border border-border">
+        <div className="relative mt-2 overflow-hidden rounded-xl border border-border">
           {coverPreview ? (
             <div className="relative">
               <img src={coverPreview} alt="Cover" className="w-full h-28 object-cover" />
               <button
-                className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
+                type="button"
+                aria-label="Rimuovi copertina"
+                className="absolute right-2 top-2 rounded-full bg-background/80 p-1.5 text-foreground"
                 onClick={() => {
                   setCoverPreview(null);
                   setPendingCoverFile(null);
                   setCoverRemoved(true);
                 }}
               >
-                <XIcon className="h-3 w-3 text-white" />
+                <XIcon className="size-4" aria-hidden />
               </button>
             </div>
           ) : (
@@ -1319,7 +1184,7 @@ function ClubSettingsForm({
                 onChange={(e) => { if (e.target.files?.[0]) handleFilePick(e.target.files[0], "cover"); }}
               />
               <Upload className="h-5 w-5 text-muted-foreground mb-1" />
-              <span className="text-xs text-muted-foreground">Carica copertina</span>
+              <span className="text-sm text-muted-foreground">Carica copertina</span>
             </label>
           )}
         </div>
@@ -1328,23 +1193,23 @@ function ClubSettingsForm({
             value={coverAiPrompt}
             onChange={(e) => setCoverAiPrompt(e.target.value)}
             maxLength={300}
-            placeholder="Prompt AI cover (opzionale)"
+            placeholder="Prompt AI copertina (opzionale)"
           />
           <Button
             type="button"
-            variant="outline-neon"
+            variant="outline"
             disabled={generatingAssetKind !== null || saving || !isOwner}
             onClick={() => void handleGenerateAsset("cover")}
           >
-            {generatingAssetKind === "cover" ? "Genero cover..." : "Genera cover AI"}
+            {generatingAssetKind === "cover" ? "Genero copertina..." : "Genera copertina AI"}
           </Button>
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Output automatico: cover 1280x640 con composizione centrale per evitare card “giganti” su smartphone.
+        <p className="mt-1 text-xs text-muted-foreground">
+          Formato automatico: copertina 1280×640 con il soggetto al centro, adatta anche agli smartphone.
         </p>
         {!isOwner ? (
-          <p className="mt-1 text-[11px] text-amber-300">
-            La generazione AI cover/logo è disponibile solo per il proprietario del club.
+          <p className="mt-1 text-xs text-warning">
+            La generazione AI di logo e copertina è riservata al proprietario del club.
           </p>
         ) : null}
       </div>
@@ -1387,13 +1252,16 @@ function ClubSettingsForm({
       {/* Theme Color */}
       <div>
         <label className="text-sm font-medium">Colore tema</label>
-        <div className="flex gap-3 mt-2">
-          {(["cyan", "lime", "coral", "violet"] as const).map((c) => (
+        <div className="mt-2 flex gap-3">
+          {THEME_COLORS.map(({ value, label, color }) => (
             <button
-              key={c}
-              className={`h-10 w-10 rounded-full border-2 transition-all ${themeColor === c ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-background" : "border-transparent opacity-60 hover:opacity-100"}`}
-              style={{ backgroundColor: `var(--electric-${c})` }}
-              onClick={() => setThemeColor(c)}
+              key={value}
+              type="button"
+              aria-label={label}
+              aria-pressed={themeColor === value}
+              className={`size-10 rounded-full transition-opacity ${themeColor === value ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : "opacity-60 hover:opacity-100"}`}
+              style={{ backgroundColor: color }}
+              onClick={() => setThemeColor(value)}
             />
           ))}
         </div>
@@ -1406,15 +1274,14 @@ function ClubSettingsForm({
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="public">Pubblico</SelectItem>
-            <SelectItem value="private">Privato</SelectItem>
-            <SelectItem value="invite">Solo invito</SelectItem>
+            <SelectItem value="private">Segreto</SelectItem>
+            <SelectItem value="invite">Privato</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Save */}
       <Button
-        variant="neon"
         className="w-full"
         disabled={saving}
         onClick={handleSave}
@@ -1423,18 +1290,18 @@ function ClubSettingsForm({
       </Button>
 
       {isStaff ? (
-        <div className="rounded-lg border border-border/60 bg-card/40 p-3">
+        <div className="rounded-xl bg-raised p-3">
           <p className="text-sm font-semibold">Moderazione</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             La gestione ruoli, ban/sblocchi e richieste ingresso è disponibile nella sezione membri del club.
           </p>
         </div>
       ) : null}
 
       {isOwner ? (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 space-y-2">
-          <p className="text-sm font-semibold text-destructive">Zona pericolosa</p>
-          <p className="text-xs text-muted-foreground">
+        <div className="space-y-2 rounded-xl border border-danger/40 p-3">
+          <p className="text-sm font-semibold text-danger">Zona pericolosa</p>
+          <p className="text-sm text-muted-foreground">
             Questa azione elimina definitivamente club, eventi e contenuti associati.
           </p>
           <Button
@@ -1462,20 +1329,21 @@ function InviteRow({ invite }: { invite: any }) {
   const link = publicSiteUrl(`/community/invite/${invite.code}`);
 
   return (
-    <div className="flex items-center gap-2 surface-panel p-2 text-sm">
-      <code className="flex-1 truncate text-xs text-muted-foreground">{link}</code>
-      <span className="text-xs text-muted-foreground">{invite.usedCount}/{invite.maxUses}</span>
+    <div className="flex items-center gap-2 rounded-xl bg-raised py-1 pl-3 pr-1 text-sm">
+      <code className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{link}</code>
+      <span className="text-xs text-muted-foreground tabular-nums">{invite.usedCount}/{invite.maxUses}</span>
       <Button
         variant="ghost"
-        size="icon"
-        className="h-7 w-7 shrink-0"
+        size="icon-sm"
+        aria-label={copied ? "Link copiato" : "Copia link"}
+        className="shrink-0"
         onClick={() => {
           navigator.clipboard.writeText(link);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}
       >
-        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {copied ? <Check className="size-4 text-success" aria-hidden /> : <Copy className="size-4" aria-hidden />}
       </Button>
     </div>
   );

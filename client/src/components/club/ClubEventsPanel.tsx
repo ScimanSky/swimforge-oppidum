@@ -1,5 +1,7 @@
+import { useId } from "react";
 import { Link } from "wouter";
-import { CalendarClock, ExternalLink, Flag, MapPin, Trophy } from "lucide-react";
+import { CalendarClock, ChevronRight, Flag, MapPin, Trophy } from "lucide-react";
+import { formatSessionDate, NO_VALUE } from "@/lib/format";
 
 export type ClubAgendaItem = {
   id: string;
@@ -13,81 +15,63 @@ export type ClubAgendaItem = {
 
 interface ClubEventsPanelProps {
   items: ClubAgendaItem[];
-  variant?: "stickyDesktop" | "inlineFeed";
   className?: string;
 }
 
-function formatEventLabel(startTime?: string | null) {
-  if (!startTime) return "Data non disponibile";
-  const eventDate = new Date(startTime);
-  if (Number.isNaN(eventDate.getTime())) return "Data non valida";
-  return eventDate.toLocaleDateString("it-IT", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export default function ClubEventsPanel({
-  items,
-  variant = "inlineFeed",
-  className,
-}: ClubEventsPanelProps) {
-  if (!items.length && variant === "inlineFeed") return null;
-
-  const rootClassName =
-    variant === "stickyDesktop"
-      ? "surface-panel h-full p-3"
-      : "surface-panel p-3";
+/** Upcoming club events and meets: one row per item, linking to its page. */
+export default function ClubEventsPanel({ items, className }: ClubEventsPanelProps) {
+  const titleId = useId();
 
   return (
-    <section className={`${rootClassName} ${className ?? ""}`.trim()} aria-label="Eventi del club">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
-          <CalendarClock className="h-4 w-4 text-action-text" />
-          Gare ed Eventi
-        </p>
-        <span className="text-xs text-muted-foreground">{items.length}</span>
+    <section aria-labelledby={titleId} className={`surface-panel p-4 ${className ?? ""}`.trim()}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 id={titleId} className="inline-flex items-center gap-2 text-[17px] font-bold">
+          <CalendarClock className="size-4 text-action-text" aria-hidden />
+          Gare ed eventi
+        </h3>
+        <span className="text-sm text-muted-foreground tabular-nums">{items.length}</span>
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border border-border/60 bg-card/30 px-3 py-4 text-xs text-muted-foreground">
-          Nessuna gara o evento in programma
-        </div>
+        <p className="mt-3 text-sm text-muted-foreground">Nessuna gara o evento in programma.</p>
       ) : (
-        <div className={variant === "stickyDesktop" ? "space-y-2" : "max-h-44 space-y-2 overflow-y-auto pr-1"}>
+        <ul className="mt-2">
           {items.map((item) => {
+            const date = formatSessionDate(item.startsAtIso);
             return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 transition-colors hover:bg-card/60"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{item.title}</p>
-                  <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{formatEventLabel(item.startsAtIso)}</span>
-                    {item.location ? (
-                      <span className="inline-flex items-center gap-1 truncate">
-                        <MapPin className="h-3 w-3" />
-                        {item.location}
-                      </span>
-                    ) : null}
-                    {item.statusLabel ? (
-                      <span className="inline-flex items-center gap-1 truncate">
-                        {item.kind === "meet" ? <Flag className="h-3 w-3" /> : <Trophy className="h-3 w-3" />}
-                        {item.statusLabel}
-                      </span>
-                    ) : null}
+              <li key={item.id} className="border-t border-border first:border-t-0">
+                <Link
+                  href={item.href}
+                  className="flex items-center gap-3 py-3 transition-colors hover:text-action-text"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{item.title}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      {date !== NO_VALUE ? <span>{date}</span> : null}
+                      {item.location ? (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <MapPin className="size-3.5 shrink-0" aria-hidden />
+                          <span className="truncate">{item.location}</span>
+                        </span>
+                      ) : null}
+                      {item.statusLabel ? (
+                        <span className="inline-flex items-center gap-1">
+                          {item.kind === "meet" ? (
+                            <Flag className="size-3.5" aria-hidden />
+                          ) : (
+                            <Trophy className="size-3.5" aria-hidden />
+                          )}
+                          {item.statusLabel}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
-              </Link>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                </Link>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </section>
   );

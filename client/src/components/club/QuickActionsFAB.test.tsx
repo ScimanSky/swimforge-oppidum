@@ -37,7 +37,7 @@ describe("QuickActionsFAB", () => {
     const [toggleButton] = screen.getAllByRole("button");
     await userEvent.click(toggleButton);
 
-    expect(screen.getByText("Posta")).toBeInTheDocument();
+    expect(screen.getByText("Nuovo post")).toBeInTheDocument();
     expect(screen.getByText("Nuovo evento (1/g)")).toBeInTheDocument();
     expect(screen.queryByText("Invita")).not.toBeInTheDocument();
     expect(screen.queryByText("Nuova convocazione")).not.toBeInTheDocument();

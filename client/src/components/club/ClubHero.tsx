@@ -1,9 +1,10 @@
-import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft, Calendar, Database, Dumbbell, ExternalLink, FileText, Medal, Shield, Trophy } from "lucide-react";
+import { useId, type ReactNode } from "react";
+import { Calendar, Database, Dumbbell, ExternalLink, FileText, Medal, Settings, Shield, Trophy, Users } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/corsia/Chip";
+import { formatInteger } from "@/lib/format";
 
 interface ClubHeroProps {
   club: {
@@ -27,7 +28,6 @@ interface ClubHeroProps {
   onLeave: () => void;
   isJoining?: boolean;
   isLeaving?: boolean;
-  variant?: "full" | "compactSticky";
   eventsPageHref?: string | null;
   meetsPageHref?: string | null;
   historyPageHref?: string | null;
@@ -38,13 +38,37 @@ interface ClubHeroProps {
   hasActiveMeet?: boolean;
 }
 
-const themeColorMap: Record<string, string> = {
-  cyan: "var(--electric-cyan)",
-  lime: "var(--electric-lime)",
-  coral: "var(--electric-coral)",
-  violet: "var(--electric-violet)",
+// Same labels as the club directory and the settings form.
+const VISIBILITY_LABEL: Record<string, string> = {
+  public: "Pubblico",
+  private: "Segreto",
+  invite: "Privato",
 };
 
+const ROLE_LABEL: Record<string, string> = {
+  owner: "Proprietario",
+  admin: "Admin",
+  moderator: "Moderatore",
+  member: "Membro",
+};
+
+function SectionLink({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <li className="shrink-0">
+      <Button variant="outline" size="sm" asChild>
+        <Link href={href}>
+          {icon}
+          {children}
+        </Link>
+      </Button>
+    </li>
+  );
+}
+
+/**
+ * Club header (Corsia): cover as a plain banner (no text over it), logo thumbnail, name as
+ * the page's h2, meta chips, section links and the join/leave action.
+ */
 export default function ClubHero({
   club,
   onOpenMembers,
@@ -53,7 +77,6 @@ export default function ClubHero({
   onLeave,
   isJoining,
   isLeaving,
-  variant = "full",
   eventsPageHref,
   meetsPageHref,
   historyPageHref,
@@ -63,307 +86,130 @@ export default function ClubHero({
   coachPageHref,
   hasActiveMeet = false,
 }: ClubHeroProps) {
-  const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
+  const titleId = useId();
   const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
-  const gareHref = meetsPageHref ?? eventsPageHref ?? null;
+  const showEventsLink = Boolean(eventsPageHref && (!meetsPageHref || eventsPageHref !== meetsPageHref));
+  const memberCount = Number(club.member_count ?? 0);
+  const roleLabel = club.member_role ? ROLE_LABEL[club.member_role] ?? club.member_role : null;
+  const hasSectionLinks = Boolean(
+    showEventsLink ||
+      meetsPageHref ||
+      historyPageHref ||
+      workoutsPageHref ||
+      pbLeaderboardHref ||
+      documentsPageHref ||
+      (isStaff && coachPageHref)
+  );
 
-  if (variant === "compactSticky") {
-    const showEventsButton = Boolean(eventsPageHref && (!meetsPageHref || eventsPageHref !== meetsPageHref));
-    const compactActionClass = "h-6 w-full min-w-0 px-1 text-[9px] sm:text-[10px]";
+  return (
+    <section aria-labelledby={titleId} className="surface-panel overflow-hidden">
+      {club.cover_image_url ? (
+        <img src={club.cover_image_url} alt="" className="h-28 w-full object-cover sm:h-40" />
+      ) : null}
 
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="surface-panel w-full overflow-hidden rounded-xl px-2 py-1.5"
-        style={{ borderColor: color, borderWidth: "1px" }}
-      >
-        {club.cover_image_url ? (
-          <img
-            src={club.cover_image_url}
-            alt=""
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35"
-          />
-        ) : null}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-background/44 via-background/72 to-background/88" />
-
-        <div className="relative z-10 grid grid-cols-[auto_1fr_auto] items-start gap-1.5">
-          <Avatar className="h-8 w-8 shrink-0 self-start border-2" style={{ borderColor: color }}>
-            <AvatarImage src={club.logo_url ?? undefined} />
-            <AvatarFallback style={{ color }} className="text-xs font-bold font-display">
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="size-12 shrink-0 rounded-xl">
+            <AvatarImage src={club.logo_url ?? undefined} alt="" className="object-cover" />
+            <AvatarFallback className="rounded-xl bg-raised text-sm font-semibold">
               {club.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-
-          <div className="min-w-0">
-            <h1 className="truncate text-[12px] font-bold font-display leading-tight" style={{ color }}>
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="font-display text-[28px] font-bold leading-tight text-foreground">
               {club.name}
-            </h1>
-            <p className="truncate text-[9px] text-muted-foreground">{club.member_count} membri</p>
+            </h2>
+            {club.tagline ? <p className="mt-0.5 text-sm text-muted-foreground">{club.tagline}</p> : null}
           </div>
-
-          <div className="flex items-center justify-end gap-0.5">
-            <Link href="/home/community">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-3 w-3" />
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 text-muted-foreground hover:text-foreground"
-              onClick={onOpenMembers}
-            >
-              <Users className="h-2.5 w-2.5" />
+          <div className="flex shrink-0 items-center">
+            <Button variant="ghost" size="icon" aria-label="Membri" onClick={onOpenMembers}>
+              <Users className="size-5" aria-hidden />
             </Button>
             {isStaff ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                onClick={onOpenSettings}
-              >
-                <Settings className="h-2.5 w-2.5" />
+              <Button variant="ghost" size="icon" aria-label="Impostazioni del club" onClick={onOpenSettings}>
+                <Settings className="size-5" aria-hidden />
               </Button>
             ) : null}
           </div>
         </div>
 
-        <div className="relative z-10 mt-1.5">
-          <div className="grid grid-cols-3 gap-1">
-          {showEventsButton ? (
-            <Link href={eventsPageHref!} className="min-w-0">
-              <Button className={compactActionClass} variant="outline-neon" size="sm">
-                <Calendar className="mr-1 h-2.5 w-2.5" />
-                Eventi
-              </Button>
-            </Link>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Chip className="tabular-nums">
+            {memberCount === 1 ? "1 membro" : `${formatInteger(memberCount)} membri`}
+          </Chip>
+          <Chip>{VISIBILITY_LABEL[club.visibility] ?? club.visibility}</Chip>
+          {roleLabel ? <Chip tone="action">{roleLabel}</Chip> : null}
+          {club.website_url ? (
+            <a
+              href={club.website_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-7 items-center gap-1 text-sm font-semibold text-action-text underline-offset-2 hover:underline"
+            >
+              <ExternalLink className="size-4" aria-hidden />
+              Sito del club
+            </a>
           ) : null}
-          {meetsPageHref ? (
-            <Link href={meetsPageHref} className="min-w-0">
-              <Button
-                className={`${compactActionClass} ${hasActiveMeet ? "animate-pulse border-amber-400 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.45)]" : ""}`}
-                variant="outline-neon"
-                size="sm"
-              >
-                <Trophy className="mr-1 h-2.5 w-2.5" />
-                Gare
-              </Button>
-            </Link>
-          ) : null}
-          {historyPageHref ? (
-            <Link href={historyPageHref} className="min-w-0">
-              <Button className={compactActionClass} variant="outline-neon" size="sm">
-                <Database className="mr-1 h-2.5 w-2.5" />
-                Storico
-              </Button>
-            </Link>
-          ) : null}
-          {workoutsPageHref ? (
-            <Link href={workoutsPageHref} className="min-w-0">
-              <Button className={compactActionClass} variant="outline-neon" size="sm">
-                <Dumbbell className="mr-1 h-2.5 w-2.5" />
-                Workout
-              </Button>
-            </Link>
-          ) : null}
-          {pbLeaderboardHref ? (
-            <Link href={pbLeaderboardHref} className="min-w-0">
-              <Button className={compactActionClass} variant="outline-neon" size="sm">
-                <Medal className="mr-1 h-2.5 w-2.5" />
-                PB Club
-              </Button>
-            </Link>
-          ) : null}
-          {documentsPageHref ? (
-            <Link href={documentsPageHref} className="min-w-0">
-              <Button className={compactActionClass} variant="outline-neon" size="sm">
-                <FileText className="mr-1 h-2.5 w-2.5" />
-                Documenti
-              </Button>
-            </Link>
-          ) : null}
-          {isStaff && coachPageHref ? (
-            <Link href={coachPageHref} className="min-w-0">
-              <Button className={compactActionClass} variant="outline-neon" size="sm">
-                <Shield className="mr-1 h-2.5 w-2.5" />
-                Coach
-              </Button>
-            </Link>
-          ) : null}
-
-          {!club.is_member ? (
-            <Button className={compactActionClass} variant="neon" onClick={onJoin} disabled={isJoining}>
-              {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti" : "Richiedi accesso"}
-            </Button>
-          ) : club.member_role !== "owner" ? (
-            <Button className={compactActionClass} variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
-              {isLeaving ? "Uscita..." : "Esci"}
-            </Button>
-          ) : null}
-          </div>
         </div>
 
-      </motion.div>
-    );
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative w-full overflow-hidden rounded-2xl sm:rounded-[26px]"
-      style={{ borderColor: color, borderWidth: "1px" }}
-    >
-      {/* Cover image */}
-      <div className="relative h-20 bg-gradient-to-br from-surface-panel to-black/60 sm:h-48">
-        {club.cover_image_url && (
-          <img src={club.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-        {/* Mobile logo (top-left) */}
-        <div className="absolute left-2 top-2 sm:hidden">
-          <Avatar className="h-9 w-9 border-2" style={{ borderColor: color }}>
-            <AvatarImage src={club.logo_url ?? undefined} />
-            <AvatarFallback style={{ color }} className="text-[10px] font-bold font-display">
-              {club.name.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-        {/* Back button */}
-        <Link href="/home/community">
-          <Button variant="ghost" size="icon" className="absolute top-2 right-12 h-8 w-8 text-white/80 hover:text-white sm:top-3 sm:left-3 sm:right-auto sm:h-10 sm:w-10">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        {/* Action icons */}
-        <div className="absolute right-2 top-2 flex gap-1 sm:top-3 sm:right-3 sm:gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white sm:h-10 sm:w-10" onClick={onOpenMembers}>
-            <Users className="h-5 w-5" />
-          </Button>
-          {isStaff && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white sm:h-10 sm:w-10" onClick={onOpenSettings}>
-              <Settings className="h-5 w-5" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Club info overlay */}
-      <div className="relative px-3 pb-3 sm:-mt-10 sm:px-5 sm:pb-5">
-        <div className="flex items-start gap-2 sm:items-end sm:gap-3">
-          {/* Logo */}
-          <Avatar className="hidden h-16 w-16 border-2 sm:flex" style={{ borderColor: color }}>
-            <AvatarImage src={club.logo_url ?? undefined} />
-            <AvatarFallback style={{ color }} className="text-xl font-bold font-display">
-              {club.name.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <h1 className="truncate pl-11 text-base font-bold font-display sm:pl-0 sm:text-xl" style={{ color }}>
-              {club.name}
-            </h1>
-            {club.tagline && (
-              <p className="truncate pl-11 text-xs text-muted-foreground sm:pl-0 sm:text-sm">{club.tagline}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Meta row */}
-        <div className="mt-2 flex items-center gap-2 sm:mt-3 sm:gap-3">
-          <Badge variant="outline" className="text-xs" style={{ borderColor: color, color }}>
-            {club.member_count} membri
-          </Badge>
-          <Badge variant="outline" className="text-xs capitalize">
-            {club.visibility}
-          </Badge>
-          {club.member_role && (
-            <Badge variant="outline" className="text-xs" style={{ borderColor: color, color }}>
-              {club.member_role}
-            </Badge>
-          )}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {gareHref ? (
-            <Link href={gareHref}>
-              <Button
-                className={`${hasActiveMeet ? "animate-pulse border-amber-400 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.45)]" : ""}`}
-                variant="outline-neon"
-                size="sm"
-              >
-                <Trophy className="mr-1.5 h-3.5 w-3.5" />
-                Gare
-              </Button>
-            </Link>
-          ) : null}
-          {historyPageHref ? (
-            <Link href={historyPageHref}>
-              <Button variant="outline-neon" size="sm">
-                <Database className="mr-1.5 h-3.5 w-3.5" />
-                Storico
-              </Button>
-            </Link>
-          ) : null}
-          {documentsPageHref ? (
-            <Link href={documentsPageHref}>
-              <Button variant="outline-neon" size="sm">
-                <FileText className="mr-1.5 h-3.5 w-3.5" />
-                Documenti
-              </Button>
-            </Link>
-          ) : null}
-          {workoutsPageHref ? (
-            <Link href={workoutsPageHref}>
-              <Button variant="outline-neon" size="sm">
-                <Dumbbell className="mr-1.5 h-3.5 w-3.5" />
-                Workout
-              </Button>
-            </Link>
-          ) : null}
-          {pbLeaderboardHref ? (
-            <Link href={pbLeaderboardHref}>
-              <Button variant="outline-neon" size="sm">
-                <Medal className="mr-1.5 h-3.5 w-3.5" />
-                PB Club
-              </Button>
-            </Link>
-          ) : null}
-          {isStaff && coachPageHref ? (
-            <Link href={coachPageHref}>
-              <Button variant="outline-neon" size="sm">
-                <Shield className="mr-1.5 h-3.5 w-3.5" />
-                Area Coach
-              </Button>
-            </Link>
-          ) : null}
-        </div>
-        {club.website_url ? (
-          <a
-            href={club.website_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--electric-cyan)] underline-offset-2 hover:underline"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Sito del club
-          </a>
+        {hasSectionLinks ? (
+          <nav aria-label="Sezioni del club" className="-mx-4 mt-4 overflow-x-auto px-4">
+            <ul className="flex min-w-max gap-2">
+              {showEventsLink ? (
+                <SectionLink href={eventsPageHref!} icon={<Calendar aria-hidden />}>
+                  Eventi
+                </SectionLink>
+              ) : null}
+              {meetsPageHref ? (
+                <SectionLink href={meetsPageHref} icon={<Trophy aria-hidden />}>
+                  Gare
+                  {hasActiveMeet ? (
+                    <>
+                      <span aria-hidden className="size-2 rounded-full bg-primary" />
+                      <span className="sr-only">, iscrizioni aperte</span>
+                    </>
+                  ) : null}
+                </SectionLink>
+              ) : null}
+              {historyPageHref ? (
+                <SectionLink href={historyPageHref} icon={<Database aria-hidden />}>
+                  Storico
+                </SectionLink>
+              ) : null}
+              {workoutsPageHref ? (
+                <SectionLink href={workoutsPageHref} icon={<Dumbbell aria-hidden />}>
+                  Allenamenti
+                </SectionLink>
+              ) : null}
+              {pbLeaderboardHref ? (
+                <SectionLink href={pbLeaderboardHref} icon={<Medal aria-hidden />}>
+                  Record del club
+                </SectionLink>
+              ) : null}
+              {documentsPageHref ? (
+                <SectionLink href={documentsPageHref} icon={<FileText aria-hidden />}>
+                  Documenti
+                </SectionLink>
+              ) : null}
+              {isStaff && coachPageHref ? (
+                <SectionLink href={coachPageHref} icon={<Shield aria-hidden />}>
+                  Area coach
+                </SectionLink>
+              ) : null}
+            </ul>
+          </nav>
         ) : null}
 
-        {/* Join/Leave */}
         {!club.is_member ? (
-          <Button className="mt-3 w-full" variant="neon" onClick={onJoin} disabled={isJoining}>
+          <Button className="mt-4 w-full sm:w-auto" onClick={onJoin} disabled={isJoining}>
             {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti" : "Richiedi accesso"}
           </Button>
         ) : club.member_role !== "owner" ? (
           <Button className="mt-3" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
-            Lascia club
+            {isLeaving ? "Uscita..." : "Lascia club"}
           </Button>
         ) : null}
       </div>
-    </motion.div>
+    </section>
   );
 }
