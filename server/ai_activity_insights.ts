@@ -221,6 +221,21 @@ function formatSegmentContext(ctx: SegmentContext | null) {
   ].join("\n- ");
 }
 
+/** Laps stored only now never went through the sync's record detection. */
+async function recomputeRecordsAfterLazyLaps(userId: number, activityId: number) {
+  try {
+    const { recomputePersonalRecordsFromStoredLaps } = await import("./personal_records");
+    await recomputePersonalRecordsFromStoredLaps(userId, { activityIds: [activityId] });
+  } catch (error) {
+    log.warn("[AI Insights] Records recompute after lazy lap storage failed", {
+      event: "ai_activity_insights:records_recompute_failed",
+      userId,
+      activityId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function ensureGarminSegmentData(activity: Record<string, unknown>) {
   const activityId = toNumber(activity["id"]);
   if (!activityId) return;
@@ -246,12 +261,15 @@ async function ensureGarminSegmentData(activity: Record<string, unknown>) {
     const garmin = await import("./garmin");
     const details = await garmin.getGarminActivityFullDetails(userId, String(garminActivityId));
     if (!details) return;
-    await garmin.persistGarminLapDetails(db, activityId, details);
+    const storedLaps = await garmin.persistGarminLapDetails(db, activityId, details);
     log.debug("[AI Insights] Garmin segment details fetched and persisted", {
       event: "ai_activity_insights:garmin_segments_persisted",
       userId,
       activityId,
     });
+    if (storedLaps > 0) {
+      await recomputeRecordsAfterLazyLaps(userId, activityId);
+    }
   } catch (error) {
     log.warn("[AI Insights] Unable to fetch Garmin segments for activity insight", {
       event: "ai_activity_insights:garmin_segments_failed",

@@ -6,6 +6,7 @@ import {
     garmin,
 } from "./_shared";
 import type { SwimmingActivityInsert } from "./_shared";
+import { recomputePersonalRecordsFromStoredLaps } from "../personal_records";
 
 export const activitiesRouter = router({
     list: protectedProcedure
@@ -185,6 +186,7 @@ export const activitiesRouter = router({
                             activity.rawData = rawData;
                         }
 
+                        let storedLaps = 0;
                         try {
                             const existingLap = await dbInstance
                                 .select({ id: garminActivityLaps.id })
@@ -192,7 +194,7 @@ export const activitiesRouter = router({
                                 .where(eq(garminActivityLaps.activityId, activity.id))
                                 .limit(1);
                             if (existingLap.length === 0) {
-                                await garmin.persistGarminLapDetails(
+                                storedLaps = await garmin.persistGarminLapDetails(
                                     dbInstance,
                                     activity.id,
                                     fullDetails
@@ -204,6 +206,23 @@ export const activitiesRouter = router({
                                 message: error instanceof Error ? error.message : String(error),
                                 stack: error instanceof Error ? error.stack : undefined,
                             });
+                        }
+
+                        // Laps stored only now never went through the sync's record
+                        // detection: compute this swim's records (silently, it is history).
+                        if (storedLaps > 0) {
+                            try {
+                                await recomputePersonalRecordsFromStoredLaps(ctx.user.id, {
+                                    activityIds: [activity.id],
+                                });
+                            } catch (error) {
+                                logger.warn("[Records] Recompute after lazy lap storage failed", {
+                                    event: "records:recompute_after_lazy_laps_failed",
+                                    userId: ctx.user.id,
+                                    activityId: activity.id,
+                                    message: error instanceof Error ? error.message : String(error),
+                                });
+                            }
                         }
                     } else if (rawData.garmin_details) {
                         activity.rawData = rawData;
