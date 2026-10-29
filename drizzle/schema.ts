@@ -779,6 +779,21 @@ export const clubPoolWorkoutRuns = pgTable("club_pool_workout_runs", {
   clubPoolWorkoutRunsClubDateCreatedIdx: index("idx_club_pool_workout_runs_club_date_created").on(table.clubId, table.targetSessionDate, table.createdAt),
 }));
 
+// «Segna completato» of a published club workout: one row per athlete and workout, for the
+// athlete's own state and the coach's «fatto da N su M». activity_id stays null until the
+// automatic link to the Garmin swim arrives.
+export const clubWorkoutCompletions = pgTable("club_workout_completions", {
+  id: serial("id").primaryKey(),
+  workoutId: integer("workout_id").notNull(),
+  clubId: integer("club_id").notNull(),
+  userId: integer("user_id").notNull(),
+  activityId: integer("activity_id"),
+  completedAt: timestamp("completed_at").defaultNow().notNull(),
+}, (table) => ({
+  clubWorkoutCompletionsUserWorkoutUnique: unique("club_workout_completions_user_workout_unique").on(table.userId, table.workoutId),
+  clubWorkoutCompletionsWorkoutIdx: index("idx_club_workout_completions_workout").on(table.workoutId),
+}));
+
 // ============================================
 // CLUB AI AUTOMATION (Autonomous coach)
 // ============================================

@@ -1256,6 +1256,7 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     await deleteFromIfExists(tx, "public.event_attendees", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.club_announcements", sql`author_id = ${userId}`);
     await deleteFromIfExists(tx, "public.community_club_members", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.club_workout_completions", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.club_media", sql`uploader_id = ${userId}`);
 
     // Progression and stats

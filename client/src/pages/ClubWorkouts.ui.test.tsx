@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   workoutsError: null as any,
   workout: undefined as any,
   workoutError: null as any,
+  completion: { completed: false, completedAt: null, coach: null } as any,
   loading: new Set<string>(),
   calls: {} as Record<string, any[]>,
   refetch: {} as Record<string, ReturnType<typeof vi.fn>>,
@@ -54,9 +55,13 @@ vi.mock("@/lib/trpc", () => {
             listPublished: query("workouts", () => state.workouts, () => state.workoutsError),
             getPublished: query("workout", () => state.workout, () => state.workoutError),
             markCompleted: mutation("markCompleted"),
+            completion: query("completion", () => state.completion),
           },
         },
       },
+      useUtils: () => ({
+        community: { clubs: { workouts: { completion: { invalidate: vi.fn() } } } },
+      }),
     },
   };
 });
@@ -89,6 +94,7 @@ describe("Allenamenti del club (Corsia)", () => {
   afterEach(cleanup);
   beforeEach(() => {
     state.club = { id: 7, name: "Rari Nantes", is_member: true, member_role: "member" };
+    state.completion = { completed: false, completedAt: null, coach: null };
     state.clubError = null;
     state.workouts = {
       workouts: [
@@ -189,10 +195,49 @@ describe("Allenamenti del club (Corsia)", () => {
 
     const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole("button", { name: "Segna completato" }));
-    expect(state.calls.markCompleted).toEqual([{ clubId: 7, workoutId: 11, completionStatus: "completed" }]);
+    expect(state.calls.markCompleted).toEqual([{ clubId: 7, workoutId: 11, completed: true }]);
+    // A member does not see who else did it.
+    expect(screen.queryByRole("heading", { name: /Fatto da/ })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Stampa" }));
     expect(print).toHaveBeenCalled();
     print.mockRestore();
+  });
+
+  it("dettaglio: l'atleta vede il proprio completamento e può annullarlo", async () => {
+    state.workout = { workout: { id: 11, sessionDate: "2020-03-02", workoutJson: plan("Soglia lunga") } };
+    state.completion = {
+      completed: true,
+      completedAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
+      coach: null,
+    };
+    renderAt("/community/club/7/workouts/11", ClubWorkoutDetailPage);
+    expect(screen.getByText("Completato 2h fa")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Segna completato" })).toBeNull();
+    await userEvent.setup({ delay: null }).click(screen.getByRole("button", { name: "Annulla completato" }));
+    expect(state.calls.markCompleted).toEqual([{ clubId: 7, workoutId: 11, completed: false }]);
+  });
+
+  it("dettaglio: il coach vede «Fatto da N su M» e chi l'ha fatto", () => {
+    state.club = { id: 7, name: "Rari Nantes", is_member: true, member_role: "coach" };
+    state.workout = { workout: { id: 11, sessionDate: "2020-03-02", workoutJson: plan("Soglia lunga") } };
+    state.completion = {
+      completed: false,
+      completedAt: null,
+      coach: {
+        completedCount: 2,
+        memberCount: 9,
+        members: [
+          { userId: 3, name: "Marta Rossi", username: null, avatarUrl: null, completedAt: new Date(Date.now() - 3600_000).toISOString() },
+          { userId: 4, name: null, username: "luca", avatarUrl: null, completedAt: new Date(Date.now() - 7200_000).toISOString() },
+        ],
+      },
+    };
+    renderAt("/community/club/7/workouts/11", ClubWorkoutDetailPage);
+    const done = screen.getByRole("region", { name: "Fatto da 2 su 9" });
+    const rows = within(done).getAllByRole("listitem");
+    expect(rows[0].textContent).toContain("Marta Rossi");
+    expect(rows[0].textContent).toContain("1h fa");
+    expect(rows[1].textContent).toContain("luca");
   });
 
   it("dettaglio: NOT_FOUND è «non trovato», un altro errore si riprova", async () => {

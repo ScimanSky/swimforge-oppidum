@@ -1022,32 +1022,56 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     }
                 }),
 
-            markCompleted: protectedProcedure
-                .input(z.object({
-                    clubId: z.number(),
-                    workoutId: z.number(),
-                    completionStatus: z.enum(["completed", "partial", "skipped"]).optional(),
-                }))
-                .mutation(async ({ ctx, input }) => {
-                    const { getPublishedClubWorkoutById } = await import("../db_club_workouts");
+            /** The athlete's «Segna completato»; staff and coaches also get «fatto da N su M». */
+            completion: protectedProcedure
+                .input(z.object({ clubId: z.number(), workoutId: z.number() }))
+                .query(async ({ ctx, input }) => {
+                    const { getClubWorkoutCompletion } = await import("../db_club_workouts");
                     try {
-                        const workout = await getPublishedClubWorkoutById({
+                        return await getClubWorkoutCompletion({
                             userId: ctx.user.id,
                             clubId: input.clubId,
                             workoutId: input.workoutId,
                         });
-                        await trackProductEvent({
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile leggere il completamento";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            markCompleted: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    workoutId: z.number(),
+                    // Older app builds send it; only «completed» is stored.
+                    completionStatus: z.enum(["completed", "partial", "skipped"]).optional(),
+                    completed: z.boolean().optional(),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    const { setClubWorkoutCompletion } = await import("../db_club_workouts");
+                    const completed = input.completed ?? (input.completionStatus ?? "completed") === "completed";
+                    try {
+                        const state = await setClubWorkoutCompletion({
                             userId: ctx.user.id,
-                            eventName: "club_workout_complete",
-                            source: "club_workout_detail",
-                            entityType: "club_workout",
-                            entityId: workout.id,
-                            metadata: {
-                                clubId: input.clubId,
-                                status: input.completionStatus ?? "completed",
-                            },
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                            completed,
                         });
-                        return { success: true, workoutId: workout.id };
+                        if (completed) {
+                            await trackProductEvent({
+                                userId: ctx.user.id,
+                                eventName: "club_workout_complete",
+                                source: "club_workout_detail",
+                                entityType: "club_workout",
+                                entityId: input.workoutId,
+                                metadata: {
+                                    clubId: input.clubId,
+                                    status: "completed",
+                                },
+                            });
+                        }
+                        return { success: true, workoutId: input.workoutId, ...state };
                     } catch (error) {
                         const message = error instanceof Error ? error.message : "Impossibile registrare completamento workout";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });

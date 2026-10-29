@@ -3,7 +3,7 @@
 Canonical Drizzle metadata for PostgreSQL is stored in:
 
 - `drizzle/meta/_journal.json`
-- latest `drizzle/meta/*_snapshot.json` (currently `0033_snapshot.json`)
+- latest `drizzle/meta/*_snapshot.json` (currently `0036_snapshot.json`)
 
 Historical MySQL snapshots are archived in:
 
