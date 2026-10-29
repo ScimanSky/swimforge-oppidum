@@ -190,6 +190,26 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
   ≥ 48 dp, 5 tab in basso.
 
 ### Fase 3 — Cuore allenamento (5-7 giorni)
+- **Richieste del proprietario (29/10/2026), da progettare per prime:**
+  1. **Vista sessione** come quella di Swimbox ma in stile Corsia (tavola:
+     https://claude.ai/artifact/FiWcw13CYvrvx7h4fcojos): blocchi apribili con metri, card per
+     ripetuta (n × distanza, stile, intensità con i colori delle zone, tempo e passo
+     obiettivo), serie divise, esercizi di tecnica, pillole di recupero, domande pronte al
+     coach («Spiegami la sessione / il riscaldamento / la tecnica»).
+  2. **Coach esperto**: per ogni nuotata scaricata dice cosa va bene, cosa no, cosa migliorare
+     e come (giri, passo, bracciate, zone cardio, confronto con storico e obiettivi).
+  3. **Memoria del coach**: in chat libera il coach registra i fatti utili (respiro affannoso,
+     dolori, stanchezza, preferenze, obiettivi) in un diario dell'atleta visibile e
+     modificabile nel profilo (dati sanitari: consenso già esistente), e li usa nelle analisi
+     e negli allenamenti successivi.
+  4. **Dalla chat all'allenamento**: il coach deduce il problema, propone in chat una sessione
+     adatta e, solo dopo l'ok dell'atleta, la crea (chiamata a funzione) e la salva in
+     Allena → Sessioni, visualizzata con la vista del punto 1. Niente diagnosi mediche:
+     davanti a sintomi seri suggerisce riposo o un medico.
+  - Modello: Gemini 4 Argon (provato il 29/10 sulle stesse prove di Gemini 3.1 Pro: più veloce,
+    risposte più personali, chiamate a funzione e JSON con schema supportati). I totali in metri
+    della sessione si ricalcolano sempre lato server: in una prova su due il modello ha
+    dichiarato 2.400 m con ripetute da 2.300 m.
 - Sessione personale (§4 #1), creazione Scrivi/Fotografa/AI (#2), calendario e
   "segna come fatta" (#3), PDF (#4), feedback post-seduta (#8), home "Oggi" (#10).
 - Gate: dal Pixel creo una sessione da foto, la pianifico, nuoto con Garmin, la seduta
