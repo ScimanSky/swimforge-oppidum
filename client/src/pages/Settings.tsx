@@ -143,17 +143,14 @@ const consentItems = [
   {
     type: "health_data_processing",
     title: "Trattamento dati salute",
-    description: "Necessario per frequenza cardiaca, VO2max, stress, calorie e sync completo Garmin/Strava.",
+    description:
+      "Permette di importare da Garmin frequenza cardiaca (media, massima, per giro e per vasca), zone cardio, training effect, VO2max, recupero, stress e calorie, e di farli analizzare dall'AI di Google Gemini: analisi di ogni nuotata, zone cardio negli allenamenti del Coach, analisi delle nuotate nella chat. Senza questo consenso la sincronizzazione Garmin è ferma e l'AI non usa questi dati, nemmeno delle nuotate già importate.",
   },
   {
     type: "garmin_sync",
     title: "Sincronizzazione Garmin",
-    description: "Autorizza l'importazione e il trattamento dei dati da Garmin Connect.",
-  },
-  {
-    type: "strava_sync",
-    title: "Sincronizzazione Strava",
-    description: "Autorizza l'importazione e il trattamento dei dati da Strava.",
+    description:
+      "Permette di collegare Garmin Connect e importare le tue nuotate: data, distanza, tempi, passo, giri e vasche, bracciate, SWOLF e stile. Serve anche il consenso «Trattamento dati salute».",
   },
   {
     type: "marketing_communications",
@@ -1355,7 +1352,7 @@ export default function Settings() {
 
             <Section
               title="Consensi GDPR"
-              description="Gestisci i consensi opzionali. Termini e Privacy sono obbligatori per usare il servizio."
+              description="Gestisci i consensi facoltativi. Termini e Privacy sono obbligatori per usare il servizio."
             >
               {consentsQuery.isLoading ? (
                 <LoadingSkeleton
@@ -1379,6 +1376,15 @@ export default function Settings() {
                       status="Obbligatorio · accettata"
                       version={(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.1"}
                     />
+                  </div>
+                  <div className="rounded-xl bg-raised p-3">
+                    <p className="font-semibold">Coach AI e Google Gemini</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Consigli, piano e chat del Coach sono generati da Google Gemini a partire da distanze, tempi, passo
+                      e zone di passo delle tue nuotate. Quando scrivi nella chat del Coach, i tuoi messaggi, con
+                      obiettivo e vincoli, sono inviati a Gemini per ottenere la risposta: non scrivere dati sulla
+                      salute che non servono. Nome, email e data di nascita non vengono inviati.
+                    </p>
                   </div>
                   <div className="divide-y divide-border">
                     {consentItems.map((item) => (

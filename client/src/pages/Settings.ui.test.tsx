@@ -245,6 +245,21 @@ describe("Settings (Corsia)", () => {
     expect(screen.getByRole("heading", { name: "Garmin Connect" })).toBeInTheDocument();
   });
 
+  it("consensi GDPR: testi accurati su Garmin, dati salute e Google Gemini, niente Strava", () => {
+    state.search = "tab=privacy";
+    render(<Settings />);
+    const section = screen.getByRole("region", { name: "Consensi GDPR" });
+    expect(within(section).queryByRole("switch", { name: "Sincronizzazione Strava" })).toBeNull();
+    expect(section).not.toHaveTextContent(/strava/i);
+    expect(within(section).getByRole("switch", { name: "Trattamento dati salute" })).toBeInTheDocument();
+    expect(within(section).getByRole("switch", { name: "Sincronizzazione Garmin" })).toBeInTheDocument();
+    expect(section).toHaveTextContent("analizzare dall'AI di Google Gemini");
+    expect(section).toHaveTextContent("frequenza cardiaca");
+    expect(section).toHaveTextContent("nemmeno delle nuotate già importate");
+    expect(section).toHaveTextContent("Permette di collegare Garmin Connect e importare le tue nuotate");
+    expect(section).toHaveTextContent("i tuoi messaggi, con obiettivo e vincoli, sono inviati a Gemini");
+  });
+
   it("consenso marketing col profilo in caricamento: interruttore bloccato, niente impostazioni di default salvate", () => {
     state.queries["profile.get"] = { isLoading: true };
     state.search = "tab=privacy";
