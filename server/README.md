@@ -24,7 +24,6 @@ Main routers are split by domain:
 
 ## Integrations
 - Garmin: `server/garmin.ts` + `garmin-service/`
-- Strava: `server/strava.ts`
 - AI: `server/ai_coach*.ts`, `server/ai_insights.ts`
 - Media: `server/lib/imagekit.ts`, `server/lib/cloudinary.ts`
 

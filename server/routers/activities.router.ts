@@ -311,10 +311,10 @@ export const activitiesRouter = router({
             notes: z.string().max(5000).optional().transform((s) => (s ? sanitizeActivityNotes(s) : s)),
         }))
         .mutation(async () => {
-            // Manual activity creation is disabled - use Garmin Connect or Strava sync
+            // Manual activity creation is disabled - use Garmin Connect sync
             throw new TRPCError({
                 code: "FORBIDDEN",
-                message: "L'inserimento manuale delle attività è disabilitato. Collega Garmin Connect o Strava."
+                message: "L'inserimento manuale delle attività è disabilitato. Collega Garmin Connect."
             });
         }),
 

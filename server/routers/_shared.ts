@@ -10,7 +10,6 @@ export { z } from "zod";
 export * as db from "../db";
 export { getDb } from "../db";
 export * as garmin from "../garmin";
-export * as strava from "../strava";
 export { sql, eq } from "drizzle-orm";
 export { swimmerProfiles } from "../../drizzle/schema";
 export type { clubAnnouncements, clubEvents, swimmingActivities } from "../../drizzle/schema";
@@ -123,22 +122,19 @@ export function detectImageType(buffer: Buffer): { mimeType: "image/jpeg" | "ima
 
 export async function runAutoSync(userId: number, options: { force?: boolean } = {}) {
     const _garmin = await import("../garmin");
-    const _strava = await import("../strava");
     const { hasGrantedConsent } = await import("../consent");
-    const [healthAllowed, garminAllowed, stravaAllowed] = await Promise.all([
+    const [healthAllowed, garminAllowed] = await Promise.all([
         hasGrantedConsent(userId, "health_data_processing"),
         hasGrantedConsent(userId, "garmin_sync"),
-        hasGrantedConsent(userId, "strava_sync"),
     ]);
 
     if (!healthAllowed) {
         return;
     }
 
-    await Promise.allSettled([
-        garminAllowed ? _garmin.autoSyncGarmin(userId, options) : Promise.resolve(),
-        stravaAllowed ? _strava.autoSyncStrava(userId, options) : Promise.resolve(),
-    ]);
+    if (garminAllowed) {
+        await Promise.allSettled([_garmin.autoSyncGarmin(userId, options)]);
+    }
     const { invalidateLeaderboardCache: _inv } = await import("../lib/cache");
     await _inv();
 }

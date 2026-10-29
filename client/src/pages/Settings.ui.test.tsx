@@ -108,7 +108,6 @@ function seed() {
       ],
     },
     "garmin.status": { data: { connected: true, lastSync: null } },
-    "strava.status": { data: { connected: false } },
     "consent.list": { data: { byType: { garmin_sync: { granted: true } }, versions: {} } },
   };
   state.refetch = {};
@@ -128,7 +127,8 @@ describe("Settings (Corsia)", () => {
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     const summary = screen.getByRole("region", { name: "Riepilogo" });
     expect(summary).toHaveTextContent("12.480 XP totale");
-    expect(summary).toHaveTextContent("1 di 2 Integrazioni attive");
+    expect(summary).toHaveTextContent("Sì Garmin collegato");
+    expect(summary).not.toHaveTextContent(/Strava|Integrazioni attive/);
     expect(summary).toHaveTextContent("3 Attività importate");
     expect(summary).toHaveTextContent("Stile libero Stile più nuotato");
     const tabs = screen.getByRole("tablist", { name: "Sezioni delle impostazioni" });
@@ -200,14 +200,14 @@ describe("Settings (Corsia)", () => {
     expect(screen.getByRole("link", { name: "Apri la Privacy Policy" })).toHaveAttribute("href", "/privacy");
   });
 
-  it("connessioni: Garmin si gestisce nella sua scheda, Strava mostra solo lo stato", () => {
+  it("connessioni: Garmin si gestisce nella sua scheda, niente Strava", () => {
     state.search = "tab=connections";
     render(<Settings />);
     const accounts = screen.getByRole("region", { name: "Account collegati" });
     expect(within(accounts).getByText("Collegato")).toBeInTheDocument();
     expect(within(accounts).getByRole("button", { name: "Gestisci Garmin Connect" })).toBeInTheDocument();
     expect(within(accounts).getAllByRole("button")).toHaveLength(1);
-    expect(within(accounts).getByText("Non collegato")).toBeInTheDocument();
+    expect(within(accounts).queryByText("Strava")).not.toBeInTheDocument();
     expect(within(accounts).getByText("Disponibile prossimamente")).toBeInTheDocument();
   });
 

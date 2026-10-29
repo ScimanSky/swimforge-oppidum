@@ -42,7 +42,7 @@ type Rule = keyof typeof RULES;
 /** Files allowed to match a rule for good (justify each entry). */
 const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
   // The shell header owns the page title. Public pages render outside the shell (no header), so
-  // their own title is the h1: the landing (Home), StravaConnect, the sign-in, sign-up and
+  // their own title is the h1: the landing (Home), the sign-in, sign-up and
   // password pages (AuthLayout), the return from Google and the email link (AuthCallback) and the
   // legal documents (LegalPage). club-print builds standalone print documents (own tab or
   // hidden iframe).
@@ -53,7 +53,6 @@ const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
     "lib/club-print.ts",
     "pages/AuthCallback.tsx",
     "pages/Home.tsx",
-    "pages/StravaConnect.tsx",
   ],
 };
 

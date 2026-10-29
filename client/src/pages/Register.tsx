@@ -25,7 +25,7 @@ import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 
 const features = [
-  "Sincronizza automaticamente da Garmin e Strava",
+  "Sincronizza automaticamente da Garmin",
   "Coach AI personalizzato per migliorare",
   "Sfida gli amici e guadagna badge",
   "Analisi avanzate delle prestazioni",

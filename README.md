@@ -8,7 +8,7 @@ It combines training tracking, social feed/clubs, and AI coach features.
 - Backend: Node.js + Express + tRPC
 - Database: PostgreSQL (Supabase recommended)
 - ORM/Migrations: Drizzle
-- Integrations: Garmin service, Strava, Gemini, ImageKit, Cloudinary
+- Integrations: Garmin service, Gemini, ImageKit, Cloudinary
 
 ## Core Features
 - Activity tracking (pool/open-water) with share-to-feed flow

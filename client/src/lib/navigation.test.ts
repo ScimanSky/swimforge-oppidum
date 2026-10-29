@@ -131,7 +131,6 @@ describe("isPublicPath", () => {
       "/",
       "/auth",
       "/auth/callback",
-      "/strava/callback",
       "/login",
       "/login/",
       "/login?next=/today",

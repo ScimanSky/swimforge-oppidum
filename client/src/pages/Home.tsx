@@ -44,7 +44,7 @@ const workflowSteps = [
   {
     step: "01",
     title: "Sincronizza",
-    body: "Importa da Garmin o Strava, o registra a mano, in un profilo unico.",
+    body: "Importa le tue nuotate da Garmin in un profilo unico.",
   },
   {
     step: "02",

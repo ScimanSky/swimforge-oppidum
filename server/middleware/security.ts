@@ -130,7 +130,7 @@ export const aiCoachLimiter = rateLimit({
 });
 
 /**
- * Rate limiter per sync endpoints (Strava / Garmin)
+ * Rate limiter per sync endpoints (Garmin)
  */
 export const syncLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minuti
@@ -229,7 +229,6 @@ export const helmetConfig = {
       connectSrc: uniq([
         "'self'",
         'https://api.garmin.com',
-        'https://api.strava.com',
         'https://nominatim.openstreetmap.org',
         supabaseOrigin,
         'https://*.supabase.co',
