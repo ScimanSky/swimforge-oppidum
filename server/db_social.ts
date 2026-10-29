@@ -16,6 +16,33 @@ export type PostReportReason = "spam" | "offensive" | "harassment" | "misinforma
 export type PostReportStatus = "open" | "in_review" | "resolved" | "rejected";
 const POST_DELETE_WINDOW_HOURS = Math.max(1, Number.parseInt(process.env.POST_DELETE_WINDOW_HOURS ?? "24", 10) || 24);
 
+/**
+ * The name of the post author's most recent club (`p` is the social_posts alias), shown
+ * next to the author. A club that is not public shows only to the viewer's own clubs:
+ * otherwise the feed would tell everyone who belongs to a private or invite-only club.
+ */
+export function authorClubNameSql(viewerId: number) {
+  return sql`(
+    SELECT c.name
+    FROM community_club_members m
+    JOIN community_clubs c ON c.id = m.club_id
+    WHERE m.user_id = p.user_id
+      AND m.status = 'active'
+      AND (
+        (c.visibility = 'public' AND c.is_private IS NOT TRUE)
+        OR EXISTS (
+          SELECT 1
+          FROM community_club_members vm
+          WHERE vm.club_id = c.id
+            AND vm.user_id = ${viewerId}
+            AND vm.status = 'active'
+        )
+      )
+    ORDER BY m.joined_at DESC NULLS LAST, m.id DESC
+    LIMIT 1
+  )`;
+}
+
 export async function getSocialFeed(userId: number, options: { limit?: number; scope?: FeedScope; before?: Date } = {}) {
   const db = await getDb();
   if (!db) return [];
@@ -56,15 +83,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       u.name AS user_name,
       sp.username AS user_username,
       sp.avatar_url AS user_avatar,
-      (
-        SELECT c.name
-        FROM community_club_members m
-        JOIN community_clubs c ON c.id = m.club_id
-        WHERE m.user_id = p.user_id
-          AND m.status = 'active'
-        ORDER BY m.joined_at DESC NULLS LAST, m.id DESC
-        LIMIT 1
-      ) AS user_club_name,
+      ${authorClubNameSql(userId)} AS user_club_name,
       EXISTS(
         SELECT 1 FROM user_presence up
         WHERE up.user_id = p.user_id
