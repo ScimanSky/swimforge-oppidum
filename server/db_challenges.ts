@@ -1,4 +1,5 @@
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { getDb } from "./db";
 import { logger } from "./middleware/logger";
 
@@ -64,6 +65,28 @@ export interface ChallengeParticipant {
   isWinner: boolean;
   completedAt: Date | null;
   stats: unknown;
+}
+
+/**
+ * ORDER BY for a challenge's participants, best first. The live ranking
+ * (calculateChallengeProgress) and both winner paths (completeChallenge and the
+ * completeChallenges cron) share it, so they always agree.
+ * - avg_pace is seconds per 100 m, lower is better: it ranks ascending. Every other
+ *   objective ranks descending.
+ * - A participant without a result (progress NULL or <= 0) always ranks last: under
+ *   the ascending pace order a 0 would otherwise beat every real pace.
+ * - Ties: earliest joiner first, then lowest user id, so there is exactly one rank 1.
+ * `tableAlias` qualifies the columns when challenge_participants is joined to other tables.
+ */
+export function challengeRankingOrderBy(
+  objective: string | null | undefined,
+  tableAlias?: string
+): SQL {
+  const column = (name: string) =>
+    tableAlias ? sql`${sql.identifier(tableAlias)}.${sql.identifier(name)}` : sql`${sql.identifier(name)}`;
+  const progress = column("current_progress");
+  const direction = objective === "avg_pace" ? sql.raw("ASC") : sql.raw("DESC");
+  return sql`CASE WHEN ${progress} > 0 THEN 0 ELSE 1 END ASC, ${progress} ${direction}, ${column("joined_at")} ASC, ${column("user_id")} ASC`;
 }
 
 // ============================================
@@ -183,7 +206,7 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
         'userId', user_id,
         'progress', current_progress,
         'rank', current_rank
-      ) ORDER BY current_progress DESC)
+      ) ORDER BY NULLIF(current_rank, 0) ASC NULLS LAST, joined_at ASC, user_id ASC)
       FROM challenge_participants WHERE challenge_id = c.id) as leaderboard
     FROM challenges c
     LEFT JOIN challenge_participants cp ON c.id = cp.challenge_id AND cp.user_id = ${userId}
@@ -391,12 +414,14 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
       break;
     }
     case "avg_pace": {
+      // Average only real paces: a 0 pace would drag the average towards a pace nobody
+      // swam. Participants without one keep progress 0, which ranks last.
       await db.execute(sql`
         WITH progress AS (
-          SELECT user_id, COALESCE(AVG(avg_pace_per_100m), 0) AS progress
+          SELECT user_id, AVG(avg_pace_per_100m) AS progress
           FROM swimming_activities
           WHERE ${baseFilter}
-            AND avg_pace_per_100m IS NOT NULL
+            AND avg_pace_per_100m > 0
           GROUP BY user_id
         )
         UPDATE challenge_participants cp
@@ -414,7 +439,7 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
     WITH ranked AS (
       SELECT 
         user_id,
-        ROW_NUMBER() OVER (ORDER BY current_progress DESC) as rank
+        ROW_NUMBER() OVER (ORDER BY ${challengeRankingOrderBy(challenge.objective)}) as rank
       FROM challenge_participants
       WHERE challenge_id = ${challengeId}
     )
@@ -432,6 +457,10 @@ export async function completeChallenge(challengeId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
+  const challengeResult = await db.execute(sql`SELECT objective FROM challenges WHERE id = ${challengeId}`);
+  const challenge = challengeResult.rows[0] as { objective: string | null } | undefined;
+  if (!challenge) return;
+
   // Mark challenge as completed
   await db.execute(sql`
     UPDATE challenges
@@ -439,10 +468,18 @@ export async function completeChallenge(challengeId: number): Promise<void> {
     WHERE id = ${challengeId}
   `);
 
-  // Mark winner (rank 1)
+  // Mark the winner: the best participant by the shared ranking, and only with a
+  // real result (nobody wins a challenge nobody swam).
   await db.execute(sql`
     UPDATE challenge_participants
     SET is_winner = true, completed_at = NOW()
-    WHERE challenge_id = ${challengeId} AND current_rank = 1
+    WHERE id = (
+      SELECT id
+      FROM challenge_participants
+      WHERE challenge_id = ${challengeId}
+        AND current_progress > 0
+      ORDER BY ${challengeRankingOrderBy(challenge.objective)}
+      LIMIT 1
+    )
   `);
 }

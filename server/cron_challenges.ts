@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { challengeRankingOrderBy } from "./db_challenges";
 import { logger } from "./middleware/logger";
 
 type ExpiredChallengeRow = {
@@ -68,7 +69,7 @@ export async function completeChallenges(): Promise<{
           SELECT user_id, current_progress
           FROM challenge_participants
           WHERE challenge_id = ${challenge.id}
-          ORDER BY current_progress DESC, joined_at ASC
+          ORDER BY ${challengeRankingOrderBy(challenge.objective)}
           LIMIT 1
         `);
 
