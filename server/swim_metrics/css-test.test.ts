@@ -1,23 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { swimmerProfiles } from "../../drizzle/schema";
 
 const m = vi.hoisted(() => {
-  const state = { preferences: undefined as unknown, profileExists: true, updates: [] as Array<{ table: unknown; values: any }> };
+  const state = { profileExists: true, updates: [] as Array<{ table: unknown; values: any }> };
   const db = {
-    select: vi.fn(() => {
-      const chain: any = {
-        from: () => chain,
-        where: () => chain,
-        limit: async () => (state.profileExists ? [{ preferences: state.preferences }] : []),
-      };
-      return chain;
-    }),
+    select: vi.fn(),
     update: vi.fn((table: unknown) => ({
       set: (values: unknown) => {
         state.updates.push({ table, values });
-        return { where: async () => undefined };
+        return { where: () => ({ returning: async () => (state.profileExists ? [{ id: 1 }] : []) }) };
       },
     })),
+    delete: vi.fn(() => ({ where: async () => undefined })),
   };
   return { state, db, deleteCached: vi.fn(async () => {}) };
 });
@@ -88,41 +83,38 @@ describe("validateCssTest", () => {
 });
 
 describe("updateCssTest", () => {
+  const render = (value: any) => new PgDialect().sqlToQuery(value);
+
   beforeEach(() => {
     vi.clearAllMocks();
     m.state.updates.length = 0;
     m.state.profileExists = true;
   });
 
-  it("saves the test without touching the other preference keys, then drops the cache", async () => {
-    m.state.preferences = { units: "metric", autoplayVideos: false };
+  it("merges the test into the stored preferences in one UPDATE (no read), then drops the cache", async () => {
     const test = { t200Seconds: 170, t400Seconds: 360, date: "2026-10-20" };
 
     expect(await updateCssTest(42, test)).toBe(true);
 
+    expect(m.db.select).not.toHaveBeenCalled();
     expect(m.state.updates).toHaveLength(1);
     expect(m.state.updates[0].table).toBe(swimmerProfiles);
-    expect(m.state.updates[0].values.preferences).toEqual({ units: "metric", autoplayVideos: false, cssTest: test });
-    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v1:42");
+    const { sql, params } = render(m.state.updates[0].values.preferences);
+    expect(sql).toContain("||");
+    expect(params).toEqual([JSON.stringify({ cssTest: test })]);
+    expect(m.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v\d+:42/));
   });
 
   it("removes only the test", async () => {
-    m.state.preferences = { units: "metric", cssTest: { t200Seconds: 170, t400Seconds: 360, date: "2026-10-20" } };
-
     expect(await updateCssTest(42, null)).toBe(true);
-
-    expect(m.state.updates[0].values.preferences).toEqual({ units: "metric" });
+    const { sql, params } = render(m.state.updates[0].values.preferences);
+    expect(sql).toMatch(/- \$\d+::text/);
+    expect(params).toEqual(["{}", "cssTest"]);
   });
 
-  it("reads preferences stored as a JSON string", async () => {
-    m.state.preferences = JSON.stringify({ language: "it" });
-    await updateCssTest(42, { t200Seconds: 170, t400Seconds: 360, date: "2026-10-20" });
-    expect(m.state.updates[0].values.preferences).toMatchObject({ language: "it", cssTest: { t200Seconds: 170 } });
-  });
-
-  it("without a profile nothing is written", async () => {
+  it("without a profile nothing is invalidated", async () => {
     m.state.profileExists = false;
     expect(await updateCssTest(42, null)).toBe(false);
-    expect(m.state.updates).toHaveLength(0);
+    expect(m.deleteCached).not.toHaveBeenCalled();
   });
 });

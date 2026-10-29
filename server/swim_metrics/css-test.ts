@@ -1,14 +1,12 @@
 /**
  * The user's 400/200 CSS test, kept in swimmer_profiles.preferences.cssTest (no migration).
  */
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { dayKey } from "@shared/swimMetrics";
-import { swimmerProfiles } from "../../drizzle/schema";
-import { getDb } from "../db";
+import { mergeSwimmerPreferences } from "../lib/preferences";
 import type { CssTest } from "./compute";
 import { CSS_MAX_PACE, CSS_MIN_PACE, cssFromTest } from "./css";
-import { invalidateSwimMetrics, preferencesObject } from "./index";
+import { invalidateSwimMetrics } from "./index";
 
 export const CSS_TEST_LIMITS = {
   t200Seconds: { min: 100, max: 420 },
@@ -94,27 +92,14 @@ export function validateCssTest(test: CssTest, today: string = dayKey(new Date()
 }
 
 /**
- * Saves (or with null removes) the test, keeping every other preference key, and drops the
- * cached metrics. False when the user has no profile.
+ * Saves (or with null removes) the test with one SQL merge of preferences.cssTest, keeping every
+ * other preference key, and drops the cached metrics. False when the user has no profile.
  */
 export async function updateCssTest(userId: number, test: CssTest | null): Promise<boolean> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const [row] = await db
-    .select({ preferences: swimmerProfiles.preferences })
-    .from(swimmerProfiles)
-    .where(eq(swimmerProfiles.userId, userId))
-    .limit(1);
-  if (!row) return false;
-
-  const preferences = { ...preferencesObject(row.preferences) };
-  if (test) preferences.cssTest = test;
-  else delete preferences.cssTest;
-
-  await db
-    .update(swimmerProfiles)
-    .set({ preferences, updatedAt: new Date() })
-    .where(eq(swimmerProfiles.userId, userId));
+  const saved = test
+    ? await mergeSwimmerPreferences(userId, { cssTest: test })
+    : await mergeSwimmerPreferences(userId, {}, ["cssTest"]);
+  if (!saved) return false;
   await invalidateSwimMetrics(userId);
   return true;
 }

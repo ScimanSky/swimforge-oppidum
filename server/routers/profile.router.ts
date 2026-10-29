@@ -4,6 +4,7 @@ import {
     normalizeBooleanRecord, coerceBoolean, detectImageType,
     logger, getUserPublicProfile,
 } from "./_shared";
+import { mergeSwimmerPreferences, preferencesPatch } from "../lib/preferences";
 import type { SwimmingActivityInsert } from "./_shared";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 
@@ -128,19 +129,16 @@ export const profileRouter = router({
                 }
             }
 
-            // Settings sends only its own preference keys: merge them into the stored ones so
-            // other keys (e.g. cssTest, saved by statistics.setCssTest) survive.
-            let mergedPreferences: Record<string, unknown> | undefined;
+            // Settings sends only its own preference keys: one SQL merge into the stored ones, so
+            // other keys (e.g. cssTest, saved by statistics.setCssTest) survive concurrent saves.
+            // Keys sent as undefined stay as stored.
             if (preferences) {
-                const current = await db.getSwimmerProfile(ctx.user.id);
-                const { preferencesObject } = await import("../swim_metrics");
-                mergedPreferences = { ...preferencesObject(current?.preferences), ...preferences };
+                await mergeSwimmerPreferences(ctx.user.id, preferencesPatch(preferences));
             }
 
             await db.updateSwimmerProfile(ctx.user.id, {
                 ...profilePayload,
                 notificationSettings,
-                preferences: mergedPreferences,
                 privacySettings,
             });
             return { success: true };
