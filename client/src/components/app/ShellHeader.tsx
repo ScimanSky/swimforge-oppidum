@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter"
-import { ChevronDown, ChevronLeft, Droplet, LogOut, Settings, Shield, User } from "lucide-react"
+import { ChevronDown, ChevronLeft, LogOut, Settings, Shield, User } from "lucide-react"
 
 import { canGoBackInApp } from "@/lib/in-app-history"
 import { FEED_PATH, TODAY_PATH, normalizePath, pageTitleForPath, parentPathForPath } from "@/lib/navigation"
 import { Button } from "@/components/ui/button"
+import { Wordmark } from "@/components/corsia/Wordmark"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,15 +16,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
-
-function Brand() {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <Droplet className="size-6 fill-current text-action-text" aria-hidden />
-      <span className="font-display text-[26px] font-bold leading-none text-foreground">SwimForge</span>
-    </span>
-  )
-}
 
 function initialsFromName(nameOrEmail: string) {
   const parts = nameOrEmail
@@ -66,7 +58,7 @@ export function ShellHeader({ homePath, profileLabel, avatarUrl, isAdmin, isLogg
           href={homePath}
           aria-label={homePath === TODAY_PATH ? "SwimForge, vai a Oggi" : "SwimForge, vai al feed"}
           className="hidden w-[224px] shrink-0 lg:inline-flex">
-          <Brand />
+          <Wordmark />
         </Link>
 
         <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -78,7 +70,7 @@ export function ShellHeader({ homePath, profileLabel, avatarUrl, isAdmin, isLogg
           {path === FEED_PATH ? (
             <h1 className="min-w-0">
               <span className="lg:hidden">
-                <Brand />
+                <Wordmark />
               </span>
               <span className="hidden font-display text-[26px] font-bold leading-none lg:inline">{pageTitle}</span>
             </h1>
