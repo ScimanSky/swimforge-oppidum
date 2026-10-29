@@ -7,33 +7,24 @@ describe("HistoryMetricCircle", () => {
     cleanup();
   });
 
-  it("renders label and value with default tone styling", () => {
-    render(<HistoryMetricCircle label="Tempo" value={'1\'03"25'} />);
+  it("mostra valore ed etichetta, letti insieme", () => {
+    const { container } = render(<HistoryMetricCircle label="Tempo" value={'1\'03"25'} />);
 
     expect(screen.getByText("Tempo")).toBeInTheDocument();
     expect(screen.getByText('1\'03"25')).toBeInTheDocument();
-
-    const wrapper = screen.getByTitle('Tempo: 1\'03"25');
-    expect(wrapper.className).toContain("h-20");
-    expect(wrapper.className).toContain("w-20");
+    expect(container.textContent).toBe('1\'03"25 Tempo');
   });
 
-  it("applies highlight pulse styling for record metrics", () => {
-    render(<HistoryMetricCircle label="Record" value="SI" highlight />);
+  it("un nuovo record si distingue solo per il colore del record, senza pulsare", () => {
+    const { container } = render(<HistoryMetricCircle label="Record" value="SI" highlight />);
 
-    const wrapper = screen.getByTitle("Record: SI");
-    const ring = wrapper.firstElementChild as HTMLElement | null;
-
-    expect(ring).not.toBeNull();
-    expect(ring?.className).toContain("animate-pulse");
-    expect(ring?.className).toContain("rgba(34,211,238,1)");
+    expect(screen.getByText("SI").className).toContain("text-xp");
+    expect(container.querySelector(".animate-pulse")).toBeNull();
   });
 
-  it("supports compact size", () => {
-    render(<HistoryMetricCircle label="Punti" value="724.75" size="sm" tone="lime" />);
+  it("anche nella misura compatta l'etichetta resta di 12px", () => {
+    render(<HistoryMetricCircle label="Punti" value="724.75" size="sm" />);
 
-    const wrapper = screen.getByTitle("Punti: 724.75");
-    expect(wrapper.className).toContain("h-16");
-    expect(wrapper.className).toContain("w-16");
+    expect(screen.getByText("Punti").className).toContain("text-xs");
   });
 });
