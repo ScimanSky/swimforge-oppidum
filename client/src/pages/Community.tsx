@@ -1,13 +1,16 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { Link } from "wouter"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Chip } from "@/components/corsia/Chip"
+import { Pager } from "@/components/corsia/Pager"
 import { getInitials } from "@/lib/format"
 import {
   Dialog,
@@ -23,20 +26,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Users,
-  Plus,
-  Sparkles,
-  ChevronRight,
-  Trophy,
-  Search,
-  UserCheck,
-  UserPlus,
-} from "lucide-react"
+import { Plus, Search, UserCheck, UserPlus } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 
+const sectionTitle = "text-[17px] font-bold"
+
+const visibilityLabel = (visibility?: string) =>
+  visibility === "invite" ? "Privato" : visibility === "private" ? "Segreto" : "Pubblico"
+
 export default function Community() {
+  const clubsTitleId = useId()
+  const peopleTitleId = useId()
+  const fieldId = useId()
   const [clubScope, setClubScope] = useState<"all" | "mine">("all")
   const [clubSearch, setClubSearch] = useState("")
   const [userSearch, setUserSearch] = useState("")
@@ -135,8 +137,8 @@ export default function Community() {
   const createClubDialog = (
     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
       <DialogTrigger asChild>
-        <Button variant="neon" className="gap-2">
-          <Plus className="h-4 w-4" />
+        <Button className="shrink-0">
+          <Plus className="size-4" aria-hidden />
           Crea club
         </Button>
       </DialogTrigger>
@@ -146,8 +148,9 @@ export default function Community() {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Nome club</p>
+            <Label htmlFor={`${fieldId}-name`}>Nome club</Label>
             <Input
+              id={`${fieldId}-name`}
               value={createDraft.name}
               onChange={(event) =>
                 setCreateDraft((prev) => ({ ...prev, name: event.target.value }))
@@ -156,8 +159,9 @@ export default function Community() {
             />
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Descrizione</p>
+            <Label htmlFor={`${fieldId}-description`}>Descrizione</Label>
             <Textarea
+              id={`${fieldId}-description`}
               value={createDraft.description}
               onChange={(event) =>
                 setCreateDraft((prev) => ({ ...prev, description: event.target.value }))
@@ -167,14 +171,14 @@ export default function Community() {
             />
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Visibilità</p>
+            <Label htmlFor={`${fieldId}-visibility`}>Visibilità</Label>
             <Select
               value={createDraft.visibility}
               onValueChange={(value) =>
                 setCreateDraft((prev) => ({ ...prev, visibility: value }))
               }
             >
-              <SelectTrigger>
+              <SelectTrigger id={`${fieldId}-visibility`}>
                 <SelectValue placeholder="Seleziona visibilità" />
               </SelectTrigger>
               <SelectContent>
@@ -185,8 +189,9 @@ export default function Community() {
             </Select>
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Cover (opzionale)</p>
+            <Label htmlFor={`${fieldId}-cover`}>Copertina (opzionale)</Label>
             <Input
+              id={`${fieldId}-cover`}
               value={createDraft.coverImageUrl}
               onChange={(event) =>
                 setCreateDraft((prev) => ({ ...prev, coverImageUrl: event.target.value }))
@@ -195,8 +200,9 @@ export default function Community() {
             />
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Sito web (opzionale)</p>
+            <Label htmlFor={`${fieldId}-website`}>Sito web (opzionale)</Label>
             <Input
+              id={`${fieldId}-website`}
               value={createDraft.websiteUrl}
               onChange={(event) =>
                 setCreateDraft((prev) => ({ ...prev, websiteUrl: event.target.value }))
@@ -205,11 +211,10 @@ export default function Community() {
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline-neon" onClick={() => setIsCreateOpen(false)}>
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Annulla
             </Button>
             <Button
-              variant="neon"
               onClick={() =>
                 createClub.mutate({
                   name: createDraft.name.trim(),
@@ -222,7 +227,7 @@ export default function Community() {
               }
               disabled={createClub.isPending || createDraft.name.trim().length < 3}
             >
-              {createClub.isPending ? "Creazione..." : "Crea Club"}
+              {createClub.isPending ? "Creazione..." : "Crea club"}
             </Button>
           </div>
         </div>
@@ -232,95 +237,132 @@ export default function Community() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2">
-        <section className="surface-panel relative w-full overflow-hidden">
-          <div className="absolute inset-0">
-            <div className="h-full w-full bg-[linear-gradient(132deg,#101820_0%,#15232d_45%,#0f171f_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_24%,transparent)_0%,transparent_66%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
+      <div className="space-y-6">
+        <section aria-labelledby={clubsTitleId} className="space-y-3">
+          {/* The «Club» sub-tab already names this section: the heading is for screen readers. */}
+          <h2 id={clubsTitleId} className="sr-only">
+            Club
+          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <Tabs
+              value={clubScope}
+              onValueChange={(value) => setClubScope(value as "all" | "mine")}
+              className="min-w-0"
+            >
+              <TabsList aria-label="Quali club" className="w-fit">
+                <TabsTrigger value="all">Esplora</TabsTrigger>
+                <TabsTrigger value="mine">I miei</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {createClubDialog}
           </div>
-          <div className="relative p-2.5 sm:p-3">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
-                    <Sparkles className="size-4 text-action-text" />
-                    Club Hub
-                  </div>
-                  <h1 className="mt-1 text-xl font-display font-bold neon-gradient-text sm:text-2xl">Club</h1>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline-neon" className="gap-2" asChild>
-                    <Link href="/leaderboard">
-                      <Trophy className="h-4 w-4" />
-                      Classifica generale
-                    </Link>
-                  </Button>
-                  {createClubDialog}
-                </div>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
-                <div className="flex gap-2">
-                  <Button
-                    variant={clubScope === "all" ? "neon" : "outline-neon"}
-                    size="sm"
-                    onClick={() => setClubScope("all")}
-                  >
-                    Esplora
-                  </Button>
-                  <Button
-                    variant={clubScope === "mine" ? "neon" : "outline-neon"}
-                    size="sm"
-                    onClick={() => setClubScope("mine")}
-                  >
-                    I miei
-                  </Button>
-                </div>
-                <Input
-                  placeholder="Cerca club..."
-                  value={clubSearch}
-                  onChange={(e) => setClubSearch(e.target.value)}
-                  className="h-9 bg-background/60"
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="surface-panel p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h2 className="text-base font-display font-semibold text-foreground">Trova nuotatori</h2>
-              <p className="text-xs text-muted-foreground">
-                Cerca per nome, username o email e aggiungi amici al volo.
-              </p>
-            </div>
-            <Badge className="border-border/70 bg-background/70 text-foreground">
-              {discoverMode ? "Ricerca persone" : "Suggeriti"}
-            </Badge>
-          </div>
-
-          <div className="relative mt-3">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
             <Input
-              value={userSearch}
-              onChange={(event) => setUserSearch(event.target.value)}
-              placeholder="Cerca persone..."
-              className="h-10 bg-background/60 pl-9"
+              type="search"
+              aria-label="Cerca club"
+              placeholder="Cerca club..."
+              value={clubSearch}
+              onChange={(e) => setClubSearch(e.target.value)}
+              className="pl-9"
             />
           </div>
 
-          <div className="mt-3 space-y-2">
-            {isDiscoverLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento nuotatori...</p>
-            ) : discoverUsers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {discoverMode ? "Nessun utente trovato." : "Nessun suggerimento disponibile al momento."}
-              </p>
-            ) : (
-              discoverUsers.slice(0, 8).map((user: any) => {
+          {clubsQuery.isLoading ? (
+            <p role="status" className="surface-panel p-4 text-sm text-muted-foreground">
+              Caricamento club...
+            </p>
+          ) : clubs.length === 0 ? (
+            <p className="surface-panel p-4 text-sm text-muted-foreground">Nessun club trovato.</p>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {pagedClubs.map((club: any) => {
+                const thumbnail = (club.logo_url || club.logoUrl || club.cover_image_url || undefined) as
+                  | string
+                  | undefined
+                const memberCount = Number(club.member_count ?? 0)
+                return (
+                  <li key={club.id} className="surface-panel flex flex-col p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="size-12 rounded-xl">
+                        <AvatarImage src={thumbnail} alt="" className="object-cover" />
+                        <AvatarFallback className="rounded-xl bg-raised text-sm font-semibold">
+                          {String(club.name || "C").slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-base font-bold text-foreground">{club.name}</h3>
+                        <p className="text-sm text-muted-foreground tabular-nums">
+                          {memberCount === 1 ? "1 membro" : `${memberCount} membri`} ·{" "}
+                          {visibilityLabel(club.visibility)}
+                        </p>
+                      </div>
+                      {club.is_member ? (
+                        <Chip tone="action">Membro</Chip>
+                      ) : club.member_status === "pending" ? (
+                        <Chip>In attesa</Chip>
+                      ) : null}
+                    </div>
+                    <p className="mt-3 line-clamp-2 flex-1 text-sm text-muted-foreground">
+                      {club.description || "Allenati insieme, condividi progressi e obiettivi."}
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3 self-start" asChild>
+                      <Link href={`/community/club/${club.id}`} aria-label={`Apri ${club.name}`}>
+                        Apri
+                      </Link>
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <Pager
+            page={clubsPage}
+            totalPages={clubsTotalPages}
+            onChange={setClubsPage}
+            label="Pagine dei club"
+          />
+        </section>
+
+        <section aria-labelledby={peopleTitleId} className="surface-panel p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id={peopleTitleId} className={sectionTitle}>
+              Trova nuotatori
+            </h2>
+            <span className="text-sm text-muted-foreground">
+              {discoverMode ? "Risultati" : "Suggeriti"}
+            </span>
+          </div>
+
+          <div className="relative mt-3">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              aria-label="Cerca persone"
+              value={userSearch}
+              onChange={(event) => setUserSearch(event.target.value)}
+              placeholder="Nome, username o email"
+              className="pl-9"
+            />
+          </div>
+
+          {isDiscoverLoading ? (
+            <p role="status" className="mt-3 text-sm text-muted-foreground">
+              Caricamento nuotatori...
+            </p>
+          ) : discoverUsers.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {discoverMode ? "Nessun utente trovato." : "Nessun suggerimento disponibile al momento."}
+            </p>
+          ) : (
+            <ul className="mt-2">
+              {discoverUsers.slice(0, 8).map((user: any) => {
                 const displayName = user.username || user.name || `Utente #${user.userId}`
                 const subtitleParts = [
                   user.username ? `@${user.username}` : null,
@@ -330,20 +372,23 @@ export default function Community() {
                 const isPending = pendingFollowUserId === user.userId
 
                 return (
-                  <div
+                  <li
                     key={user.userId}
-                    className="flex items-center gap-3 rounded-xl border border-border/55 bg-background/35 p-2.5"
+                    className="flex items-center gap-3 border-t border-border py-3 first:border-t-0 last:pb-0"
                   >
-                    <Link href={`/u/${user.userId}`}>
-                      <Avatar className="size-10 cursor-pointer border border-border/60">
-                        <AvatarImage src={user.avatarUrl || ""} alt={displayName} />
-                        <AvatarFallback className="text-xs font-semibold">
+                    <Link href={`/u/${user.userId}`} tabIndex={-1} aria-hidden>
+                      <Avatar className="size-10">
+                        <AvatarImage src={user.avatarUrl || ""} alt="" />
+                        <AvatarFallback className="bg-raised text-xs font-semibold">
                           {getInitials(displayName)}
                         </AvatarFallback>
                       </Avatar>
                     </Link>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/u/${user.userId}`} className="block truncate text-sm font-semibold text-foreground hover:underline">
+                      <Link
+                        href={`/u/${user.userId}`}
+                        className="block truncate text-sm font-semibold text-foreground hover:underline"
+                      >
                         {displayName}
                       </Link>
                       <p className="truncate text-xs text-muted-foreground">
@@ -351,128 +396,30 @@ export default function Community() {
                       </p>
                     </div>
                     <Button
-                      variant={isFollowing ? "ghost-neon" : "outline-neon"}
+                      variant={isFollowing ? "ghost" : "outline"}
                       size="sm"
-                      className="shrink-0 gap-1"
+                      className="shrink-0"
                       disabled={isFollowing || isPending || followUser.isPending}
                       onClick={() => followUser.mutate({ userId: Number(user.userId) })}
                     >
                       {isFollowing ? (
                         <>
-                          <UserCheck className="size-3.5" />
+                          <UserCheck className="size-4" aria-hidden />
                           Seguito
                         </>
                       ) : (
                         <>
-                          <UserPlus className="size-3.5" />
+                          <UserPlus className="size-4" aria-hidden />
                           {isPending ? "..." : "Segui"}
                         </>
                       )}
                     </Button>
-                  </div>
+                  </li>
                 )
-              })
-            )}
-          </div>
-        </section>
-
-        {/* Clubs Section */}
-        <div className="space-y-3">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {clubsQuery.isLoading ? (
-              <div className="surface-panel p-6 text-muted-foreground">Caricamento club...</div>
-            ) : clubs.length === 0 ? (
-              <div className="surface-panel p-6 text-muted-foreground">Nessun club trovato.</div>
-            ) : (
-              pagedClubs.map((club: any) => (
-                <div key={club.id} className="surface-panel overflow-hidden">
-                  <div className="relative h-32">
-                    {club.cover_image_url ? (
-                      <img
-                        src={club.cover_image_url}
-                        alt={club.name}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-[linear-gradient(132deg,#163047_0%,#1f3f5c_50%,#11283b_100%)]" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/85 to-transparent" />
-                    <Badge className="absolute left-3 top-3 bg-background/70 text-foreground border border-border/80">
-                      {club.visibility === "invite"
-                        ? "Privato"
-                        : club.visibility === "private"
-                        ? "Segreto"
-                        : "Pubblico"}
-                    </Badge>
-                    {club.is_member ? (
-                      <Badge className="absolute right-3 top-3 bg-primary/20 text-action-text border border-primary/35">
-                        Membro
-                      </Badge>
-                    ) : club.member_status === "pending" ? (
-                      <Badge className="absolute right-3 top-3 bg-raised text-muted-foreground border border-border">
-                        In attesa
-                      </Badge>
-                    ) : null}
-                    <Avatar className="absolute -bottom-5 left-3 h-10 w-10 border-2 border-background shadow-md">
-                      <AvatarImage src={(club.logo_url || club.logoUrl || undefined) as string | undefined} alt={club.name} />
-                      <AvatarFallback className="text-xs font-semibold">
-                        {String(club.name || "C").slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                  <div className="p-4 pt-7">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{club.name}</h3>
-                        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                          {club.description || "Allenati insieme, condividi progressi e obiettivi."}
-                        </p>
-                      </div>
-                      <Button variant="outline-neon" size="icon-sm" asChild>
-                        <Link href={`/community/club/${club.id}`}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
-                      <span className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        {club.member_count} membri
-                      </span>
-                      <Button variant="neon" size="sm" asChild>
-                        <Link href={`/community/club/${club.id}`}>Apri</Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          {clubs.length > clubsPageSize && (
-            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-3 py-2">
-              <p className="text-xs text-muted-foreground">Pagina {clubsPage} di {clubsTotalPages}</p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline-neon"
-                  onClick={() => setClubsPage((prev) => Math.max(1, prev - 1))}
-                  disabled={clubsPage === 1}
-                >
-                  Indietro
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline-neon"
-                  onClick={() => setClubsPage((prev) => Math.min(clubsTotalPages, prev + 1))}
-                  disabled={clubsPage === clubsTotalPages}
-                >
-                  Avanti
-                </Button>
-              </div>
-            </div>
+              })}
+            </ul>
           )}
-        </div>
+        </section>
       </div>
     </AppLayout>
   )
