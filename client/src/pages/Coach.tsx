@@ -17,9 +17,11 @@ import {
   formatDistance as formatDistanceValue,
   formatDurationParts,
   formatInteger,
-  formatSignedInteger,
   NO_VALUE,
 } from "@/lib/format"
+import { metricHeaders } from "@/lib/swim-metrics-view"
+import { STREAK_UNIT } from "@/lib/profile-stats"
+import { TSB_READING_LABELS } from "@shared/swimMetrics"
 import { toast } from "sonner"
 import { Sparkles, AlertTriangle } from "lucide-react"
 import { useSearch } from "wouter"
@@ -81,9 +83,12 @@ const sessionMeta = (entry: any) =>
     .filter(Boolean)
     .join(" · ")
 
-/** Score 0-100 as an integer; null without a number (the metric is then not shown). */
-const formatScore = (value?: number | null) =>
-  value !== null && value !== undefined && Number.isFinite(value) ? formatInteger(value) : null
+const SUGGESTED_CHAT_PROMPTS = [
+  "Come imposto la prossima seduta in base al mio recupero?",
+  "Guardando i miei dati, cosa devo migliorare prima?",
+  "Mi prepari 2 obiettivi concreti per questa settimana?",
+  "Come leggo il mio passo soglia e le zone di intensità?",
+]
 
 const insightNumberFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 })
 /** Number quoted in an insight, Italian style: 4.5% → «4,5 %», -3 → «−3». */
@@ -100,32 +105,6 @@ const getExerciseDetails = (exercise: WorkoutExercise) =>
     exercise.intensity && `Intensità: ${exercise.intensity}`,
     exercise.equipment && `Attrezzi: ${exercise.equipment}`,
   ].filter(Boolean) as string[]
-
-const getConditionLabel = (value?: number | null) => {
-  if (value === null || value === undefined) return "N/D"
-  if (value >= 75) return "Ottima"
-  if (value >= 55) return "Buona"
-  if (value >= 35) return "Da gestire"
-  return "Critica"
-}
-
-const getFocusLabel = (
-  performance?: number,
-  consistency?: number,
-  recovery?: number | null,
-  efficiency?: number | null
-) => {
-  const candidates = [
-    { label: "Prestazione", value: performance },
-    { label: "Costanza", value: consistency },
-    { label: "Recupero", value: recovery },
-    { label: "Efficienza", value: efficiency },
-  ].filter((item) => item.value !== null && item.value !== undefined)
-
-  if (!candidates.length) return "Analisi in corso"
-  candidates.sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
-  return candidates[0].label
-}
 
 /** One generated workout (pool or dry-land): meta, section picker, first three exercises. */
 function WorkoutDetail({
@@ -213,10 +192,15 @@ export default function Coach() {
     refetchOnWindowFocus: false,
   })
   const chat = useCoachChat(Number((meQuery.data as any)?.id) || null)
-  const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
-    { days: 30 },
-    { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
-  )
+  // The swim metrics (the same as Statistiche) and the AI advice built on them.
+  const { data: metrics } = trpc.statistics.getMetrics.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+  const { data: insights } = trpc.statistics.getInsights.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
 
   // Read-only: fetch existing workouts (no generation)
   const workoutsQuery = trpc.aiCoach.getWorkouts.useQuery(undefined, {
@@ -269,35 +253,13 @@ export default function Coach() {
     return formatDate(workoutsData.generatedAt)
   }, [workoutsData?.generatedAt])
 
-  const focusLabel = useMemo(
-    () =>
-      getFocusLabel(
-        advanced?.performanceIndex,
-        advanced?.consistencyScore,
-        advanced?.recoveryReadinessScore,
-        advanced?.swimmingEfficiencyIndex
-      ),
-    [advanced]
-  )
-
-  const suggestedChatPrompts = useMemo(
-    () => [
-      "Come imposto la prossima seduta in base al mio recupero?",
-      "Guardando i miei dati, cosa devo migliorare prima?",
-      "Mi prepari 2 obiettivi concreti per questa settimana?",
-      `Che lavoro faccio per migliorare in ${focusLabel.toLowerCase()}?`,
-    ],
-    [focusLabel]
-  )
-
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
     { limit: 50, offset: 0 },
     { staleTime: 60 * 1000 }
   )
 
   const insightCards = useMemo(() => {
-    const insights = advanced?.insights ?? []
-    if (!insights.length) return []
+    if (!insights?.length) return []
     return insights.map((text, index) => {
       const metricMatch = text.match(/(-?\d+(?:\.\d+)?)(%?)/)
       return {
@@ -306,51 +268,31 @@ export default function Coach() {
         metric: metricMatch ? formatInsightNumber(Number(metricMatch[1]), metricMatch[2] === "%") : null,
       }
     })
-  }, [advanced?.insights])
+  }, [insights])
 
   const safeInsightIndex = insightCards.length
     ? Math.min(activeInsightIndex, insightCards.length - 1)
     : 0
   const activeInsight = insightCards[safeInsightIndex]
 
+  // Key swim metrics with a value (a metric without data is not shown); the rest is in Statistiche.
   const keyMetrics = useMemo((): Array<MetricProps & { id: string }> => {
-    if (!advanced) return []
-    const recovery = advanced.recoveryReadinessScore ?? null
-    const streakCurrent = advanced.streak?.current ?? 0
-    const metrics: Array<MetricProps & { id: string }> = [
-      { id: "performance", value: formatInteger(advanced.performanceIndex ?? 0), unit: "/100", label: "Prestazione" },
-      { id: "consistency", value: formatInteger(advanced.consistencyScore ?? 0), unit: "/100", label: "Costanza" },
+    if (!metrics) return []
+    const headers = metricHeaders(metrics)
+    const tiles: Array<(MetricProps & { id: string }) | null> = [
+      headers.css.value ? { id: "css", value: headers.css.value, unit: headers.css.unit, label: "Passo soglia" } : null,
+      headers.intensity.value
+        ? { id: "intensity", value: headers.intensity.value, unit: headers.intensity.unit, label: "Intensità" }
+        : null,
+      headers.volume.value
+        ? { id: "volume", value: headers.volume.value, unit: headers.volume.unit, label: "Volume" }
+        : null,
+      headers.volume.value
+        ? { id: "streak", value: formatInteger(metrics.volume.streakWeeks), unit: STREAK_UNIT, label: "Serie" }
+        : null,
     ]
-    if (recovery !== null) {
-      metrics.push({ id: "recovery", value: formatInteger(recovery), unit: "/100", label: "Recupero" })
-    }
-    metrics.push({
-      id: "streak",
-      value: formatInteger(streakCurrent),
-      unit: streakCurrent === 1 ? "giorno" : "giorni",
-      label: `Serie, record ${formatInteger(advanced.streak?.record ?? 0)}`,
-    })
-    return metrics
-  }, [advanced])
-
-  // Advanced scores with a value only: a metric without data is not shown.
-  const advancedMetrics = useMemo(
-    () =>
-      // RRS is already the «Recupero» metric above; POI is a signed percentage.
-      [
-        { key: "SEI", value: formatScore(advanced?.swimmingEfficiencyIndex) },
-        { key: "TCI", value: formatScore(advanced?.technicalConsistencyIndex) },
-        { key: "SER", value: formatScore(advanced?.strokeEfficiencyRating) },
-        { key: "ACS", value: formatScore(advanced?.aerobicCapacityScore) },
-        {
-          key: "POI",
-          value:
-            advanced?.poiBaseline === false ? null : formatSignedInteger(advanced?.progressiveOverloadIndex),
-          unit: "%",
-        },
-      ].filter((metric): metric is { key: string; value: string; unit?: string } => metric.value !== null),
-    [advanced]
-  )
+    return tiles.filter((tile) => tile !== null)
+  }, [metrics])
 
   const archive = useSessionArchive(sessionInsightsQuery.data)
   const sessionEntries = archive.entries
@@ -381,10 +323,8 @@ export default function Coach() {
     setActiveDrySectionIndex(0)
   }, [drylandWorkout?.sections?.length])
 
-  const conditionLabel = useMemo(
-    () => getConditionLabel(advanced?.recoveryReadinessScore),
-    [advanced?.recoveryReadinessScore]
-  )
+  // Form − fatigue reading (TrainingPeaks conventions), «In costruzione».
+  const balanceReading = metrics?.load.today ? TSB_READING_LABELS[metrics.load.today.reading] : null
 
   const lastSyncLabel = useMemo(
     () => formatDate(latestSessionInsight?.activity_date),
@@ -407,9 +347,8 @@ export default function Coach() {
   }, [search])
 
   const summaryItems = [
-    { label: "Focus di oggi", value: focusLabel },
-    ...(advanced?.recoveryReadinessScore !== null && advanced?.recoveryReadinessScore !== undefined
-      ? [{ label: "Condizione", value: conditionLabel }]
+    ...(balanceReading
+      ? [{ label: "Equilibrio", value: balanceReading.charAt(0).toUpperCase() + balanceReading.slice(1) }]
       : []),
     { label: "Nuotate analizzate", value: formatInteger(sessionInsightsQuery.data?.length ?? 0) },
   ]
@@ -444,28 +383,13 @@ export default function Coach() {
 
           <TabsContent value="insights" className="mt-3">
             <div className="flex flex-col gap-4">
-              {keyMetrics.length > 0 || advancedMetrics.length > 0 ? (
-                <section aria-label="Punteggi" className="surface-panel order-2 p-4 lg:order-1">
-                  {keyMetrics.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
-                      {keyMetrics.map(({ id, ...metric }) => (
-                        <Metric key={id} size="responsive" {...metric} />
-                      ))}
-                    </div>
-                  ) : null}
-                  {advancedMetrics.length > 0 ? (
-                    <div className="mt-4 grid grid-cols-3 gap-x-4 gap-y-4 border-t border-border pt-4 sm:grid-cols-6">
-                      {advancedMetrics.map((metric) => (
-                        <Metric
-                          key={metric.key}
-                          value={metric.value}
-                          unit={metric.unit}
-                          label={metric.key}
-                          size="sm"
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+              {keyMetrics.length > 0 ? (
+                <section aria-label="Metriche" className="surface-panel order-2 p-4 lg:order-1">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+                    {keyMetrics.map(({ id, ...metric }) => (
+                      <Metric key={id} size="responsive" {...metric} />
+                    ))}
+                  </div>
                 </section>
               ) : null}
 
@@ -787,7 +711,7 @@ export default function Coach() {
               isLoading={chat.isPending}
               placeholder="Scrivi al coach (es. «Come imposto la nuotata di domani?»)"
               emptyStateMessage="Parti da una domanda concreta sul tuo allenamento."
-              suggestedPrompts={suggestedChatPrompts}
+              suggestedPrompts={SUGGESTED_CHAT_PROMPTS}
               maxInputLength={CHAT_MAX_MESSAGE_CHARS}
               height={520}
             />

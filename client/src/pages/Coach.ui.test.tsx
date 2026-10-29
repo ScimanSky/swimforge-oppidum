@@ -3,9 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import Coach from "./Coach";
+import { emptySwimMetricsFixture, swimMetricsFixture } from "@/components/stats/metrics-fixture";
 
 const state = vi.hoisted(() => ({
-  advanced: undefined as any,
+  metrics: undefined as any,
+  coachInsights: undefined as any,
   workouts: undefined as any,
   insights: [] as any[],
   generateCalls: 0,
@@ -16,7 +18,10 @@ const state = vi.hoisted(() => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     auth: { me: { useQuery: () => ({ data: { id: 7 } }) } },
-    statistics: { getAdvanced: { useQuery: () => ({ data: state.advanced }) } },
+    statistics: {
+      getMetrics: { useQuery: () => ({ data: state.metrics }) },
+      getInsights: { useQuery: () => ({ data: state.coachInsights }) },
+    },
     aiCoach: {
       getWorkouts: { useQuery: () => ({ data: state.workouts }) },
       generateWorkouts: {
@@ -83,19 +88,8 @@ describe("Coach AI", () => {
     state.chatResponse = { message: "Risposta del coach", provider: "gemini", fallback: false };
     vi.mocked(toast.warning).mockClear();
     vi.mocked(toast.info).mockClear();
-    state.advanced = {
-      performanceIndex: 62,
-      consistencyScore: 48,
-      recoveryReadinessScore: null,
-      streak: { current: 2, record: 6 },
-      poiBaseline: true,
-      swimmingEfficiencyIndex: 55,
-      technicalConsistencyIndex: null,
-      strokeEfficiencyRating: 47,
-      aerobicCapacityScore: null,
-      progressiveOverloadIndex: null,
-      insights: ["Il passo è migliorato del **4.5%**", "Aggiungi una nuotata"],
-    };
+    state.metrics = swimMetricsFixture();
+    state.coachInsights = ["Il passo è migliorato del **4.5%**", "Aggiungi una nuotata"];
     state.workouts = { pool: workout("Aerobico in vasca"), dryland: undefined, canGenerate: true };
     state.insights = [
       {
@@ -110,19 +104,23 @@ describe("Coach AI", () => {
     ];
   });
 
-  it("non ripete il titolo e mostra riepilogo, punteggi e consigli", async () => {
+  it("non ripete il titolo e mostra riepilogo, metriche e consigli", async () => {
     render(<Coach />);
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-    expect(screen.getByText("Focus di oggi")).toBeTruthy();
-    // Recovery has no data: neither the condition nor the score is shown.
-    expect(screen.queryByText("Condizione")).toBeNull();
-    expect(screen.getByText("Ultima analisi")).toBeTruthy();
+    const summary = screen.getByRole("region", { name: "Riepilogo del coach" });
+    expect(summary).toHaveTextContent("EquilibrioIn costruzione");
+    expect(within(summary).getByText("Ultima analisi")).toBeTruthy();
+    expect(within(summary).queryByText("Focus di oggi")).toBeNull();
 
-    const scores = screen.getByRole("region", { name: "Punteggi" });
-    expect(within(scores).getByText("Prestazione")).toBeTruthy();
-    expect(within(scores).queryByText("Recupero")).toBeNull();
-    expect(within(scores).getByText("SEI")).toBeTruthy();
-    expect(within(scores).queryByText("TCI")).toBeNull();
+    const metrics = screen.getByRole("region", { name: "Metriche" });
+    expect(metrics).toHaveTextContent("1:48 /100 m Passo soglia");
+    expect(metrics).toHaveTextContent("64% facile Intensità");
+    expect(metrics).toHaveTextContent("7,7 km/sett. Volume");
+    expect(metrics).toHaveTextContent("9 sett. Serie");
+    // The invented scores are gone.
+    for (const old of ["Prestazione", "Costanza", "Recupero", "SEI", "TCI", "SER", "ACS", "POI"]) {
+      expect(screen.queryByText(old)).toBeNull();
+    }
 
     expect(screen.getByRole("heading", { level: 2, name: "Consiglio 1" })).toBeTruthy();
     expect(screen.getByText("4,5 %")).toBeTruthy();
@@ -130,14 +128,17 @@ describe("Coach AI", () => {
     expect(screen.getByText("Aggiungi una nuotata")).toBeTruthy();
   });
 
-  it("recupero una volta sola e carico progressivo con segno", () => {
-    state.advanced = { ...state.advanced, recoveryReadinessScore: 70, progressiveOverloadIndex: -12 };
+  it("senza dati per una metrica non la mostra; senza consigli lo dice", () => {
+    state.metrics = emptySwimMetricsFixture();
+    state.coachInsights = [];
     render(<Coach />);
-    const scores = screen.getByRole("region", { name: "Punteggi" });
-    expect(within(scores).getByText("Recupero")).toBeTruthy();
-    expect(within(scores).queryByText("RRS")).toBeNull();
-    const poi = within(scores).getByText("POI").parentElement!;
-    expect(poi.textContent).toContain("−12 %");
+    expect(screen.queryByText("Equilibrio")).toBeNull();
+    const metrics = screen.getByRole("region", { name: "Metriche" });
+    expect(within(metrics).queryByText("Passo soglia")).toBeNull();
+    expect(within(metrics).queryByText("Intensità")).toBeNull();
+    expect(metrics).toHaveTextContent("1 sett. Serie");
+    expect(screen.queryByText("—")).toBeNull();
+    expect(screen.getByText(/Nessun consiglio disponibile/)).toBeTruthy();
   });
 
   it("apre la scheda dal parametro tab e genera gli allenamenti", async () => {
