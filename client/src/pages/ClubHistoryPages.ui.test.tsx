@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import type { ComponentType } from "react";
+import { createElement, type ComponentType } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -70,12 +70,8 @@ vi.mock("@/components/AppLayout", () => {
   return { default: AppLayout, AppLayout };
 });
 
-function page(path: string, Page: ComponentType) {
-  return (
-    <Router hook={memoryLocation({ path }).hook}>
-      <Page />
-    </Router>
-  );
+function page(path: string, component: ComponentType) {
+  return <Router hook={memoryLocation({ path }).hook}>{createElement(component)}</Router>;
 }
 
 describe("Storico del club: dal caricamento ai dati", () => {
