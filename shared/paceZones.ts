@@ -182,6 +182,24 @@ export function zoneOneLine(code: PaceZoneCode): string {
   return `${code} · ${zone.level}: ${zone.explanation}`;
 }
 
+/**
+ * Safety limits of the coach's workouts, for a recreational swimmer (our convention): the metres
+ * of C1, C2 and C3 in one session, the shortest rest of C2 and C3 as a multiple of the rep time
+ * (with a send-off, the rest it leaves at the zone pace), the A1 warm-up and the total against
+ * the median of the last pool swims. The server checks them on every generated workout.
+ */
+export const WORKOUT_SAFETY_LIMITS = {
+  sessionMeters: { C1: 1600, C2: 600, C3: 300 } as Partial<Record<PaceZoneCode, number>>,
+  restVsRep: { C2: 1, C3: 3 } as Partial<Record<PaceZoneCode, number>>,
+  warmupA1Meters: 200,
+  totalVsMedian: 1.5,
+  lastPoolSwims: 6,
+} as const;
+
+/** The limits in one line, for the definitions, the glossary and the coach. */
+export const WORKOUT_SAFETY_TEXT =
+  "Limiti di sicurezza degli allenamenti del coach (convenzione nostra): in un allenamento al massimo 1600 m in C1, 600 m in C2 e 300 m in C3; in C2 il recupero è almeno lungo quanto la ripetuta, in C3 almeno 3 volte; si comincia sempre con almeno 200 m facili in A1; il totale non supera 1,5 volte la mediana delle tue ultime 6 nuotate in vasca.";
+
 /** The zones of each of the five levels, aligned so that the two scales never contradict. */
 export const LEVEL_ZONES: Record<IntensityLevel, PaceZoneCode[]> = {
   Facile: ["A1"],
