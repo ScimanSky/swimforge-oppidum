@@ -33,11 +33,12 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from cryptography.fernet import Fernet
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from dotenv import load_dotenv
 
+from activity_selection import MAX_ACTIVITIES_LIMIT, select_recent_swims
 from mfa_state import load_state_entry, serialize_state
 
 # Load environment variables
@@ -244,6 +245,8 @@ class SwimmingActivity(BaseModel):
 class SyncRequest(BaseModel):
     user_id: str
     days_back: int = 30
+    # When set, import the N most recent swims (newest first) and ignore days_back.
+    max_activities: Optional[int] = Field(default=None, ge=1, le=MAX_ACTIVITIES_LIMIT)
 
 
 class SyncResponse(BaseModel):
@@ -532,12 +535,6 @@ def determine_stroke_type(activity_name: str, activity_type: str) -> str:
         return "butterfly"
     
     return "mixed"
-
-
-def is_swimming_activity(activity: dict) -> bool:
-    """Check if activity is a swimming activity"""
-    activity_type = activity.get("activityType", {}).get("typeKey", "").lower()
-    return "swim" in activity_type or "pool" in activity_type
 
 
 def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None) -> SwimmingActivity:
@@ -1146,9 +1143,10 @@ async def get_status(user_id: str, api_key: str = Depends(verify_api_key)):
 def get_swimming_activities(
     user_id: str,
     days_back: int = 30,
-    api_key: str = Depends(verify_api_key)
+    api_key: str = Depends(verify_api_key),
+    max_activities: Optional[int] = Query(default=None, ge=1, le=MAX_ACTIVITIES_LIMIT),
 ):
-    """Fetch swimming activities from Garmin Connect"""
+    """Fetch swimming activities from Garmin Connect (the last max_activities swims when given)"""
     client = get_garmin_client(user_id)
     
     if not client:
@@ -1158,62 +1156,54 @@ def get_swimming_activities(
         )
     
     try:
-        # Get activities
-        start_date = datetime.now() - timedelta(days=days_back)
-        
-        # Fetch activities (limit to 100)
+        # Fetch activities (limit to 100), then pick the swims to import before
+        # any per-activity Garmin call (HR zones), so a capped sync costs less.
         activities = client.get_activities(0, 100)
-        
-        # Filter for swimming activities
+        selected = select_recent_swims(activities, max_activities, days_back, datetime.now())
+        if max_activities is not None:
+            logger.info(f"Sync capped to the last {max_activities} swims for user {user_id}: {len(selected)} selected")
+
         swimming_activities = []
-        for activity in activities:
-            if is_swimming_activity(activity):
-                # Check if within date range
-                activity_date = activity.get("startTimeLocal", "")
-                if activity_date:
-                    try:
-                        act_dt = datetime.fromisoformat(activity_date.replace("Z", "+00:00"))
-                        if act_dt.replace(tzinfo=None) >= start_date:
-                            # Fetch HR zones data for this activity
-                            hr_zones_data = None
-                            try:
-                                activity_id = activity.get("activityId")
-                                if activity_id:
-                                    hr_zones_response = client.get_activity_hr_in_timezones(activity_id)
-                                    if hr_zones_response:
-                                        # Handle both list and dict responses
-                                        if isinstance(hr_zones_response, list):
-                                            # If it's a list, convert it to a dict by zone number
-                                            hr_zones_data = {
-                                                "zone1": 0,
-                                                "zone2": 0,
-                                                "zone3": 0,
-                                                "zone4": 0,
-                                                "zone5": 0
-                                            }
-                                            for zone in hr_zones_response:
-                                                if isinstance(zone, dict):
-                                                    zone_num = zone.get("zoneNumber")
-                                                    time_in_seconds = zone.get("secsInZone", 0)
-                                                    if zone_num and 1 <= zone_num <= 5:
-                                                        hr_zones_data[f"zone{zone_num}"] = time_in_seconds
-                                        elif isinstance(hr_zones_response, dict):
-                                            # If it's a dict, extract directly
-                                            hr_zones_data = {
-                                                "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
-                                                "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
-                                                "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
-                                                "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
-                                                "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
-                                            }
-                                        logger.info(f"HR zones for activity {activity_id}: {hr_zones_data}")
-                            except Exception as hr_err:
-                                logger.warning(f"Could not fetch HR zones for activity {activity.get('activityId')}: {hr_err}")
-                            
-                            swimming_activities.append(parse_swimming_activity(activity, hr_zones_data))
-                    except Exception:
-                        swimming_activities.append(parse_swimming_activity(activity))
-        
+        for activity in selected:
+            hr_zones_data = None
+            try:
+                activity_id = activity.get("activityId")
+                if activity_id:
+                    hr_zones_response = client.get_activity_hr_in_timezones(activity_id)
+                    if hr_zones_response:
+                        # Handle both list and dict responses
+                        if isinstance(hr_zones_response, list):
+                            # If it's a list, convert it to a dict by zone number
+                            hr_zones_data = {
+                                "zone1": 0,
+                                "zone2": 0,
+                                "zone3": 0,
+                                "zone4": 0,
+                                "zone5": 0
+                            }
+                            for zone in hr_zones_response:
+                                if isinstance(zone, dict):
+                                    zone_num = zone.get("zoneNumber")
+                                    time_in_seconds = zone.get("secsInZone", 0)
+                                    if zone_num and 1 <= zone_num <= 5:
+                                        hr_zones_data[f"zone{zone_num}"] = time_in_seconds
+                        elif isinstance(hr_zones_response, dict):
+                            # If it's a dict, extract directly
+                            hr_zones_data = {
+                                "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
+                                "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
+                                "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
+                                "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
+                                "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
+                            }
+                        logger.info(f"HR zones for activity {activity_id}: {hr_zones_data}")
+            except Exception as hr_err:
+                logger.warning(f"Could not fetch HR zones for activity {activity.get('activityId')}: {hr_err}")
+            try:
+                swimming_activities.append(parse_swimming_activity(activity, hr_zones_data))
+            except Exception:
+                swimming_activities.append(parse_swimming_activity(activity))
+
         logger.info(f"Found {len(swimming_activities)} swimming activities for user {user_id}")
         
         return {
@@ -1427,7 +1417,8 @@ def sync_activities(request: SyncRequest, api_key: str = Depends(verify_api_key)
         result = get_swimming_activities(
             request.user_id,
             request.days_back,
-            api_key
+            api_key,
+            max_activities=request.max_activities,
         )
         
         # Update last sync time
