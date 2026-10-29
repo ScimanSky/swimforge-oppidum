@@ -29,7 +29,7 @@ import {
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
-import { invalidateUserCache } from "./lib/cache";
+import { cacheKeys, deleteCached, invalidateUserCache } from "./lib/cache";
 import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
 import { calculateActivityXp as calculateActivityXpCore } from "./lib/utils";
 import { logger } from "./middleware/logger";
@@ -1595,6 +1595,9 @@ export async function syncGarminActivities(
 
       // Invalidate cached data for this user
       await invalidateUserCache(String(userId));
+    } else {
+      // Laps backfilled on swims already stored change the swim metrics too.
+      await deleteCached(cacheKeys.swimMetrics(String(userId)));
     }
 
     // Update last sync time

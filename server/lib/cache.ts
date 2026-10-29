@@ -476,6 +476,7 @@ export const cacheKeys = {
     `user:activities:${key}:${limit}:${offset}`,
   search: (query: string) => `search:${query}`,
   badgeDefinitions: () => 'badge:definitions',
+  swimMetrics: (userId: string) => `swim-metrics:v1:${userId}`,
 };
 
 /**
@@ -496,6 +497,7 @@ export async function invalidateUserCache(userId: string): Promise<void> {
       cacheKeys.userStats(userId),
       cacheKeys.userProfile(userId),
       cacheKeys.badges(userId),
+      cacheKeys.swimMetrics(userId),
       // REMOVED: `user:activities:${userId}:*` — DEL doesn't support wildcards
     ];
 

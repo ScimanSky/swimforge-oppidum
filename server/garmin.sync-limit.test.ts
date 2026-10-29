@@ -2,10 +2,14 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   process.env.GARMIN_SERVICE_SECRET = "test-secret";
-  return { getDb: vi.fn() };
+  return { getDb: vi.fn(), deleteCached: vi.fn(async () => {}) };
 });
 
 vi.mock("./db", () => ({ getDb: h.getDb, upsertPersonalRecord: vi.fn() }));
+vi.mock("./lib/cache", async () => {
+  const actual = await vi.importActual<typeof import("./lib/cache")>("./lib/cache");
+  return { ...actual, deleteCached: h.deleteCached };
+});
 
 import { syncGarminActivities } from "./garmin";
 import { garminTokens, swimmerProfiles } from "../drizzle/schema";
@@ -135,5 +139,13 @@ describe("syncGarminActivities auto-sync timestamp", () => {
     expect(updates.some((u) => u.table === swimmerProfiles && "lastGarminSyncAt" in u.values)).toBe(false);
     // The "last sync" shown in Settings still reflects the manual sync.
     expect(updates.some((u) => u.table === garminTokens && "lastSyncAt" in u.values)).toBe(true);
+  });
+
+  it("drops the cached swim metrics even without new swims (laps may have been backfilled)", async () => {
+    mockDbRecordingUpdates();
+
+    await syncGarminActivities(7, 30);
+
+    expect(h.deleteCached).toHaveBeenCalledWith("swim-metrics:v1:7");
   });
 });

@@ -8,6 +8,7 @@ import {
   swimmingActivities,
 } from "../drizzle/schema";
 import { logger } from "./middleware/logger";
+import { cacheKeys, deleteCached } from "./lib/cache";
 import { ENV } from "./_core/env";
 
 let genAI: GoogleGenerativeAI | null = null;
@@ -247,6 +248,8 @@ async function ensureGarminSegmentData(activity: Record<string, unknown>) {
     const details = await garmin.getGarminActivityFullDetails(userId, String(garminActivityId));
     if (!details) return;
     await garmin.persistGarminLapDetails(db, activityId, details);
+    // New laps change the swim metrics.
+    await deleteCached(cacheKeys.swimMetrics(String(userId)));
     log.debug("[AI Insights] Garmin segment details fetched and persisted", {
       event: "ai_activity_insights:garmin_segments_persisted",
       userId,

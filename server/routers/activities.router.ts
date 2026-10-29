@@ -6,6 +6,7 @@ import {
     garmin,
 } from "./_shared";
 import type { SwimmingActivityInsert } from "./_shared";
+import { invalidateSwimMetrics } from "../swim_metrics";
 
 export const activitiesRouter = router({
     list: protectedProcedure
@@ -197,6 +198,8 @@ export const activitiesRouter = router({
                                     activity.id,
                                     fullDetails
                                 );
+                                // New laps change the swim metrics.
+                                await invalidateSwimMetrics(ctx.user.id);
                             }
                         } catch (error) {
                             logger.warn("[Garmin] Failed to persist lap details", {

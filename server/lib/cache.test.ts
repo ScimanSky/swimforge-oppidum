@@ -233,3 +233,17 @@ describe("Redis outage: client open (reconnecting) but not ready", () => {
     ]);
   });
 });
+
+describe("invalidateUserCache", () => {
+  it("also drops the user's swim metrics", async () => {
+    m.client.set.mockResolvedValue("OK");
+    const multi = { del: vi.fn(), exec: vi.fn(async () => []) };
+    m.client.multi.mockReturnValue(multi);
+    m.client.scanIterator.mockReturnValue((async function* () {})());
+    m.client.eval.mockResolvedValue(1);
+
+    await invalidateUserCache("42");
+
+    expect(multi.del).toHaveBeenCalledWith(expect.arrayContaining(["user:stats:42", "swim-metrics:v1:42"]));
+  });
+});
