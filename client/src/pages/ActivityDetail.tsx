@@ -939,14 +939,21 @@ export default function ActivityDetail() {
             shared={Boolean(activity.shareToFeed)}
             className="surface-panel px-4 py-3"
           />
-          <div className="flex items-center justify-end gap-3">
+          {/* Phones: stacked full-width buttons (the long label never fits beside «Coach AI»
+              on one row); from sm up they sit side by side. Labels may wrap instead of clipping. */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
             {!activity.shareToFeed ? (
-              <Button type="button" size="lg" className="flex-1" onClick={() => setSharePickerOpen(true)}>
+              <Button
+                type="button"
+                size="lg"
+                className="h-auto min-h-12 w-full whitespace-normal py-2 text-center sm:w-auto sm:flex-1"
+                onClick={() => setSharePickerOpen(true)}
+              >
                 Condividi con foto o commento
               </Button>
             ) : null}
             {/* The coach's Session IQ reads only the last synced session: no per-activity link (Phase 3). */}
-            <Button variant="outline" size="lg" asChild>
+            <Button variant="outline" size="lg" className="w-full sm:w-auto" asChild>
               <Link href="/coach">
                 <Sparkles className="size-5" aria-hidden />
                 Coach AI
