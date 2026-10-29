@@ -12,7 +12,6 @@ type PublicProfile = {
   location: string | null;
   level: number | null;
   totalXp: number | null;
-  privacySettings: unknown;
   followerCount: number;
   followingCount: number;
   isFollowing: boolean;
@@ -93,10 +92,12 @@ export async function getUserPublicProfile(params: {
     )
     .limit(1);
 
-  const profilePublic = getPrivacyFlag(row.privacySettings, "profilePublic", true);
+  // Only the derived visibility flag goes out: the raw settings stay private.
+  const { privacySettings, ...publicRow } = row;
+  const profilePublic = getPrivacyFlag(privacySettings, "profilePublic", true);
 
   return {
-    ...row,
+    ...publicRow,
     followerCount: Number(followerCountResult[0]?.count ?? 0),
     followingCount: Number(followingCountResult[0]?.count ?? 0),
     isFollowing: isFollowingResult.length > 0,

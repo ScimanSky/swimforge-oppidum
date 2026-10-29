@@ -14,6 +14,24 @@ import { ensureRequiredLegalConsents } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
+import type { User } from "../../drizzle/schema";
+
+// What auth.me hands to the client about the caller: never the password hash
+// nor the session token version.
+export function toSelfUser(user: User | null) {
+    if (!user) return null;
+    return {
+        id: user.id,
+        openId: user.openId,
+        name: user.name,
+        email: user.email,
+        loginMethod: user.loginMethod,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastSignedIn: user.lastSignedIn,
+    };
+}
 
 const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
@@ -27,7 +45,7 @@ const REGISTRATION_PASSWORD_SCHEMA = z
     .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
 
 export const authRouter = router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => toSelfUser(opts.ctx.user)),
 
     // Register with email and password
     register: publicProcedure
