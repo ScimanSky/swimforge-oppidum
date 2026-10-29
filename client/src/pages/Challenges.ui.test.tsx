@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -20,10 +20,14 @@ const state = vi.hoisted(() => ({
   mutating: {} as Record<string, any>,
 }));
 
+// `mutate` leaves the mutation pending (as on the network) until the test clears `state.mutating`.
 const mutation = vi.hoisted(() => (name: string, calls: any[]) => (options: any) => {
   state.options[name] = options;
   return {
-    mutate: (vars: any) => calls.push(vars),
+    mutate: (vars: any) => {
+      calls.push(vars);
+      state.mutating[name] = vars;
+    },
     isPending: state.mutating[name] !== undefined,
     variables: state.mutating[name],
   };
@@ -69,6 +73,36 @@ const challenge = (id: number, extra: Record<string, unknown> = {}) => ({
   end_date: new Date(Date.now() + 3 * 86400000).toISOString(),
   ...extra,
 });
+
+/**
+ * Radix keeps a closing dialog mounted until its exit animation ends, as in a browser. jsdom has
+ * no CSS animations: the alertdialog reports one («exit» once closed) and `finishExit` ends it.
+ */
+function animateAlertDialogExit() {
+  const original = window.getComputedStyle.bind(window);
+  const spy = vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) => {
+    const styles = original(element, pseudo);
+    if (!(element instanceof HTMLElement) || element.getAttribute("role") !== "alertdialog") return styles;
+    return new Proxy(styles, {
+      get: (target, key) => {
+        if (key === "animationName") return element.dataset.state === "closed" ? "exit" : "enter";
+        const value = Reflect.get(target, key, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  });
+  return {
+    finishExit: async () => {
+      const dialog = screen.getByRole("alertdialog");
+      act(() => {
+        dialog.dispatchEvent(Object.assign(new Event("animationend"), { animationName: "exit" }));
+      });
+      // Radix restores focus in a timeout after the unmount: wait for it.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    },
+    restore: () => spy.mockRestore(),
+  };
+}
 
 function renderChallenges() {
   const tree = () => (
@@ -139,6 +173,19 @@ describe("Sfide (Corsia)", () => {
     });
   });
 
+  it("Partecipa e Abbandona falliti sul server ({ success: false }): avviso d'errore", () => {
+    renderChallenges();
+    state.options.join.onSuccess({ success: true });
+    state.options.leave.onSuccess({ success: true });
+    expect(toast.error).not.toHaveBeenCalled();
+    state.options.join.onSuccess({ success: false });
+    expect(toast.error).toHaveBeenLastCalledWith("Impossibile partecipare alla sfida");
+    state.options.leave.onSuccess({ success: false });
+    expect(toast.error).toHaveBeenLastCalledWith("Impossibile abbandonare la sfida");
+    // Either way the list is refreshed.
+    expect(state.refetch).toHaveBeenCalledTimes(4);
+  });
+
   it("sfida sul passo: la barra misura rispetto al passo migliore (più basso)", () => {
     state.challenges = [
       challenge(3, {
@@ -201,6 +248,56 @@ describe("Sfide (Corsia)", () => {
       within(screen.getByRole("alertdialog")).getByRole("button", { name: "Abbandona" })
     );
     expect(state.leaveCalls).toEqual([{ challengeId: 7 }]);
+  });
+
+  describe("fuoco e titolo del dialogo «Abbandona»", () => {
+    let exit: ReturnType<typeof animateAlertDialogExit>;
+    beforeEach(() => {
+      exit = animateAlertDialogExit();
+      state.challenges = [challenge(7, { isParticipant: true }), challenge(8, { isParticipant: true })];
+    });
+    afterEach(() => exit.restore());
+
+    const openLeave = async (name: string) => {
+      const card = screen.getByRole("heading", { level: 3, name }).closest("li")!;
+      const opener = within(card).getByRole("button", { name: "Abbandona" });
+      await userEvent.click(opener);
+      return opener;
+    };
+
+    it("Annulla: il titolo resta durante la chiusura e il fuoco torna su «Abbandona»", async () => {
+      renderChallenges();
+      const opener = await openLeave("Sfida 7");
+      await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Annulla" }));
+      // Still animating out: the title keeps the challenge name.
+      expect(screen.getByRole("alertdialog", { name: "Abbandonare «Sfida 7»?" })).toBeTruthy();
+      await exit.finishExit();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(document.activeElement).toBe(opener);
+    });
+
+    it("confermato: mentre la richiesta è in corso il fuoco va sulla scheda «Attive», non sul body", async () => {
+      renderChallenges();
+      const opener = await openLeave("Sfida 7");
+      await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Abbandona" }));
+      expect(screen.getByRole("alertdialog", { name: "Abbandonare «Sfida 7»?" })).toBeTruthy();
+      // The card's button is disabled while the request runs.
+      expect(opener.hasAttribute("disabled")).toBe(true);
+      await exit.finishExit();
+      expect(document.activeElement).toBe(screen.getByRole("tab", { name: /Attive/ }));
+    });
+
+    it("confermato: la scheda sparisce col refetch prima della fine dell'animazione", async () => {
+      const { rerender } = renderChallenges();
+      await openLeave("Sfida 7");
+      await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Abbandona" }));
+      state.mutating = {};
+      state.challenges = [challenge(8, { isParticipant: true })];
+      rerender();
+      expect(screen.queryByRole("heading", { level: 3, name: "Sfida 7" })).toBeNull();
+      await exit.finishExit();
+      expect(document.activeElement).toBe(screen.getByRole("tab", { name: /Attive/ }));
+    });
   });
 
   it("partecipa a una sfida disponibile", async () => {

@@ -125,9 +125,13 @@ export default function Challenges() {
   const fieldId = useId()
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  // «Abbandona» asks first; focus goes back to the button that asked.
+  // «Abbandona» asks first. The last target stays rendered while the dialog animates out;
+  // `leaveOpen` drives it.
   const [leaveTarget, setLeaveTarget] = useState<{ id: number; name: string } | null>(null)
+  const [leaveOpen, setLeaveOpen] = useState(false)
   const leaveOpenerRef = useRef<HTMLButtonElement | null>(null)
+  const leaveConfirmedRef = useRef(false)
+  const activeTabRef = useRef<HTMLButtonElement>(null)
   const isDesktopWide = useMediaQuery("(min-width: 1280px)", false)
   const activeListRef = useRef<HTMLUListElement>(null)
   const availableListRef = useRef<HTMLUListElement>(null)
@@ -168,13 +172,16 @@ export default function Challenges() {
     }
   )
 
+  // The server reports a failed insert or delete as { success: false }, not as an error.
   const joinChallenge = trpc.challenges.join.useMutation({
-    onSuccess: () => challengesQuery.refetch(),
+    onSuccess: (result) => {
+      if (result && result.success === false) toast.error("Impossibile partecipare alla sfida")
+      challengesQuery.refetch()
+    },
     onError: (err) => toast.error(err.message || "Impossibile partecipare alla sfida"),
   })
   const leaveChallenge = trpc.challenges.leave.useMutation({
     onSuccess: (result) => {
-      // The server reports a failed delete as { success: false }, not as an error.
       if (result && result.success === false) toast.error("Impossibile abbandonare la sfida")
       challengesQuery.refetch()
     },
@@ -380,7 +387,7 @@ export default function Challenges() {
         >
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <TabsList aria-label="Sfide">
-              <TabsTrigger value="active">
+              <TabsTrigger value="active" ref={activeTabRef}>
                 Attive
                 {challengesQuery.data ? (
                   <span className="tabular-nums">({participatingCount})</span>
@@ -480,7 +487,9 @@ export default function Challenges() {
                           disabled={isLeaving(challenge.id)}
                           onClick={(event) => {
                             leaveOpenerRef.current = event.currentTarget
+                            leaveConfirmedRef.current = false
                             setLeaveTarget({ id: challenge.id, name: challenge.name })
+                            setLeaveOpen(true)
                           }}
                         >
                           Abbandona
@@ -600,15 +609,21 @@ export default function Challenges() {
           </TabsContent>
         </Tabs>
 
-        <Dialog open={leaveTarget != null} onOpenChange={(open) => !open && setLeaveTarget(null)}>
+        <Dialog open={leaveOpen && leaveTarget != null} onOpenChange={setLeaveOpen}>
           <DialogContent
             role="alertdialog"
             showCloseButton={false}
             className="sm:max-w-sm"
             onCloseAutoFocus={(event) => {
-              // Back to «Abbandona» when its card is still there (cancelled or failed).
+              // This runs after the exit animation. Cancelled: back to the card's «Abbandona».
+              // Confirmed, the card is leaving (its button disabled while the request runs, then
+              // gone with the refetch): the «Attive» tab, which stays, so focus is never lost.
               event.preventDefault()
-              if (leaveOpenerRef.current?.isConnected) leaveOpenerRef.current.focus()
+              const opener = leaveOpenerRef.current
+              const backToOpener =
+                !leaveConfirmedRef.current && opener?.isConnected === true && !opener.disabled
+              const target = backToOpener ? opener : activeTabRef.current
+              target?.focus()
             }}
           >
             <DialogHeader>
@@ -623,7 +638,8 @@ export default function Challenges() {
                 variant="destructive"
                 onClick={() => {
                   if (leaveTarget) leaveChallenge.mutate({ challengeId: leaveTarget.id })
-                  setLeaveTarget(null)
+                  leaveConfirmedRef.current = true
+                  setLeaveOpen(false)
                 }}
               >
                 Abbandona
