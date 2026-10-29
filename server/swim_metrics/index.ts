@@ -1,14 +1,16 @@
 /**
- * Swim metrics of a user: reads 180 days of swims and their laps, the CSS test in the profile
- * preferences and the swim dates for the streak, then computes everything (cached 1 hour).
+ * Swim metrics of a user: reads 180 days of swims and their laps, 300 days of laps near the CSS
+ * distances, the CSS test in the profile preferences and the swims per week for the streak (five
+ * queries in parallel), then computes everything (cached 1 hour).
  */
-import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, between, eq, gte, sql } from "drizzle-orm";
 import type { SwimMetrics } from "@shared/swimMetrics";
-import { dayKey } from "@shared/swimMetrics";
+import { addDaysToKey, dayKey } from "@shared/swimMetrics";
 import { garminActivityLaps, swimmerProfiles, swimmingActivities } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { cacheKeys, deleteCached, getOrSetCached } from "../lib/cache";
 import { computeSwimMetrics, HISTORY_DAYS, type CssTest, type SwimMetricsInput } from "./compute";
+import type { CssLap } from "./css";
 import { toMetricLap, type MetricActivity, type MetricLap } from "./laps";
 
 export { computeSwimMetrics, type CssTest } from "./compute";
@@ -44,58 +46,87 @@ export function parseCssTest(preferences: unknown): CssTest | null {
   return { t200Seconds, t400Seconds, date };
 }
 
+/** Days of freestyle laps read for the CSS estimates: the 90-day windows of 7 month ends. */
+export const CSS_LAPS_DAYS = 300;
+/** Lap distances the light CSS query keeps: 200 yd − 3% (177 m) to 1500 m + 3%. */
+const CSS_LAP_MIN_METERS = 177;
+const CSS_LAP_MAX_METERS = 1545;
+
+/** Monday «YYYY-MM-DD» of the Rome week of a swim (activity_date is a UTC timestamp). */
+const romeWeekStart = sql<string>`to_char(date_trunc('week', (${swimmingActivities.activityDate} AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome'), 'YYYY-MM-DD')`;
+
 async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // One day of margin: the compute keeps the 180 Rome days.
+  // One day of margin on each window: the compute keeps whole Rome days.
   const since = new Date(now.getTime() - (HISTORY_DAYS + 1) * DAY_MS);
-  const rows = await db
-    .select({
-      id: swimmingActivities.id,
-      activityDate: swimmingActivities.activityDate,
-      distanceMeters: swimmingActivities.distanceMeters,
-      durationSeconds: swimmingActivities.durationSeconds,
-      poolLengthMeters: swimmingActivities.poolLengthMeters,
-      isOpenWater: swimmingActivities.isOpenWater,
-    })
-    .from(swimmingActivities)
-    .where(and(eq(swimmingActivities.userId, userId), gte(swimmingActivities.activityDate, since)))
-    .orderBy(asc(swimmingActivities.activityDate));
+  const cssSince = new Date(now.getTime() - (CSS_LAPS_DAYS + 1) * DAY_MS);
+  const streakSince = new Date(now.getTime() - STREAK_LOOKBACK_DAYS * DAY_MS);
+  const recentSwims = and(eq(swimmingActivities.userId, userId), gte(swimmingActivities.activityDate, since));
 
-  const ids = rows.map((row) => row.id);
-  const lapRows = ids.length
-    ? await db
-        .select({
-          activityId: garminActivityLaps.activityId,
-          lapIndex: garminActivityLaps.lapIndex,
-          distanceMeters: garminActivityLaps.distanceMeters,
-          durationSeconds: garminActivityLaps.durationSeconds,
-          movingDurationSeconds: garminActivityLaps.movingDurationSeconds,
-          totalNumberOfStrokes: garminActivityLaps.totalNumberOfStrokes,
-          averageSwolf: garminActivityLaps.averageSwolf,
-          strokeType: garminActivityLaps.strokeType,
-        })
-        .from(garminActivityLaps)
-        .where(inArray(garminActivityLaps.activityId, ids))
-        .orderBy(asc(garminActivityLaps.activityId), asc(garminActivityLaps.lapIndex))
-    : [];
-
-  const [profile] = await db
-    .select({ preferences: swimmerProfiles.preferences })
-    .from(swimmerProfiles)
-    .where(eq(swimmerProfiles.userId, userId))
-    .limit(1);
-
-  const streakRows = await db
-    .select({ activityDate: swimmingActivities.activityDate })
-    .from(swimmingActivities)
-    .where(
-      and(
-        eq(swimmingActivities.userId, userId),
-        gte(swimmingActivities.activityDate, new Date(now.getTime() - STREAK_LOOKBACK_DAYS * DAY_MS)),
+  // Five independent queries, in parallel.
+  const [rows, lapRows, profileRows, cssLapRows, streakRows] = await Promise.all([
+    db
+      .select({
+        id: swimmingActivities.id,
+        activityDate: swimmingActivities.activityDate,
+        distanceMeters: swimmingActivities.distanceMeters,
+        durationSeconds: swimmingActivities.durationSeconds,
+        poolLengthMeters: swimmingActivities.poolLengthMeters,
+        isOpenWater: swimmingActivities.isOpenWater,
+      })
+      .from(swimmingActivities)
+      .where(recentSwims)
+      .orderBy(asc(swimmingActivities.activityDate)),
+    db
+      .select({
+        activityId: garminActivityLaps.activityId,
+        lapIndex: garminActivityLaps.lapIndex,
+        distanceMeters: garminActivityLaps.distanceMeters,
+        durationSeconds: garminActivityLaps.durationSeconds,
+        movingDurationSeconds: garminActivityLaps.movingDurationSeconds,
+        totalNumberOfStrokes: garminActivityLaps.totalNumberOfStrokes,
+        averageSwolf: garminActivityLaps.averageSwolf,
+        strokeType: garminActivityLaps.strokeType,
+      })
+      .from(garminActivityLaps)
+      .innerJoin(swimmingActivities, eq(garminActivityLaps.activityId, swimmingActivities.id))
+      .where(recentSwims)
+      .orderBy(asc(garminActivityLaps.activityId), asc(garminActivityLaps.lapIndex)),
+    db
+      .select({ preferences: swimmerProfiles.preferences })
+      .from(swimmerProfiles)
+      .where(eq(swimmerProfiles.userId, userId))
+      .limit(1),
+    // Light: only pool laps near a CSS distance, over 300 days (the stroke is checked in code).
+    db
+      .select({
+        activityDate: swimmingActivities.activityDate,
+        poolLengthMeters: swimmingActivities.poolLengthMeters,
+        isOpenWater: swimmingActivities.isOpenWater,
+        distanceMeters: garminActivityLaps.distanceMeters,
+        durationSeconds: garminActivityLaps.durationSeconds,
+        movingDurationSeconds: garminActivityLaps.movingDurationSeconds,
+        strokeType: garminActivityLaps.strokeType,
+      })
+      .from(garminActivityLaps)
+      .innerJoin(swimmingActivities, eq(garminActivityLaps.activityId, swimmingActivities.id))
+      .where(
+        and(
+          eq(swimmingActivities.userId, userId),
+          gte(swimmingActivities.activityDate, cssSince),
+          eq(swimmingActivities.isOpenWater, false),
+          between(garminActivityLaps.distanceMeters, CSS_LAP_MIN_METERS, CSS_LAP_MAX_METERS),
+        ),
       ),
-    );
+    // The streak: swims per Rome week over two years, counted by the database.
+    db
+      .select({ weekStart: romeWeekStart, swims: sql<number>`count(*)::int` })
+      .from(swimmingActivities)
+      .where(and(eq(swimmingActivities.userId, userId), gte(swimmingActivities.activityDate, streakSince)))
+      .groupBy(sql`1`),
+  ]);
 
   const lapsByActivity = new Map<number, MetricLap[]>();
   for (const row of lapRows) {
@@ -118,10 +149,25 @@ async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
     };
   });
 
+  const cssLaps: CssLap[] = cssLapRows.flatMap((row) => {
+    const lap = toMetricLap({ ...row, activityId: 0, lapIndex: 0, totalNumberOfStrokes: null, averageSwolf: null });
+    if (!(lap.distanceMeters > 0) || !(lap.seconds > 0)) return [];
+    return [{
+      day: dayKey(new Date(row.activityDate)),
+      poolLengthMeters: row.poolLengthMeters ?? null,
+      isOpenWater: Boolean(row.isOpenWater),
+      distanceMeters: lap.distanceMeters,
+      seconds: lap.seconds,
+      stroke: lap.stroke,
+    }];
+  });
+
   return {
     activities,
-    cssTest: parseCssTest(profile?.preferences),
-    streakDates: streakRows.map((row) => new Date(row.activityDate)),
+    cssTest: parseCssTest(profileRows[0]?.preferences),
+    streakWeekCounts: new Map(streakRows.map((row) => [String(row.weekStart), Number(row.swims) || 0])),
+    cssLaps,
+    cssLapsFrom: addDaysToKey(dayKey(now), -(CSS_LAPS_DAYS - 1)),
   };
 }
 

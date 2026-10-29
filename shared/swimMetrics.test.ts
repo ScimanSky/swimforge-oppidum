@@ -13,6 +13,7 @@ import {
   pacingCvReading,
   weekStartKey,
   weeklyStreak,
+  weeklyStreakFromCounts,
 } from "./swimMetrics";
 
 describe("dayKey", () => {
@@ -89,6 +90,17 @@ describe("weeklyStreak", () => {
       at("2026-10-19T08:00:00Z"), at("2026-10-23T08:00:00Z"), // week of 19/10: 2
     ];
     expect(weeklyStreak(dates, now)).toBe(1);
+  });
+
+  it("from swims counted per Rome week (Monday keys), as the database groups them", () => {
+    const counts = new Map([
+      ["2026-10-12", 2],
+      ["2026-10-19", 3],
+      ["2026-10-26", 1],
+    ]);
+    expect(weeklyStreakFromCounts(counts, now)).toBe(2);
+    expect(weeklyStreakFromCounts({ "2026-10-19": 2, "2026-10-26": 2 }, now)).toBe(2);
+    expect(weeklyStreakFromCounts(new Map(), now)).toBe(0);
   });
 
   it("is 0 without swims and accepts another minimum", () => {

@@ -29,7 +29,9 @@ export type SwimMetricsInput = {
   /** The user's 400/200 test, whatever its age. */
   cssTest: CssTest | null;
   /** Dates of the swims over a longer window, for the weekly streak. */
-  streakDates: Date[];
+  streakDates?: Date[];
+  /** Or the swims per Rome week (Monday «YYYY-MM-DD») over that window, counted by the database. */
+  streakWeekCounts?: Map<string, number>;
   /**
    * Active pool laps for the CSS estimates over a longer window (300 days), so that every month's
    * 90-day window is complete. Default: the laps of `activities`.
@@ -353,6 +355,6 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
       latestSet: pacing.latestSet,
       missing: pacing.missing,
     },
-    volume: volumeSummary(activities, now, input.streakDates),
+    volume: volumeSummary(activities, now, input.streakWeekCounts ?? input.streakDates),
   };
 }

@@ -1,30 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { garminActivityLaps, swimmerProfiles, swimmingActivities } from "../../drizzle/schema";
 
-// Fake db: each select resolves to the rows of the table it reads. The streak query is the one
-// that selects only the activity dates.
+// Fake db: each select resolves to the rows of the table it reads (and of the columns it selects).
 const m = vi.hoisted(() => {
   const state = {
-    activities: [] as any[],
-    laps: [] as any[],
-    profile: [] as any[],
     tables: [] as unknown[],
+    selections: [] as Array<Record<string, unknown>>,
+    grouped: [] as boolean[],
+    /** Selects issued when the first query resolved: 5 means all ran in parallel. */
+    selectsAtFirstResolve: null as number | null,
     rowsFor: (_table: unknown, _selection: Record<string, unknown>): unknown[] => [],
   };
   const db = {
     select: vi.fn((selection: Record<string, unknown>) => {
       let table: unknown;
+      const index = state.selections.length;
+      state.selections.push(selection);
+      state.grouped.push(false);
       const chain: any = {
         from: (t: unknown) => {
           table = t;
           state.tables.push(t);
           return chain;
         },
+        innerJoin: () => chain,
         where: () => chain,
         orderBy: () => chain,
+        groupBy: () => {
+          state.grouped[index] = true;
+          return chain;
+        },
         limit: () => chain,
         then: (resolve: (rows: unknown[]) => unknown, reject: (e: unknown) => unknown) =>
-          Promise.resolve().then(() => state.rowsFor(table, selection)).then(resolve, reject),
+          Promise.resolve()
+            .then(() => {
+              state.selectsAtFirstResolve ??= state.selections.length;
+              return state.rowsFor(table, selection);
+            })
+            .then(resolve, reject),
       };
       return chain;
     }),
@@ -89,14 +102,32 @@ const LAPS = [
   ]),
 ];
 
+// The light CSS query (300 days): the active laps with their swim's day and pool.
+const ACTIVITY_BY_ID = new Map(ACTIVITIES.map((a) => [a.id, a]));
+const OLD_CSS_LAPS = [
+  // 20/03: older than the 180 days, inside the 90-day window of the end of May.
+  { activityDate: new Date("2026-03-20T17:00:00Z"), poolLengthMeters: 25, isOpenWater: false, distanceMeters: 200, durationSeconds: 170, movingDurationSeconds: 170, strokeType: "FREESTYLE" },
+  { activityDate: new Date("2026-03-20T17:00:00Z"), poolLengthMeters: 25, isOpenWater: false, distanceMeters: 400, durationSeconds: 360, movingDurationSeconds: 360, strokeType: "FREESTYLE" },
+];
+const cssLapRows = () => [
+  ...OLD_CSS_LAPS,
+  ...LAPS.filter((lap) => lap.distanceMeters >= 177 && !ACTIVITY_BY_ID.get(lap.activityId)!.isOpenWater).map((lap) => {
+    const a = ACTIVITY_BY_ID.get(lap.activityId)!;
+    return { activityDate: a.activityDate, poolLengthMeters: a.poolLengthMeters, isOpenWater: a.isOpenWater, distanceMeters: lap.distanceMeters, durationSeconds: lap.durationSeconds, movingDurationSeconds: lap.movingDurationSeconds, strokeType: lap.strokeType };
+  }),
+];
+// Swims per Rome week, as the grouped streak query returns them.
+const STREAK_WEEKS = [
+  { weekStart: "2026-10-05", swims: 2 },
+  { weekStart: "2026-10-12", swims: 2 },
+  { weekStart: "2026-10-19", swims: 3 },
+  { weekStart: "2026-10-26", swims: 1 },
+];
+
 function useData(preferences: unknown = {}) {
   m.state.rowsFor = (table, selection) => {
-    if (table === swimmingActivities) {
-      return Object.keys(selection).length === 1
-        ? ACTIVITIES.map((a) => ({ activityDate: a.activityDate }))
-        : ACTIVITIES;
-    }
-    if (table === garminActivityLaps) return LAPS;
+    if (table === swimmingActivities) return "weekStart" in selection ? STREAK_WEEKS : ACTIVITIES;
+    if (table === garminActivityLaps) return "activityDate" in selection ? cssLapRows() : LAPS;
     if (table === swimmerProfiles) return [{ preferences }];
     return [];
   };
@@ -106,6 +137,9 @@ describe("getSwimMetrics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     m.state.tables.length = 0;
+    m.state.selections.length = 0;
+    m.state.grouped.length = 0;
+    m.state.selectsAtFirstResolve = null;
     m.getOrSetCached.mockImplementation((_key: string, fetcher: () => Promise<unknown>) => fetcher());
   });
 
@@ -115,10 +149,14 @@ describe("getSwimMetrics", () => {
     expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v1:42", expect.any(Function), 3600);
   });
 
-  it("reads swims, laps, profile and streak dates", async () => {
+  it("reads swims, laps, profile, CSS laps and swims per week with independent queries in parallel", async () => {
     useData();
     await getSwimMetrics(42, NOW);
-    expect(m.state.tables).toEqual([swimmingActivities, garminActivityLaps, swimmerProfiles, swimmingActivities]);
+    expect(m.state.tables).toEqual([swimmingActivities, garminActivityLaps, swimmerProfiles, garminActivityLaps, swimmingActivities]);
+    expect(m.state.selectsAtFirstResolve).toBe(5);
+    // The streak is one grouped count per Rome week, not two years of dates.
+    expect(Object.keys(m.state.selections[4]).sort()).toEqual(["swims", "weekStart"]);
+    expect(m.state.grouped).toEqual([false, false, false, false, true]);
   });
 
   it("computes the six metrics from 3 swims", async () => {
@@ -140,6 +178,8 @@ describe("getSwimMetrics", () => {
     expect(metrics.css.history[5].month).toBe("2026-10");
     expect(metrics.css.history[5].paceSecondsPer100).toBeCloseTo(104.3, 1);
     expect(metrics.css.history[4].paceSecondsPer100).toBeNull();
+    // May's window (from 03/03) is complete thanks to the 300 days of CSS laps: 200 / 190 m/s.
+    expect(metrics.css.history[0]).toEqual({ month: "2026-05", paceSecondsPer100: 95 });
     expect(metrics.css.missing).toBeNull();
 
     // Per swim: the pool swim of 6/10 has zones, SI and a set; open water only load.
@@ -183,6 +223,7 @@ describe("getSwimMetrics", () => {
     // Volume.
     expect(metrics.volume.weeks).toHaveLength(12);
     expect(metrics.volume.weeks[11]).toEqual({ weekStart: "2026-10-26", km: 2, sessions: 1 });
+    expect(metrics.volume.streakWeeks).toBe(3); // weeks of 5, 12 and 19/10; the current one has 1
   });
 
   it("uses a CSS test of the last 90 days and ignores an expired one", async () => {
@@ -199,7 +240,6 @@ describe("getSwimMetrics", () => {
   it("without swims says what is missing", async () => {
     m.state.rowsFor = (table) => (table === swimmerProfiles ? [{ preferences: null }] : []);
     const metrics = await getSwimMetrics(42, NOW);
-    expect(m.state.tables).not.toContain(garminActivityLaps);
     expect(metrics.sessions).toEqual([]);
     expect(metrics.css.current).toBeNull();
     expect(metrics.css.missing).toBe(

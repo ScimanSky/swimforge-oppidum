@@ -320,12 +320,22 @@ export function weeklyStreak(dates: Date[], now: Date, minPerWeek = 2): number {
     const key = weekStartKey(date);
     perWeek.set(key, (perWeek.get(key) ?? 0) + 1);
   }
+  return weeklyStreakFromCounts(perWeek, now, minPerWeek);
+}
 
+/** weeklyStreak from swims already counted per week (keys: the Monday «YYYY-MM-DD», Rome). */
+export function weeklyStreakFromCounts(
+  perWeek: Map<string, number> | Record<string, number>,
+  now: Date,
+  minPerWeek = 2,
+): number {
+  const count = (week: string) =>
+    (perWeek instanceof Map ? perWeek.get(week) : perWeek[week]) ?? 0;
   let week = weekStartKey(now);
   let streak = 0;
-  if ((perWeek.get(week) ?? 0) >= minPerWeek) streak = 1;
+  if (count(week) >= minPerWeek) streak = 1;
   week = addDaysToKey(week, -7);
-  while ((perWeek.get(week) ?? 0) >= minPerWeek) {
+  while (count(week) >= minPerWeek) {
     streak += 1;
     week = addDaysToKey(week, -7);
   }
