@@ -88,7 +88,6 @@ const PENDING: Record<Rule, string[]> = {
     "index.css",
   ],
   "variante-neon": [
-    "components/CookieBanner.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/onboarding/OnboardingFirstAction.tsx",
     "components/onboarding/OnboardingFlow.tsx",
@@ -108,7 +107,6 @@ const PENDING: Record<Rule, string[]> = {
   sfocatura: [
     "components/ActivityInsightNotification.tsx",
     "components/BadgeUnlockNotification.tsx",
-    "components/CookieBanner.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "pages/StravaConnect.tsx",
