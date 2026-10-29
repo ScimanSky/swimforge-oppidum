@@ -527,7 +527,12 @@ export async function unbanMember(actorId: number, clubId: number, userId: numbe
   return { unbanned: true };
 }
 
-export async function updateMemberRole(actorId: number, clubId: number, userId: number, role: "member" | "moderator" | "admin") {
+/** Roles the owner can assign; «owner» is never assigned. */
+export type AssignableClubRole = "member" | "coach" | "moderator" | "admin";
+/** Roles an invite can carry; anything above «member» needs an owner or admin invite. */
+export type InviteClubRole = "member" | "coach" | "moderator";
+
+export async function updateMemberRole(actorId: number, clubId: number, userId: number, role: AssignableClubRole) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
@@ -575,7 +580,7 @@ export async function listClubInvites(actorId: number, clubId: number) {
   return result.rows;
 }
 
-export async function createClubInvite(actorId: number, clubId: number, input: { role?: "member" | "moderator"; maxUses?: number; expiresAt?: Date | null }) {
+export async function createClubInvite(actorId: number, clubId: number, input: { role?: InviteClubRole; maxUses?: number; expiresAt?: Date | null }) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
@@ -584,7 +589,8 @@ export async function createClubInvite(actorId: number, clubId: number, input: {
     throw new Error("Forbidden");
   }
 
-  if (input.role === "moderator" && actor.role !== "owner" && actor.role !== "admin") {
+  // A moderator invites members only: coach and moderator links come from owner or admin.
+  if (input.role && input.role !== "member" && actor.role !== "owner" && actor.role !== "admin") {
     throw new Error("Forbidden");
   }
 

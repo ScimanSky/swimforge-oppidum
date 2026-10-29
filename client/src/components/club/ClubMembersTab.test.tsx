@@ -71,6 +71,8 @@ describe("ClubMembersTab (Corsia)", () => {
     render(<ClubMembersTab clubId={7} isStaff isOwner />);
     await user.selectOptions(screen.getByRole("combobox", { name: "Ruolo di Marco" }), "moderator");
     expect(state.roleCalls).toEqual([{ clubId: 7, userId: 2, role: "moderator" }]);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Ruolo di Marco" }), "Coach");
+    expect(state.roleCalls[1]).toEqual({ clubId: 7, userId: 2, role: "coach" });
 
     const requests = screen.getByRole("heading", { level: 3, name: "Richieste in attesa" }).closest("section")!;
     await user.click(within(requests).getByRole("button", { name: "Approva" }));

@@ -286,7 +286,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
         createInvite: protectedProcedure
             .input(z.object({
                 clubId: z.number(),
-                role: z.enum(["member", "moderator"]).optional(),
+                role: z.enum(["member", "coach", "moderator"]).optional(),
                 maxUses: z.number().min(1).max(100).optional(),
                 expiresAt: z.date().optional().nullable(),
             }))
@@ -475,7 +475,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             }),
 
         updateMemberRole: protectedProcedure
-            .input(z.object({ clubId: z.number(), userId: z.number(), role: z.enum(["member", "moderator", "admin"]) }))
+            .input(z.object({ clubId: z.number(), userId: z.number(), role: z.enum(["member", "coach", "moderator", "admin"]) }))
             .mutation(async ({ ctx, input }) => {
                 const { updateMemberRole } = await import("../db_clubs");
                 return updateMemberRole(ctx.user.id, input.clubId, input.userId, input.role);

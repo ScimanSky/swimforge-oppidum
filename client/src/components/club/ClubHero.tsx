@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/corsia/Chip";
 import { formatInteger } from "@/lib/format";
+import { CLUB_ROLE_LABEL, CLUB_STAFF_ROLES, COACH_AREA_ROLES } from "@/lib/club-roles";
 
 interface ClubHeroProps {
   club: {
@@ -47,12 +48,6 @@ const VISIBILITY_LABEL: Record<string, string> = {
   invite: "Privato",
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  owner: "Proprietario",
-  admin: "Admin",
-  moderator: "Moderatore",
-  member: "Membro",
-};
 
 function SectionLink({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
   return (
@@ -90,10 +85,11 @@ export default function ClubHero({
   createMenu,
 }: ClubHeroProps) {
   const titleId = useId();
-  const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
+  const isStaff = CLUB_STAFF_ROLES.includes(club.member_role ?? "");
+  const canOpenCoachArea = COACH_AREA_ROLES.includes(club.member_role ?? "");
   const showEventsLink = Boolean(eventsPageHref && (!meetsPageHref || eventsPageHref !== meetsPageHref));
   const memberCount = Number(club.member_count ?? 0);
-  const roleLabel = club.member_role ? ROLE_LABEL[club.member_role] ?? club.member_role : null;
+  const roleLabel = club.member_role ? CLUB_ROLE_LABEL[club.member_role] ?? club.member_role : null;
   const hasSectionLinks = Boolean(
     showEventsLink ||
       meetsPageHref ||
@@ -101,7 +97,7 @@ export default function ClubHero({
       workoutsPageHref ||
       pbLeaderboardHref ||
       documentsPageHref ||
-      (isStaff && coachPageHref)
+      (canOpenCoachArea && coachPageHref)
   );
 
   return (
@@ -195,7 +191,7 @@ export default function ClubHero({
                   Documenti
                 </SectionLink>
               ) : null}
-              {isStaff && coachPageHref ? (
+              {canOpenCoachArea && coachPageHref ? (
                 <SectionLink href={coachPageHref} icon={<Shield aria-hidden />}>
                   Area coach
                 </SectionLink>

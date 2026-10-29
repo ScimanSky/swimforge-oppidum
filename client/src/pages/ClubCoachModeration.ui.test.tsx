@@ -287,8 +287,13 @@ describe("Area coach del club (Corsia)", () => {
     expect(within(invites).getByText(/\/community\/invite\/abc123$/)).toBeTruthy();
     expect(within(invites).getByText("2/10")).toBeTruthy();
     expect(within(invites).getByRole("button", { name: "Copia link" })).toBeTruthy();
-    await userEvent.setup({ delay: null }).click(within(invites).getByRole("button", { name: "Genera nuovo invito" }));
-    expect(state.calls.createInvite).toEqual([{ clubId: 7, maxUses: 10 }]);
+    const user = userEvent.setup({ delay: null });
+    await user.click(within(invites).getByRole("button", { name: "Genera nuovo invito" }));
+    expect(state.calls.createInvite).toEqual([{ clubId: 7, role: "member", maxUses: 10 }]);
+    // Owner and admin can also create a single-use «Coach» link.
+    await user.selectOptions(screen.getByRole("combobox", { name: "Ruolo con l'invito" }), "Coach");
+    await user.click(screen.getByRole("button", { name: "Genera nuovo invito" }));
+    expect(state.calls.createInvite[1]).toEqual({ clubId: 7, role: "coach", maxUses: 1 });
 
     cleanup();
     state.invites = undefined;
