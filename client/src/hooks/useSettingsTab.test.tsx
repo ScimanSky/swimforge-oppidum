@@ -37,6 +37,15 @@ describe("useSettingsTab", () => {
     expect(location.history.at(-1)).toBe("/settings?tab=connections&onboarding=1");
   });
 
+  it("cambiare scheda (anche con le frecce) non aggiunge voci alla cronologia: «Indietro» lascia le impostazioni", () => {
+    const { result, location } = setup("tab=profile");
+    act(() => result.current.selectTab("connections"));
+    act(() => result.current.selectTab("notifications"));
+    act(() => result.current.selectTab("preferences"));
+    expect(result.current.activeTab).toBe("preferences");
+    expect(location.history).toEqual(["/settings?tab=preferences"]);
+  });
+
   it("segue l'URL quando cambia da fuori", () => {
     const { result, location } = setup("tab=profile");
     act(() => location.navigate("/settings?tab=privacy"));

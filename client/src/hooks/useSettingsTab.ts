@@ -27,11 +27,13 @@ export function useSettingsTab() {
     setActiveTab(tabFromUrl);
   }, [tabFromUrl]);
 
+  // Replace, not push: moving between tabs (the arrow keys move one at a time) must not fill
+  // the history, so «Indietro» leaves the settings instead of walking back through the tabs.
   const selectTab = (nextTab: string) => {
     const nextParams = new URLSearchParams(params);
     nextParams.set("tab", nextTab);
     setActiveTab(nextTab);
-    navigate(`${location || "/settings"}?${nextParams.toString()}`);
+    navigate(`${location || "/settings"}?${nextParams.toString()}`, { replace: true });
   };
 
   return { activeTab, selectTab, onboarding };
