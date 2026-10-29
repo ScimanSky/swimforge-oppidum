@@ -7,13 +7,17 @@ import { Metric } from "@/components/corsia/Metric";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { distanceParts, formatDayMonthYear, formatDurationParts, NO_VALUE } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { CELEBRATION_LAYER, useCelebrationsAllowed } from "@/hooks/useCelebrationGate";
 
 /**
  * «Analisi pronta» after a sync: the newest pending analyses, marked seen when the dialog closes
- * (Esc, a tap outside, «Chiudi» or «Apri l'analisi»).
+ * (Esc, a tap outside, «Chiudi» or «Apri l'analisi»). Queued while the cookie banner or the
+ * onboarding is open (useCelebrationsAllowed).
  */
 export default function ActivityInsightNotification() {
   const { isAuthenticated } = useAuth();
+  const allowed = useCelebrationsAllowed();
   const [queue, setQueue] = useState<any[]>([]);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -51,7 +55,7 @@ export default function ActivityInsightNotification() {
     }, 250);
   };
 
-  if (!newest) return null;
+  if (!newest || !allowed) return null;
 
   const distance = distanceParts(newest.activity_distance_meters);
   const duration = formatDurationParts(newest.activity_duration_seconds);
@@ -63,7 +67,11 @@ export default function ActivityInsightNotification() {
 
   return (
     <Dialog open={isVisible} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent showCloseButton={false} className="max-h-[85dvh] overflow-y-auto rounded-2xl bg-card p-6 shadow-none sm:max-w-lg">
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName={CELEBRATION_LAYER}
+        className={cn("max-h-[85dvh] overflow-y-auto rounded-2xl bg-card p-6 shadow-none sm:max-w-lg", CELEBRATION_LAYER)}
+      >
         <div className="flex items-start gap-3">
           <span aria-hidden className="rounded-full bg-raised p-2 text-action-text">
             <Sparkles className="size-5" />

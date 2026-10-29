@@ -5,7 +5,9 @@ import { Chip } from "@/components/corsia/Chip";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
+import { cn } from "@/lib/utils";
 import type { BadgeNotificationItem } from "@/hooks/useBadgeNotifications";
+import { CELEBRATION_LAYER, useCelebrationsAllowed } from "@/hooks/useCelebrationGate";
 
 interface BadgeUnlockNotificationProps {
   badges: BadgeNotificationItem[];
@@ -88,11 +90,13 @@ function triggerConfetti() {
 
 /**
  * New badges, one dialog each: «Prossimo badge» / «Continua». Closing it (Esc, a tap outside)
- * moves on too, as the tap on the backdrop always did.
+ * moves on too, as the tap on the backdrop always did. Queued while the cookie banner or the
+ * onboarding is open (useCelebrationsAllowed).
  */
 export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnlockNotificationProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
+  const allowed = useCelebrationsAllowed();
 
   const currentBadge = badges[currentIndex];
   const normalizeBadgeUrl = (url: string) =>
@@ -104,12 +108,13 @@ export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnl
   );
   const fallbackImageUrl = assetUrl("/badges_new/oppidum_member.png");
 
+  // Sound and confetti when a badge shows, not while it waits behind the banner or the tour.
   useEffect(() => {
-    if (currentBadge) {
+    if (currentBadge && allowed) {
       playCelebrationSound();
       triggerConfetti();
     }
-  }, [currentIndex]);
+  }, [currentIndex, allowed]);
 
   const isLast = currentIndex >= badges.length - 1;
 
@@ -128,11 +133,15 @@ export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnl
     }
   };
 
-  if (!currentBadge) return null;
+  if (!currentBadge || !allowed) return null;
 
   return (
     <Dialog open={isVisible} onOpenChange={(open) => { if (!open) handleNext(); }}>
-      <DialogContent showCloseButton={false} className="rounded-2xl bg-card p-6 text-center shadow-none sm:max-w-sm">
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName={CELEBRATION_LAYER}
+        className={cn("rounded-2xl bg-card p-6 text-center shadow-none sm:max-w-sm", CELEBRATION_LAYER)}
+      >
         {badges.length > 1 ? (
           <Chip className="mx-auto">
             Badge {currentIndex + 1} di {badges.length}

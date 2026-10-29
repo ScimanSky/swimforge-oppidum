@@ -16,6 +16,7 @@ import {
   getOnboardingIdentityLocally,
   type OnboardingRole,
 } from "@/lib/onboarding";
+import { useHoldCelebrations } from "@/hooks/useCelebrationGate";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -187,6 +188,11 @@ export default function OnboardingFlow() {
   const serverDone = Boolean((consentsQuery.data as any)?.byType?.[ONBOARDING_CONSENT_TYPE]?.granted);
   const canEvaluate = Boolean(meQuery.data?.id) && !consentsQuery.isLoading;
   const shouldRender = stage !== "hidden";
+
+  // New badges and records wait while the onboarding is open, about to open (on the way to the
+  // tour page) or not decided yet: they would sit under its overlay and be dismissed unseen.
+  const deciding = Boolean(meQuery.data?.id) && !canEvaluate && !isPublicPath(pathname);
+  useHoldCelebrations("onboarding", shouldRender || pendingTourLaunch || deciding);
 
   useEffect(() => {
     const handler = () => {

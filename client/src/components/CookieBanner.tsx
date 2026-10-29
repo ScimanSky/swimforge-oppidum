@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
+import { useHoldCelebrations } from "@/hooks/useCelebrationGate";
 
 const COOKIE_CONSENT_STORAGE_KEY = "swimforge:cookie-consent:v1";
 
@@ -105,6 +106,9 @@ export default function CookieBanner() {
     analytics: false,
     marketing: false,
   });
+
+  // New badges and records wait for the choice: a modal popup would swallow the taps on it.
+  useHoldCelebrations("cookie-banner", !ready || open);
 
   useEffect(() => {
     const existing = readCookiePreferences();

@@ -7,6 +7,8 @@ import { Metric } from "@/components/corsia/Metric";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatSwimCentiseconds } from "@/lib/swimTime";
+import { cn } from "@/lib/utils";
+import { CELEBRATION_LAYER, useCelebrationsAllowed } from "@/hooks/useCelebrationGate";
 
 type PbCelebrationEvent = {
   id: number;
@@ -53,8 +55,13 @@ function setLastSeenId(nextId: number) {
   window.localStorage.setItem(LAST_SEEN_KEY, String(value));
 }
 
+/**
+ * «Nuovo record personale» after a sync, one dialog per PB. Queued while the cookie banner or
+ * the onboarding is open (useCelebrationsAllowed).
+ */
 export default function PbCelebrationNotification() {
   const { isAuthenticated } = useAuth();
+  const allowed = useCelebrationsAllowed();
   const [queue, setQueue] = useState<PbCelebrationEvent[]>([]);
   const openedEventIdsRef = useRef<Set<number>>(new Set());
   const trackCelebrationAction = trpc.records.trackCelebrationAction.useMutation();
@@ -80,7 +87,8 @@ export default function PbCelebrationNotification() {
     }
   }, [pendingQuery.data, queue.length]);
 
-  const current = queue[0];
+  // Only a record on screen counts: none while it waits behind the banner or the tour.
+  const current = allowed ? queue[0] : undefined;
 
   useEffect(() => {
     if (!current) return;
@@ -155,7 +163,11 @@ export default function PbCelebrationNotification() {
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) markCurrentAsSeenAndAdvance(); }}>
-      <DialogContent showCloseButton={false} className="rounded-2xl bg-card p-6 shadow-none sm:max-w-md">
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName={CELEBRATION_LAYER}
+        className={cn("rounded-2xl bg-card p-6 shadow-none sm:max-w-md", CELEBRATION_LAYER)}
+      >
         <Chip tone="xp" className="justify-self-start">
           <Trophy className="size-4" aria-hidden />
           Nuovo record personale
