@@ -146,6 +146,8 @@ describe("PersonalRecordsBoard", () => {
     state.error = new Error("boom");
     render(<PersonalRecordsBoard userId={7} />);
     expect(screen.getByRole("alert")).toHaveTextContent("Non riesco a caricare i dati");
+    // Inside the records card: no card of its own.
+    expect(screen.getByRole("alert")).not.toHaveClass("surface-panel");
     expect(screen.queryByText("Ancora nessun record personale.")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
     expect(state.refetch).toHaveBeenCalled();

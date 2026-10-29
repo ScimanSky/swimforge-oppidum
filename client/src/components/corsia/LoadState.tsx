@@ -30,12 +30,28 @@ export function LoadingSkeleton({
   );
 }
 
-/** A query that failed (and has nothing to show): short message and «Riprova». */
-export function LoadError({ onRetry, className }: { onRetry: () => void; className?: string }) {
+/**
+ * A query that failed (and has nothing to show): short message and «Riprova». A card of its own
+ * on a page; `variant="inline"` inside another card or a popover (no second border and fill:
+ * spacing comes from `className`).
+ */
+export function LoadError({
+  onRetry,
+  className,
+  variant = "card",
+}: {
+  onRetry: () => void;
+  className?: string;
+  variant?: "card" | "inline";
+}) {
   return (
     <div
       role="alert"
-      className={cn("surface-panel flex items-center justify-between gap-3 p-4", className)}
+      className={cn(
+        "flex items-center justify-between gap-3",
+        variant === "card" && "surface-panel p-4",
+        className
+      )}
     >
       <p className="text-sm text-muted-foreground">Non riesco a caricare i dati</p>
       <Button size="sm" variant="outline" onClick={onRetry}>

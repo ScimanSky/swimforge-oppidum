@@ -409,7 +409,7 @@ function ConversationView({
     );
   } else if (query.isError && !query.data) {
     // A failed poll keeps the messages already on screen; only a chat that never loaded says so.
-    body = <LoadError onRetry={() => void query.refetch()} className="m-4" />;
+    body = <LoadError variant="inline" onRetry={() => void query.refetch()} className="p-4" />;
   } else if (messages.length === 0) {
     body = <p className="p-6 text-center text-sm text-muted-foreground">Nessun messaggio: scrivi il primo.</p>;
   } else {
@@ -630,7 +630,7 @@ function MessagesPage() {
     } else if (peopleQuery.isPending) {
       list = <LoadingSkeleton label="Ricerca in corso…" count={3} className="space-y-2 p-4" itemClassName="h-14 w-full rounded-xl" />;
     } else if (peopleQuery.isError) {
-      list = <LoadError onRetry={() => void peopleQuery.refetch()} className="m-4" />;
+      list = <LoadError variant="inline" onRetry={() => void peopleQuery.refetch()} className="p-4" />;
     } else if (peopleQuery.data.length === 0) {
       list = <p className="p-4 text-sm text-muted-foreground">Nessun nuotatore trovato.</p>;
     } else {
@@ -663,7 +663,7 @@ function MessagesPage() {
       <LoadingSkeleton label="Caricamento delle conversazioni…" count={4} className="space-y-2 p-4" itemClassName="h-14 w-full rounded-xl" />
     );
   } else if (conversationsQuery.isError && !conversationsQuery.data) {
-    list = <LoadError onRetry={() => void conversationsQuery.refetch()} className="m-4" />;
+    list = <LoadError variant="inline" onRetry={() => void conversationsQuery.refetch()} className="p-4" />;
   } else if (conversations.length === 0) {
     list = (
       <div className="flex flex-col items-center gap-3 p-6 text-center text-muted-foreground">

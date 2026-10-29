@@ -228,6 +228,8 @@ describe("NotificationBell (Corsia)", () => {
     renderBell();
     await userEvent.click(screen.getByRole("button", { name: /Notifiche/ }));
     expect(screen.queryByText("Nessuna notifica")).toBeNull();
+    // Inside the popover: no card of its own.
+    expect(screen.getByRole("alert")).not.toHaveClass("surface-panel");
     await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
     expect(state.refetch).toHaveBeenCalled();
     cleanup();

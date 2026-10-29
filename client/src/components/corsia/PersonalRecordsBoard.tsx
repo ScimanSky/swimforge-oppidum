@@ -98,7 +98,8 @@ export function PersonalRecordsBoard({
       />
     );
   } else if (query.isError && !query.data) {
-    content = <LoadError onRetry={() => void query.refetch()} />;
+    // Inside the records card (or the one the board sits in when not framed).
+    content = <LoadError variant="inline" onRetry={() => void query.refetch()} />;
   } else if (rows.length === 0) {
     content = <p className="text-sm text-muted-foreground">{emptyText}</p>;
   } else {

@@ -411,10 +411,11 @@ describe("DirectMessages (Corsia)", () => {
       expect(screen.getByRole("searchbox", { name: "Cerca un nuotatore" })).toHaveFocus();
     });
 
-    it("a chat that cannot load offers «Riprova»", () => {
+    it("a chat that cannot load offers «Riprova», without a card inside the Messages card", () => {
       state.chatError = new Error("boom");
       renderIn(<DirectMessages mode="page" />);
       expect(screen.getByRole("alert")).toHaveTextContent("Non riesco a caricare i dati");
+      expect(screen.getByRole("alert")).not.toHaveClass("surface-panel");
     });
   });
 

@@ -8,6 +8,7 @@ import { HUB_TABS } from "@/lib/navigation";
 import { ActivityCard, type ActivityCardData } from "./ActivityCard";
 import { Chip } from "./Chip";
 import { LevelCard, LevelStrip } from "./LevelCard";
+import { LoadError } from "./LoadState";
 import { Metric } from "./Metric";
 import { SectionTabs } from "./SectionTabs";
 import { WeekCard } from "./WeekCard";
@@ -293,6 +294,19 @@ describe("primitivi Corsia", () => {
     expect(card).toHaveTextContent("12,7 km");
     expect(screen.getByText("1 nuotata")).toBeInTheDocument();
     expect(screen.queryByText(/XP/)).toBeNull();
+  });
+
+  it("LoadError: una card da sola, senza bordo né fondo propri dentro un'altra card", () => {
+    render(<LoadError onRetry={() => {}} />);
+    expect(screen.getByRole("alert")).toHaveClass("surface-panel");
+    cleanup();
+
+    render(<LoadError variant="inline" onRetry={() => {}} className="p-4" />);
+    const inline = screen.getByRole("alert");
+    expect(inline).toHaveTextContent("Non riesco a caricare i dati");
+    expect(inline).not.toHaveClass("surface-panel");
+    expect(inline).toHaveClass("p-4");
+    expect(screen.getByRole("button", { name: "Riprova" })).toBeInTheDocument();
   });
 
   it("Surface è piatta: nessun movimento al passaggio del mouse", () => {

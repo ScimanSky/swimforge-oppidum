@@ -240,7 +240,7 @@ export default function NotificationBell() {
           {notificationsQuery.isPending ? (
             <LoadingSkeleton label="Caricamento delle notifiche…" count={4} className="space-y-2 p-4" />
           ) : notificationsQuery.isError ? (
-            <LoadError onRetry={() => void notificationsQuery.refetch()} className="m-4" />
+            <LoadError variant="inline" onRetry={() => void notificationsQuery.refetch()} className="p-4" />
           ) : notifications.length === 0 ? (
             <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
               <Bell className="mb-2 size-8" aria-hidden />
