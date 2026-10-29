@@ -141,7 +141,7 @@ export default function PostReactions({
                 aria-hidden
                 className={cn(
                   "size-[22px]",
-                  currentUserReaction ? "fill-current text-xp" : "text-muted-foreground"
+                  currentUserReaction ? "fill-current text-action-text" : "text-muted-foreground"
                 )}
               />
               {totalReactions > 0 ? <span className="tabular-nums">{formatInteger(totalReactions)}</span> : null}

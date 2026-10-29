@@ -94,3 +94,23 @@ describe("PostReactions (emoji)", () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Reazione non riuscita, riprova"));
   });
 });
+
+describe("PostReactions (heart, in the feed)", () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    server.responses = {
+      "community.reactions.list": [{ reactionType: "fire", count: 3 }],
+      "community.reactions.userReaction": { reactionType: "fire" },
+    };
+    server.failing = new Set();
+    server.calls = [];
+  });
+
+  it("your reaction fills the heart in the action blue, never the XP orange", async () => {
+    renderWithServer(<PostReactions postId={7} variant="heart" />);
+    const trigger = await screen.findByRole("button", { name: "Cambia reazione, 3 reazioni" });
+    const heart = trigger.querySelector("svg");
+    expect(heart).toHaveClass("fill-current", "text-action-text");
+    expect(heart).not.toHaveClass("text-xp");
+  });
+});
