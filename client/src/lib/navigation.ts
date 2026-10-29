@@ -199,5 +199,24 @@ export function parentPathForPath(location: string): string | null {
   return null;
 }
 
+/**
+ * `raw` as an in-app path (pathname + query + hash), resolved against this site; null for
+ * anything that leaves it: another origin, «//host», «/\host» (browsers read the backslash as
+ * a slash), an encoded backslash or double slash, an unparsable value. Never throws.
+ */
+export function toInAppPath(raw: string | null | undefined): string | null {
+  if (typeof window === "undefined" || typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin !== window.location.origin) return null;
+    // Decoded once more (as a router or a later `?from=` may do), it must still stay here.
+    const decoded = decodeURIComponent(url.pathname);
+    if (decoded.includes("\\") || decoded.startsWith("//")) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export const homePathForPlatform = (isNative: boolean) =>
   isNative ? TODAY_PATH : FEED_PATH;

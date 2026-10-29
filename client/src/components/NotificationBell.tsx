@@ -30,6 +30,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { formatTimeAgo } from "@/lib/format";
+import { toInAppPath } from "@/lib/navigation";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
 import { supabase } from "@/lib/supabase";
@@ -72,9 +73,9 @@ const countLabel = (count: number) => (count > 9 ? "9+" : String(count));
 
 /** Where a notification leads: its own in-app link, else a page that fits its type. */
 function notificationPath(notification: any): string {
-  const link = typeof notification.link === "string" ? notification.link.trim() : "";
-  // In-app paths only: an absolute or protocol-relative URL cannot be pushed to the history.
-  if (link.startsWith("/") && !link.startsWith("//")) return link;
+  // In-app paths only: another site's address cannot be pushed to the history.
+  const link = toInAppPath(typeof notification.link === "string" ? notification.link : null);
+  if (link) return link;
   const referenceId = Number(notification.referenceId ?? notification.reference_id);
   switch (notification.type) {
     case "mention":

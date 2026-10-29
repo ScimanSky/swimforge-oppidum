@@ -7,6 +7,7 @@ import { Notice } from "@/components/corsia/LoadState"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { previousInAppPath } from "@/lib/in-app-history"
+import { toInAppPath } from "@/lib/navigation"
 import { trpc } from "@/lib/trpc"
 import { errorToastMessage } from "@/lib/trpc-errors"
 
@@ -25,10 +26,7 @@ const MIN_OTHER_DETAILS = 10
 const FALLBACK = "/home"
 
 /** The page the report was opened from (`?from=`): an in-app path only, else the feed. */
-function safeReturnPath(raw: string | null) {
-  if (!raw) return FALLBACK
-  return raw.startsWith("/") && !raw.startsWith("//") ? raw : FALLBACK
-}
+const safeReturnPath = (raw: string | null) => toInAppPath(raw) ?? FALLBACK
 
 /** `/home/report/post/:postId`: why a post should be looked at by the admins. */
 export default function ReportPost() {

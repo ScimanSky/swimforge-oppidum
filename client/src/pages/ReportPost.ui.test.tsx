@@ -72,6 +72,7 @@ describe("ReportPost (Corsia)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Invia segnalazione" }));
     expect(state.reports).toEqual([{ postId: 12, reason: "harassment", details: "Insulti nei commenti" }]);
     expect(toast.success).toHaveBeenCalledWith("Segnalazione inviata. Grazie.");
+    expect(toast.error).not.toHaveBeenCalled();
     expect(location.history).toEqual(["/post/12"]);
   });
 
@@ -94,8 +95,13 @@ describe("ReportPost (Corsia)", () => {
     back.mockRestore();
   });
 
-  it("an external ?from= never leaves the app: back to the feed", async () => {
-    const location = renderReport("/home/report/post/12?from=%2F%2Fevil.example");
+  it.each([
+    ["%2F%2Fevil.example"],
+    ["%2F%5Cevil.example"],
+    ["%2F%255Cevil.example"],
+    ["https%3A%2F%2Fevil.example%2Fpost%2F12"],
+  ])("an external ?from=%s never leaves the app: «Annulla» goes back to the feed", async (from) => {
+    const location = renderReport(`/home/report/post/12?from=${from}`);
     await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
     expect(location.history).toEqual(["/home"]);
   });

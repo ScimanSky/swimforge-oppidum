@@ -138,13 +138,16 @@ describe("NotificationBell (Corsia)", () => {
     expect(location.history?.at(-1)).toBe("/post/5");
   });
 
-  it("an external link never leaves the app: the page of its type instead", async () => {
-    state.list = [notification({ link: "https://evil.example/x", referenceId: 9 })];
-    const location = renderBell();
-    await userEvent.click(screen.getByRole("button", { name: "Notifiche, 2 non lette" }));
-    await userEvent.click(screen.getByRole("button", { name: /Nuovo commento/ }));
-    expect(location.history?.at(-1)).toBe("/post/9");
-  });
+  it.each(["https://evil.example/x", "//evil.example/x", "/\\evil.example", "/%5Cevil.example"])(
+    "an external link (%s) never leaves the app: the page of its type instead",
+    async (link) => {
+      state.list = [notification({ link, referenceId: 9 })];
+      const location = renderBell();
+      await userEvent.click(screen.getByRole("button", { name: "Notifiche, 2 non lette" }));
+      await userEvent.click(screen.getByRole("button", { name: /Nuovo commento/ }));
+      expect(location.history?.at(-1)).toBe("/post/9");
+    }
+  );
 
   it("«Segna tutte come lette» confirms only after the server agreed", async () => {
     renderBell();

@@ -7,6 +7,7 @@ import {
   normalizePath,
   pageTitleForPath,
   parentPathForPath,
+  toInAppPath,
 } from "./navigation";
 
 describe("normalizePath", () => {
@@ -148,5 +149,29 @@ describe("isPublicPath", () => {
     for (const path of ["/today", "/home", "/post/7", "/track", "/profile", "/loginx", "/privacy/x"]) {
       expect(isPublicPath(path), path).toBe(false);
     }
+  });
+});
+
+describe("toInAppPath", () => {
+  it("tiene percorso, query e hash di un indirizzo dell'app", () => {
+    expect(toInAppPath("/post/12")).toBe("/post/12");
+    expect(toInAppPath("/messages?con=5#fine")).toBe("/messages?con=5#fine");
+    expect(toInAppPath(`${window.location.origin}/u/8?x=1`)).toBe("/u/8?x=1");
+  });
+
+  it.each([
+    ["//evil.example/x"],
+    ["/\\evil.example"],
+    ["/%5Cevil.example"],
+    ["/%5cevil.example"],
+    ["/%2F%2Fevil.example"],
+    ["https://evil.example/post/1"],
+    ["javascript:alert(1)"],
+    ["/%E0%A4%A"],
+    [""],
+    [null],
+    [undefined],
+  ])("%s → null (mai fuori dall'app, mai un'eccezione)", (raw) => {
+    expect(toInAppPath(raw)).toBeNull();
   });
 });
