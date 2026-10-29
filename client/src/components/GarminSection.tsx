@@ -111,7 +111,11 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
       if (data.error) {
         toast.error(data.error);
       } else {
-        toast.success(`${data.synced} attività sincronizzate!`);
+        if (data.synced === 0) {
+          toast.info("Nessuna nuova nuotata da sincronizzare");
+        } else {
+          toast.success(`${data.synced} attività sincronizzate!`);
+        }
         if (Array.isArray(data.detectedPbs) && data.detectedPbs.length > 0) {
           toast.success(`Nuovi PB rilevati: ${data.detectedPbs.length}`);
         }

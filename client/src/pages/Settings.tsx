@@ -263,7 +263,11 @@ export default function Settings() {
         toast.error(data.error)
         return
       }
-      toast.success(`${data?.synced ?? 0} attività sincronizzate!`)
+      if ((data?.synced ?? 0) === 0) {
+        toast.info("Nessuna nuova nuotata da sincronizzare")
+      } else {
+        toast.success(`${data?.synced} attività sincronizzate!`)
+      }
       if (Array.isArray(data?.detectedPbs) && data.detectedPbs.length > 0) {
         toast.success(`Nuovi PB rilevati: ${data.detectedPbs.length}`)
       }

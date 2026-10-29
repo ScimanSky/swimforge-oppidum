@@ -14,29 +14,29 @@ interface GarminSyncCountPickerProps {
 export default function GarminSyncCountPicker({ value, onChange, disabled, className }: GarminSyncCountPickerProps) {
   const name = useId()
   return (
-    <div
-      role="radiogroup"
-      aria-label="Nuotate da sincronizzare"
+    <fieldset
+      disabled={disabled}
       className={cn(
-        "inline-flex rounded-lg border border-border/60 bg-background/40 p-0.5",
+        "m-0 inline-flex min-w-0 rounded-lg border border-border/60 bg-background/40 p-0.5",
         disabled && "opacity-50",
         className,
       )}
     >
+      <legend className="sr-only">Quante nuotate sincronizzare</legend>
       {GARMIN_SYNC_COUNT_OPTIONS.map((option) => (
-        <label key={option.value} className="relative">
+        <label key={option.value} className="relative flex">
           <input
             type="radio"
             name={name}
             value={option.value}
             checked={value === option.value}
             onChange={() => onChange(option.value)}
-            disabled={disabled}
             className="peer sr-only"
           />
           <span
             className={cn(
-              "block cursor-pointer select-none whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium",
+              // min-h-11: 44px touch target; the text stays compact.
+              "flex min-h-11 cursor-pointer select-none items-center whitespace-nowrap rounded-md px-2.5 text-xs font-medium",
               "text-muted-foreground transition-colors hover:text-foreground",
               "peer-checked:bg-primary peer-checked:text-primary-foreground",
               "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
@@ -47,6 +47,6 @@ export default function GarminSyncCountPicker({ value, onChange, disabled, class
           </span>
         </label>
       ))}
-    </div>
+    </fieldset>
   )
 }

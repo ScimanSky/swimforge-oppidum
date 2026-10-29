@@ -12,13 +12,14 @@ const state = vi.hoisted(() => ({
   invalidateProfile: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  toastInfo: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
   toast: {
     success: (...args: any[]) => state.toastSuccess(...args),
     error: (...args: any[]) => state.toastError(...args),
-    info: vi.fn(),
+    info: (...args: any[]) => state.toastInfo(...args),
   },
 }));
 
@@ -67,31 +68,34 @@ describe("GarminSection sync count", () => {
   });
 
   it("defaults to the last 10 swims", async () => {
+    const user = userEvent.setup();
     render(<GarminSection garminConnected />);
 
     expect(screen.getByRole("radio", { name: "Ultime 10" })).toBeChecked();
-    await userEvent.click(screen.getByRole("button", { name: "Sincronizza le ultime 10" }));
+    await user.click(screen.getByRole("button", { name: "Sincronizza le ultime 10" }));
 
     expect(state.syncCalls).toEqual([{ daysBack: 30, maxActivities: 10 }]);
   });
 
   it("sends the chosen count and remembers it", async () => {
+    const user = userEvent.setup();
     render(<GarminSection garminConnected />);
 
-    await userEvent.click(screen.getByRole("radio", { name: "Ultime 5" }));
+    await user.click(screen.getByRole("radio", { name: "Ultime 5" }));
     expect(screen.getByRole("radio", { name: "Ultime 5" })).toBeChecked();
     expect(window.localStorage.getItem(GARMIN_SYNC_COUNT_KEY)).toBe("5");
 
-    await userEvent.click(screen.getByRole("button", { name: "Sincronizza le ultime 5" }));
+    await user.click(screen.getByRole("button", { name: "Sincronizza le ultime 5" }));
     expect(state.syncCalls).toEqual([{ daysBack: 30, maxActivities: 5 }]);
   });
 
   it("starts from the remembered choice", async () => {
     window.localStorage.setItem(GARMIN_SYNC_COUNT_KEY, "1");
+    const user = userEvent.setup();
     render(<GarminSection garminConnected />);
 
     expect(screen.getByRole("radio", { name: "Ultima nuotata" })).toBeChecked();
-    await userEvent.click(screen.getByRole("button", { name: "Sincronizza l'ultima nuotata" }));
+    await user.click(screen.getByRole("button", { name: "Sincronizza l'ultima nuotata" }));
 
     expect(state.syncCalls).toEqual([{ daysBack: 30, maxActivities: 1 }]);
   });
@@ -105,6 +109,26 @@ describe("GarminSection sync count", () => {
     expect(state.toastSuccess).toHaveBeenCalledWith("Nuovi PB rilevati: 2");
     expect(state.invalidateActivities).toHaveBeenCalled();
     expect(state.invalidateProfile).toHaveBeenCalled();
+  });
+
+  it("says there is nothing new when the sync imports no swims", () => {
+    render(<GarminSection garminConnected />);
+
+    state.syncOptions.onSuccess({ synced: 0, newXp: 0, detectedPbs: [] });
+
+    expect(state.toastInfo).toHaveBeenCalledWith("Nessuna nuova nuotata da sincronizzare");
+    expect(state.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("supports the arrow keys between the choices", async () => {
+    const user = userEvent.setup();
+    render(<GarminSection garminConnected />);
+
+    await user.click(screen.getByRole("radio", { name: "Ultime 10" }));
+    await user.keyboard("{ArrowLeft}");
+
+    expect(screen.getByRole("radio", { name: "Ultime 5" })).toBeChecked();
+    expect(screen.getByRole("group", { name: "Quante nuotate sincronizzare" })).toBeInTheDocument();
   });
 
   it("disables the sync while it runs", () => {

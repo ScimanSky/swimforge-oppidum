@@ -4,13 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "./Settings";
 import { GARMIN_SYNC_COUNT_KEY } from "@/lib/garmin-sync-count";
 
-const state = vi.hoisted(() => ({ syncCalls: [] as Array<Record<string, unknown>> }));
+const state = vi.hoisted(() => ({
+  syncCalls: [] as Array<Record<string, unknown>>,
+  syncOptions: null as any,
+  toastSuccess: vi.fn(),
+  toastInfo: vi.fn(),
+}));
 
 vi.mock("wouter", () => ({
   useLocation: () => ["/settings?onboarding=1&tab=connections", vi.fn()],
   Link: ({ children }: any) => <a>{children}</a>,
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: {
+    success: (...args: any[]) => state.toastSuccess(...args),
+    error: vi.fn(),
+    info: (...args: any[]) => state.toastInfo(...args),
+  },
+}));
 vi.mock("@/components/AppLayout", () => ({ default: ({ children }: any) => <div>{children}</div> }));
 vi.mock("@/components/GarminSection", () => ({ default: () => null }));
 vi.mock("@/lib/supabase", () => ({ supabase: { auth: { signOut: vi.fn() } } }));
@@ -24,13 +35,16 @@ vi.mock("@/lib/trpc", () => {
   };
   const procedure = (path: string): any => ({
     useQuery: () => ({ data: queryData[path], isLoading: false, refetch: vi.fn() }),
-    useMutation: () => ({
-      mutate: (vars: Record<string, unknown>) => {
-        if (path === "garmin.sync") state.syncCalls.push(vars);
-      },
-      mutateAsync: vi.fn(),
-      isPending: false,
-    }),
+    useMutation: (options: any) => {
+      if (path === "garmin.sync") state.syncOptions = options;
+      return {
+        mutate: (vars: Record<string, unknown>) => {
+          if (path === "garmin.sync") state.syncCalls.push(vars);
+        },
+        mutateAsync: vi.fn(),
+        isPending: false,
+      };
+    },
     invalidate: vi.fn(),
   });
   const utils: any = new Proxy({}, { get: () => new Proxy({}, { get: () => procedure("utils") }) });
@@ -50,6 +64,7 @@ vi.mock("@/lib/trpc", () => {
 describe("Settings onboarding Garmin sync", () => {
   beforeEach(() => {
     state.syncCalls = [];
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -58,23 +73,42 @@ describe("Settings onboarding Garmin sync", () => {
   });
 
   it("syncs the last 10 swims by default", async () => {
+    const user = userEvent.setup();
     render(<Settings />);
 
     expect(screen.getByRole("radio", { name: "Ultime 10" })).toBeChecked();
-    await userEvent.click(screen.getByRole("button", { name: "Sincronizza le ultime 10" }));
+    await user.click(screen.getByRole("button", { name: "Sincronizza le ultime 10" }));
 
     expect(state.syncCalls).toEqual([{ daysBack: 30, maxActivities: 10 }]);
-  }, 15000);
+  });
 
   it("uses the remembered choice and stores a new one", async () => {
     window.localStorage.setItem(GARMIN_SYNC_COUNT_KEY, "5");
+    const user = userEvent.setup();
     render(<Settings />);
 
     expect(screen.getByRole("radio", { name: "Ultime 5" })).toBeChecked();
-    await userEvent.click(screen.getByRole("radio", { name: "Ultima nuotata" }));
+    await user.click(screen.getByRole("radio", { name: "Ultima nuotata" }));
     expect(window.localStorage.getItem(GARMIN_SYNC_COUNT_KEY)).toBe("1");
 
-    await userEvent.click(screen.getByRole("button", { name: "Sincronizza l'ultima nuotata" }));
+    await user.click(screen.getByRole("button", { name: "Sincronizza l'ultima nuotata" }));
     expect(state.syncCalls).toEqual([{ daysBack: 30, maxActivities: 1 }]);
-  }, 15000);
+  });
+
+  it("says there is nothing new when the sync imports no swims", () => {
+    render(<Settings />);
+
+    state.syncOptions.onSuccess({ synced: 0, newXp: 0, detectedPbs: [] });
+
+    expect(state.toastInfo).toHaveBeenCalledWith("Nessuna nuova nuotata da sincronizzare");
+    expect(state.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("still announces the imported swims", () => {
+    render(<Settings />);
+
+    state.syncOptions.onSuccess({ synced: 2, newXp: 0, detectedPbs: [] });
+
+    expect(state.toastSuccess).toHaveBeenCalledWith("2 attività sincronizzate!");
+  });
 });
