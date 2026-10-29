@@ -296,3 +296,58 @@ describe("parseCssTest", () => {
     expect(parseCssTest("{")).toBeNull();
   });
 });
+
+// The owner: a recreational masters swimmer, out of shape, no CSS test and no Garmin CSS. Best
+// freestyle laps of the last 90 days: 100 in 1:26, 200 in 3:20, 300 in 5:56 (clearly
+// submaximal: slower per 100 m than the 400) and 400 in 6:57.
+describe("getSwimMetrics: the owner's CSS (integration fixture)", () => {
+  const OWNER_SWIMS = [
+    { id: 101, activityDate: new Date("2026-08-20T17:00:00Z"), distanceMeters: 1400, durationSeconds: 1900, poolLengthMeters: 25, isOpenWater: false },
+    { id: 102, activityDate: new Date("2026-09-10T17:00:00Z"), distanceMeters: 1000, durationSeconds: 1300, poolLengthMeters: 25, isOpenWater: false },
+    { id: 103, activityDate: new Date("2026-10-01T17:00:00Z"), distanceMeters: 1200, durationSeconds: 1600, poolLengthMeters: 25, isOpenWater: false },
+    { id: 104, activityDate: new Date("2026-10-22T17:00:00Z"), distanceMeters: 1000, durationSeconds: 1350, poolLengthMeters: 25, isOpenWater: false },
+  ];
+  const rep = (t: number) => [[100, t, "FREESTYLE", 44, 40], [0, 30, null, null, null]] as Array<[number, number, string | null, number | null, number | null]>;
+  const OWNER_LAPS = [
+    ...laps(101, [[400, 417, "FREESTYLE", 180, 44], [0, 90, null, null, null], ...rep(96), ...rep(97), ...rep(99), ...rep(101), [200, 260, "BREASTSTROKE", 60, null], [0, 60, null, null, null], [400, 470, "FREESTYLE", 184, 47]]),
+    ...laps(102, [[200, 200, "FREESTYLE", 88, 43], [0, 60, null, null, null], [300, 356, "FREESTYLE", 138, 49], [0, 60, null, null, null], [100, 86, "FREESTYLE", 40, 38], [0, 120, null, null, null], [400, 480, "FREESTYLE", 186, 48]]),
+    ...laps(103, [[400, 430, "FREESTYLE", 182, 45], [0, 60, null, null, null], [200, 210, "FREESTYLE", 90, 44], [0, 60, null, null, null], ...rep(100), ...rep(102), ...rep(104), [200, 230, "FREESTYLE", 92, 46]]),
+    ...laps(104, [[400, 445, "FREESTYLE", 184, 46], [0, 120, null, null, null], [300, 365, "FREESTYLE", 140, 50], [0, 60, null, null, null], [300, 370, "FREESTYLE", 142, 50]]),
+  ];
+  const byId = new Map(OWNER_SWIMS.map((a) => [a.id, a]));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.getOrSetCached.mockImplementation((_key: string, fetcher: () => Promise<unknown>) => fetcher());
+    m.state.rowsFor = (table, selection) => {
+      if (table === swimmingActivities) return "weekStart" in selection ? [] : OWNER_SWIMS;
+      if (table === garminActivityLaps) {
+        if (!("activityDate" in selection)) return OWNER_LAPS;
+        return OWNER_LAPS.filter((lap) => lap.distanceMeters >= 177).map((lap) => {
+          const a = byId.get(lap.activityId)!;
+          return { activityDate: a.activityDate, poolLengthMeters: 25, isOpenWater: false, distanceMeters: lap.distanceMeters, durationSeconds: lap.durationSeconds, movingDurationSeconds: lap.movingDurationSeconds, strokeType: lap.strokeType };
+        });
+      }
+      if (table === swimmerProfiles) return [{ preferences: { units: "metric" } }];
+      return [];
+    };
+  });
+
+  it("estimates the CSS from the 200 and the 400 at about 1:48.5/100 m, medium confidence", async () => {
+    const metrics = await getSwimMetrics(1, NOW);
+    const css = metrics.css.current!;
+    expect(css.source).toBe("stima");
+    expect(css.confidence).toBe("media");
+    expect(css.paceSecondsPer100).toBe(108.5); // 217 s for the 200 m between the 200 and the 400
+    expect(css.speedMps).toBeCloseTo(200 / 217, 3);
+    expect(css.points.map((p) => [p.distanceMeters, p.seconds, p.date])).toEqual([
+      [200, 200, "2026-09-10"],
+      [400, 417, "2026-08-20"],
+    ]);
+    expect(css.droppedPoints!.map((p) => [p.distanceMeters, p.seconds, p.slowerThan.distanceMeters])).toEqual([[300, 356, 400]]);
+    expect(css.dPrimeMeters).toBeCloseTo(15.7, 1);
+    // The coach reads the zones as paces for this CSS.
+    const { swimMetricsForCoach } = await import("./coach-context");
+    expect(swimMetricsForCoach(metrics)).toContain("Z2 Aerobico 1:58–2:08");
+  });
+});
