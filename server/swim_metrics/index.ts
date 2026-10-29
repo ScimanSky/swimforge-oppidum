@@ -12,6 +12,7 @@ import { clearAIInsightsCache } from "../ai_insights";
 import { cacheKeys, deleteCached, getOrSetCached } from "../lib/cache";
 import { computeSwimMetrics, HISTORY_DAYS, type CssTest, type SwimMetricsInput } from "./compute";
 import type { CssLap } from "./css";
+import { efficiencySummary, sessionEfficiency, type EfficiencySummary } from "./efficiency";
 import { toMetricLap, type MetricActivity, type MetricLap } from "./laps";
 
 export { computeSwimMetrics, type CssTest } from "./compute";
@@ -170,6 +171,64 @@ async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
     cssLaps,
     cssLapsFrom: addDaysToKey(dayKey(now), -(CSS_LAPS_DAYS - 1)),
   };
+}
+
+/** Days of swims the Stroke Index summary needs: the 28 days and the 90-day baseline before them. */
+export const STROKE_INDEX_WINDOW_DAYS = 118;
+
+/**
+ * The Stroke Index summary of the efficiency card, computed fresh from the database (no cache):
+ * the «Efficienza Suprema» badge is checked during a sync, before the caches are dropped.
+ */
+export async function loadStrokeIndexProgress(userId: number, now: Date = new Date()): Promise<EfficiencySummary> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const since = new Date(now.getTime() - (STROKE_INDEX_WINDOW_DAYS + 1) * DAY_MS);
+  const poolSwims = and(
+    eq(swimmingActivities.userId, userId),
+    gte(swimmingActivities.activityDate, since),
+    eq(swimmingActivities.isOpenWater, false),
+  );
+  const [rows, lapRows] = await Promise.all([
+    db
+      .select({
+        id: swimmingActivities.id,
+        activityDate: swimmingActivities.activityDate,
+        poolLengthMeters: swimmingActivities.poolLengthMeters,
+      })
+      .from(swimmingActivities)
+      .where(poolSwims),
+    db
+      .select({
+        activityId: garminActivityLaps.activityId,
+        lapIndex: garminActivityLaps.lapIndex,
+        distanceMeters: garminActivityLaps.distanceMeters,
+        durationSeconds: garminActivityLaps.durationSeconds,
+        movingDurationSeconds: garminActivityLaps.movingDurationSeconds,
+        totalNumberOfStrokes: garminActivityLaps.totalNumberOfStrokes,
+        averageSwolf: garminActivityLaps.averageSwolf,
+        strokeType: garminActivityLaps.strokeType,
+      })
+      .from(garminActivityLaps)
+      .innerJoin(swimmingActivities, eq(garminActivityLaps.activityId, swimmingActivities.id))
+      .where(poolSwims),
+  ]);
+  const lapsByActivity = new Map<number, MetricLap[]>();
+  for (const row of lapRows) {
+    const list = lapsByActivity.get(row.activityId) ?? [];
+    list.push(toMetricLap(row));
+    lapsByActivity.set(row.activityId, list);
+  }
+  const sessions = rows
+    .map((row) => ({ date: new Date(row.activityDate), row }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map(({ date, row }) => ({
+      date: dayKey(date),
+      poolLengthMeters: row.poolLengthMeters ?? null,
+      isOpenWater: false,
+      ...sessionEfficiency(lapsByActivity.get(row.id) ?? []),
+    }));
+  return efficiencySummary(sessions, now);
 }
 
 /** The six metrics of a user (only ever called for the logged-in user), cached per Rome day. */

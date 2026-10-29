@@ -57,7 +57,7 @@ vi.mock("../lib/cache", async () => {
 });
 
 import { aiInsightsCache } from "../../drizzle/schema";
-import { getSwimMetrics, invalidateSwimMetrics, parseCssTest } from "./index";
+import { getSwimMetrics, invalidateSwimMetrics, loadStrokeIndexProgress, parseCssTest } from "./index";
 
 let lapId = 0;
 function laps(activityId: number, specs: Array<[number, number, string | null, number | null, number | null]>) {
@@ -349,5 +349,35 @@ describe("getSwimMetrics: the owner's CSS (integration fixture)", () => {
     // The coach reads the zones as paces for this CSS.
     const { swimMetricsForCoach } = await import("./coach-context");
     expect(swimMetricsForCoach(metrics)).toContain("Z2 Aerobico 1:58–2:08");
+  });
+});
+
+describe("loadStrokeIndexProgress (for the «Efficienza Suprema» badge)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.state.tables.length = 0;
+    m.state.selections.length = 0;
+    m.state.grouped.length = 0;
+  });
+
+  it("reads 118 days of pool swims and their laps, and summarises the Stroke Index like the card", async () => {
+    // 6 baseline swims (40–100 days ago) at SI 2.0, 6 recent swims at SI 2.2 (+10%).
+    const days = [100, 90, 80, 70, 60, 40, 25, 20, 15, 10, 5, 2];
+    const swims = days.map((d, i) => ({
+      id: 200 + i,
+      activityDate: new Date(NOW.getTime() - d * 86_400_000),
+      poolLengthMeters: 25,
+    }));
+    // SI = v × DPS: 100 m in 100 s with 50 cycles = 1 × 2 = 2.0; 100 m in 100/1.1 s with 50 cycles = 2.2.
+    const lapRows = swims.flatMap((s, i) =>
+      laps(s.id, [[100, i < 6 ? 100 : 100 / 1.1, "FREESTYLE", 50, 40], [0, 20, null, null, null], [100, i < 6 ? 100 : 100 / 1.1, "FREESTYLE", 50, 40]]),
+    );
+    m.state.rowsFor = (table) => (table === swimmingActivities ? swims : table === garminActivityLaps ? lapRows : []);
+
+    const summary = await loadStrokeIndexProgress(42, NOW);
+    expect(m.state.tables).toEqual([swimmingActivities, garminActivityLaps]);
+    expect(summary).toMatchObject({ poolLengthMeters: 25, n28: 6, nBaseline: 6 });
+    expect(summary.avg28).toBeCloseTo(2.2, 9);
+    expect(summary.baseline).toBeCloseTo(2.0, 9);
   });
 });
