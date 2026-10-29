@@ -95,7 +95,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/AdminReports.tsx",
     "pages/ForgotPassword.tsx",
     "pages/Login.tsx",
-    "pages/PostDetail.tsx",
     "pages/Register.tsx",
     "pages/ReportPost.tsx",
     "pages/ResetPassword.tsx",
