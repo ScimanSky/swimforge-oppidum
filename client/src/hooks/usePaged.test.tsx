@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { usePaged } from "./usePaged";
+import { usePaged, type PageResetKey } from "./usePaged";
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
 
@@ -46,6 +46,16 @@ describe("usePaged", () => {
     act(() => result.current.setPage(3));
     rerender({ size: 4 });
     expect(result.current).toMatchObject({ page: 2, totalPages: 2, pageItems: [5, 6] });
+  });
+
+  // Checked by `pnpm check` (this file is .tsx so tsc includes it): an object key fails to compile.
+  it("accetta come chiavi solo valori primitivi", () => {
+    const keys: PageResetKey[] = ["all", 3, true, null, undefined];
+    // @ts-expect-error an object built during render is a new key on every render.
+    const objectKeys: PageResetKey[] = [{ filter: "all" }];
+    // @ts-expect-error same for an array.
+    const arrayKeys: PageResetKey[] = [["all"]];
+    expect([keys, objectKeys, arrayKeys].map((list) => list.length)).toEqual([5, 1, 1]);
   });
 
   it("torna alla prima pagina quando cambia una chiave", () => {

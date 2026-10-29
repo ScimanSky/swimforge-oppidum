@@ -1,6 +1,13 @@
 import { useCallback, useState } from "react";
 
-const sameKeys = (a: readonly unknown[], b: readonly unknown[]) =>
+/**
+ * What resets the paging (a filter, a search): primitives only, compared with `Object.is`. An
+ * object or array built during render is new on every render: it would reset the page on each
+ * one and loop («Too many re-renders»).
+ */
+export type PageResetKey = string | number | boolean | null | undefined;
+
+const sameKeys = (a: readonly PageResetKey[], b: readonly PageResetKey[]) =>
   a.length === b.length && a.every((key, index) => Object.is(key, b[index]));
 
 /**
@@ -12,12 +19,12 @@ const sameKeys = (a: readonly unknown[], b: readonly unknown[]) =>
 export function usePaged<T>(
   items: readonly T[],
   pageSize: number,
-  resetKeys: readonly unknown[] = []
+  resetKeys: readonly PageResetKey[] = []
 ) {
   const size = Math.max(1, Math.floor(pageSize) || 1);
   const totalPages = Math.max(1, Math.ceil(items.length / size));
   const [storedPage, setStoredPage] = useState(1);
-  const [lastKeys, setLastKeys] = useState<readonly unknown[]>(resetKeys);
+  const [lastKeys, setLastKeys] = useState<readonly PageResetKey[]>(resetKeys);
 
   // Adjusted during render (React's «storing information from previous renders» pattern):
   // the very first paint after the change is already right, with no effect and no flash.
