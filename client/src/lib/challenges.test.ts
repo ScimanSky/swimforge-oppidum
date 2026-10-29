@@ -5,7 +5,6 @@ import {
   challengeProgressParts,
   challengeProgressPercent,
   compareChallengeProgress,
-  dayStreak,
 } from "./challenges";
 
 describe("challengeProgressParts", () => {
@@ -48,22 +47,5 @@ describe("progresso delle sfide: il passo migliore è il più basso", () => {
   it("ordine: migliore prima, per il passo crescente con chi non ha dati in fondo", () => {
     expect([3, 0, 9].sort(compareChallengeProgress("total_sessions"))).toEqual([9, 3, 0]);
     expect([120, 0, 98].sort(compareChallengeProgress("avg_pace"))).toEqual([98, 120, 0]);
-  });
-});
-
-describe("dayStreak", () => {
-  it("giorni di fila fino a oggi, contati sui giorni locali", () => {
-    const now = new Date(2026, 9, 29, 10, 0);
-    const days = [
-      new Date(2026, 9, 29, 0, 30), // just after local midnight: still today
-      new Date(2026, 9, 28, 23, 45),
-      new Date(2026, 9, 27, 7, 0),
-      new Date(2026, 9, 25, 7, 0),
-    ];
-    expect(dayStreak(days, now)).toBe(3);
-  });
-  it("zero se oggi non si è nuotato", () => {
-    expect(dayStreak([new Date(2026, 9, 28, 9)], new Date(2026, 9, 29, 10))).toBe(0);
-    expect(dayStreak([], new Date())).toBe(0);
   });
 });

@@ -147,15 +147,36 @@ describe("Sfide (Corsia)", () => {
     expect(state.refetch).toHaveBeenCalled();
   });
 
-  it("«Giorni di fila» senza unità ripetuta, contati sui giorni locali", () => {
-    const today = new Date();
-    today.setHours(0, 30, 0, 0);
-    state.activities = [{ activityDate: today.toISOString() }];
-    renderChallenges();
-    const summary = screen.getByRole("region", { name: "Riepilogo" });
-    const streak = within(summary).getByText("Giorni di fila").parentElement!;
-    expect(streak.textContent).not.toMatch(/giorn[oi]/);
-    expect(within(streak).getByText("1")).toBeTruthy();
+  describe("«Serie attuale» come nel profilo (lun/mer/ven, giorni locali)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      // Wednesday 28 October 2026, evening.
+      vi.setSystemTime(new Date(2026, 9, 28, 19, 0));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("lunedì e mercoledì di fila contano 2, anche senza il martedì", () => {
+      state.activities = [
+        { activityDate: new Date(2026, 9, 26, 7, 0).toISOString() },
+        // Just after local midnight: Wednesday, not Tuesday as in UTC.
+        { activityDate: new Date(2026, 9, 28, 0, 30).toISOString() },
+      ];
+      renderChallenges();
+      const summary = screen.getByRole("region", { name: "Riepilogo" });
+      expect(within(summary).queryByText("Giorni di fila")).toBeNull();
+      const streak = within(summary).getByText("Serie attuale").parentElement!;
+      expect(streak.textContent).toBe("2 g Serie attuale");
+    });
+
+    it("mercoledì non ancora nuotato non interrompe la serie", () => {
+      state.activities = [
+        { activityDate: new Date(2026, 9, 23, 7, 0).toISOString() },
+        { activityDate: new Date(2026, 9, 26, 7, 0).toISOString() },
+      ];
+      renderChallenges();
+      const streak = within(screen.getByRole("region", { name: "Riepilogo" })).getByText("Serie attuale").parentElement!;
+      expect(streak.textContent).toBe("2 g Serie attuale");
+    });
   });
 
   it("Partecipa disattivato mentre la richiesta è in corso; errore con avviso", () => {
@@ -209,7 +230,7 @@ describe("Sfide (Corsia)", () => {
     const summary = screen.getByRole("region", { name: "Riepilogo" });
     expect(within(summary).getByText("8.420")).toBeTruthy();
     expect(within(summary).getByText("XP totali")).toBeTruthy();
-    expect(within(summary).getByText("Giorni di fila")).toBeTruthy();
+    expect(within(summary).getByText("Serie attuale")).toBeTruthy();
     for (const name of [/Attive/, "Disponibili", "Concluse", "Classifica"]) {
       expect(screen.getByRole("tab", { name })).toBeTruthy();
     }

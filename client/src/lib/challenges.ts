@@ -5,7 +5,6 @@ import {
   formatInteger,
   formatPaceValue,
 } from "@/lib/format";
-import { localDayKey } from "@/lib/profile-stats";
 
 /** Labels shared by the challenge list, the create dialog and the challenge detail. */
 export const CHALLENGE_TYPE_LABELS: Record<string, string> = {
@@ -99,16 +98,4 @@ export function challengeProgressPercent(
   if (!(mine > 0) || !(best > 0)) return 0;
   const ratio = isLowerBetter(objective) ? best / mine : mine / best;
   return Math.min(100, ratio * 100);
-}
-
-/** Consecutive local days with a swim, ending today (0 when today has no swim yet). */
-export function dayStreak(days: readonly Date[], now: Date = new Date()): number {
-  const swum = new Set(days.map(localDayKey));
-  const cursor = new Date(now);
-  let streak = 0;
-  while (swum.has(localDayKey(cursor))) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
 }

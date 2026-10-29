@@ -44,9 +44,9 @@ import {
   challengeObjectiveLabel,
   challengeProgressParts,
   challengeProgressPercent,
-  dayStreak,
 } from "@/lib/challenges"
 import { formatDistance, formatInteger, toFiniteNumber } from "@/lib/format"
+import { activityDays, getStreaks } from "@/lib/profile-stats"
 import { rankEntries } from "@/lib/ranking"
 
 const formatDaysLeft = (endDate: string | Date) => {
@@ -146,7 +146,8 @@ export default function Challenges() {
   })
 
   const profileQuery = trpc.profile.get.useQuery()
-  const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
+  // Same query as the profile (shared cache), for the same «Serie attuale».
+  const activitiesQuery = trpc.activities.list.useQuery({ limit: 50, offset: 0, source: "all" })
   const badgesQuery = trpc.badges.userBadges.useQuery()
   const challengesQuery = trpc.challenges.list.useQuery()
   const createChallenge = trpc.challenges.create.useMutation({
@@ -218,13 +219,11 @@ export default function Challenges() {
   const availablePaging = usePaged(availableChallenges, isDesktopWide ? 2 : 3, [activeTab])
   const leaderboardPaging = usePaged(rankedLeaderboard, isDesktopWide ? 3 : 4, [activeTab])
 
-  // Local calendar days (a swim at 00:30 is today, not yesterday in UTC).
-  const streak = useMemo(() => {
-    const days = (activitiesQuery.data ?? [])
-      .map((activity) => new Date(activity.activityDate))
-      .filter((date) => !Number.isNaN(date.getTime()))
-    return dayStreak(days)
-  }, [activitiesQuery.data])
+  // The profile's streak (Mon/Wed/Fri training days, local calendar days), same number as there.
+  const streak = useMemo(
+    () => getStreaks(activityDays(activitiesQuery.data ?? [])).current,
+    [activitiesQuery.data]
+  )
   const challengesLoading = challengesQuery.isPending
   const challengesFailed = !challengesQuery.data && challengesQuery.isError
   const leaderboardLoading = leaderboardQuery.isPending
@@ -239,7 +238,7 @@ export default function Challenges() {
       : null,
     badgesQuery.data ? { label: "Badge", value: formatInteger(badgesQuery.data.length) } : null,
     activitiesQuery.data
-      ? { label: "Giorni di fila", value: formatInteger(streak) }
+      ? { label: "Serie attuale", value: formatInteger(streak), unit: "g" }
       : null,
     profileQuery.data
       ? { label: "XP totali", value: formatInteger(profileQuery.data.totalXp ?? 0), unit: "XP", tone: "xp" as const }
