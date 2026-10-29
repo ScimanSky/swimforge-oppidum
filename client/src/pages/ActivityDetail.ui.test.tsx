@@ -168,7 +168,7 @@ describe("ActivityDetail (Corsia)", () => {
   it("header: date, place and source, the name as h2 (no h1), XP chip", () => {
     render(<ActivityDetail />);
 
-    expect(screen.getByText("lun 26 ott · 10:47 · Vasca 25m · Garmin")).toBeInTheDocument();
+    expect(screen.getByText("lun 26 ott · 10:47 · Vasca 25 m · Garmin")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Soglia 10×200" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(screen.getByText("+180 XP")).toBeInTheDocument();
