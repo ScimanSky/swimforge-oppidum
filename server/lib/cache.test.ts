@@ -3,13 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => {
   const client = {
     isOpen: true,
+    isReady: true,
     on: vi.fn(),
     connect: vi.fn(async () => {}),
+    destroy: vi.fn(),
     get: vi.fn(),
     set: vi.fn(),
     setEx: vi.fn(),
     del: vi.fn(),
     eval: vi.fn(),
+    multi: vi.fn(),
+    scanIterator: vi.fn(),
+    info: vi.fn(),
+    dbSize: vi.fn(),
   };
   return {
     client,
@@ -29,18 +35,25 @@ vi.mock("../middleware/logger", () => ({ logger: m.logger }));
 import {
   CACHE_MAX_VALUE_BYTES,
   deleteCached,
+  deleteMultipleCached,
+  getCacheStats,
   getCached,
   getOrSetCached,
+  invalidateCachePattern,
+  invalidateUserCache,
   setCached,
 } from "./cache";
 import { REDIS_COMMAND_TIMEOUT_MS, resetRedisCircuit } from "./with-timeout";
+import { resetLogThrottle } from "./throttled-log";
 
 const never = () => new Promise<never>(() => {});
 
 beforeEach(() => {
   vi.clearAllMocks();
   resetRedisCircuit();
+  resetLogThrottle();
   m.client.isOpen = true;
+  m.client.isReady = true;
 });
 
 afterEach(() => {
@@ -165,9 +178,58 @@ describe("getOrSetCached", () => {
     expect(m.client.eval).toHaveBeenCalledTimes(1);
   });
 
-  it("is a pass-through when the client is not open", async () => {
-    m.client.isOpen = false;
+  it("is a pass-through when the client is not ready", async () => {
+    m.client.isReady = false;
     await expect(getOrSetCached("k", async () => "fresh", 60)).resolves.toBe("fresh");
     expect(m.client.get).not.toHaveBeenCalled();
+  });
+});
+
+describe("Redis outage: client open (reconnecting) but not ready", () => {
+  const redisMethods = ["get", "set", "setEx", "del", "eval", "multi", "scanIterator", "info", "dbSize"] as const;
+
+  it("every helper short-circuits without calling Redis or logging", async () => {
+    m.client.isOpen = true;
+    m.client.isReady = false;
+    const fetcher = vi.fn(async () => "fresh");
+
+    for (let i = 0; i < 20; i++) {
+      await expect(getCached(`k${i}`)).resolves.toBeNull();
+      await setCached(`k${i}`, { i }, 60);
+      await deleteCached(`k${i}`);
+      await deleteMultipleCached([`a${i}`, `b${i}`]);
+      await expect(getOrSetCached(`k${i}`, fetcher, 60)).resolves.toBe("fresh");
+      await invalidateCachePattern("user:*");
+      await invalidateUserCache(`u${i}`);
+    }
+    await expect(getCacheStats()).resolves.toEqual({ keys: 0, info: "Redis not connected" });
+
+    for (const method of redisMethods) expect(m.client[method]).not.toHaveBeenCalled();
+    expect(m.logger.warn).not.toHaveBeenCalled();
+    expect(m.logger.error).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(20);
+  });
+
+  it("per-request failures are logged at most once per event", async () => {
+    const offline = new Error("The client is offline");
+    m.client.get.mockRejectedValue(offline);
+    m.client.set.mockRejectedValue(offline);
+    m.client.setEx.mockRejectedValue(offline);
+    m.client.del.mockRejectedValue(offline);
+    for (let i = 0; i < 30; i++) {
+      await getOrSetCached(`k${i}`, async () => i, 60);
+      await getCached(`k${i}`);
+      await setCached(`k${i}`, i, 60);
+      await deleteCached(`k${i}`);
+      await deleteMultipleCached([`a${i}`, `b${i}`]);
+    }
+    const events = [...m.logger.error.mock.calls, ...m.logger.warn.mock.calls].map((c) => c[1]?.event);
+    expect(events.sort()).toEqual([
+      "cache:delete_failed",
+      "cache:get_failed",
+      "cache:lock_unavailable",
+      "cache:set_failed",
+      "redis:connection_warning",
+    ]);
   });
 });
