@@ -140,9 +140,10 @@ describe("ClubDetailEnhanced (Corsia)", () => {
     expect(within(header).getByText("Pubblico")).toBeTruthy();
 
     const stats = screen
-      .getByRole("heading", { level: 3, name: "Attività del club" })
+      .getByRole("heading", { level: 3, name: "Il club questa settimana" })
       .closest("section")!;
-    expect(within(stats).getByText("post in settimana")).toBeTruthy();
+    expect(within(stats).getByText("post")).toBeTruthy();
+    expect(within(stats).getByText("5")).toBeTruthy();
     expect(
       screen.getByText("Unisciti al club per vedere gare ed eventi.")
     ).toBeTruthy();
@@ -261,5 +262,52 @@ describe("ClubDetailEnhanced (Corsia)", () => {
     expect(within(colours).getByRole("radio", { name: "Verde" })).toBeChecked();
     await user.click(screen.getByRole("button", { name: "Salva modifiche" }));
     expect(state.updateCalls).toEqual([expect.objectContaining({ clubId: 7, themeColor: "lime" })]);
+  });
+
+  describe("numeri della settimana", () => {
+    const nextEvent = {
+      id: 3,
+      title: "Uscita al mare",
+      startTime: "2099-11-02T08:30:00Z",
+      eventType: "social",
+    };
+    const weekHeading = () => screen.queryByRole("heading", { level: 3, name: "Il club questa settimana" });
+
+    it("il prossimo evento solo ai membri", () => {
+      state.stats = { ...state.stats, next_event: nextEvent };
+      renderClub();
+      expect(weekHeading()).toBeTruthy();
+      expect(screen.queryByText("Uscita al mare")).toBeNull();
+      cleanup();
+      state.club = { ...baseClub, is_member: true, member_role: "member" };
+      renderClub();
+      const stats = weekHeading()!.closest("section")!;
+      expect(within(stats).getByText("Uscita al mare")).toBeTruthy();
+    });
+
+    it("club non pubblico, non membro: nessuna richiesta e nessun numero", () => {
+      state.club = { ...baseClub, visibility: "invite" };
+      renderClub();
+      expect(state.enabled.weeklyStats).toBe(false);
+      expect(weekHeading()).toBeNull();
+      expect(screen.getByText("Unisciti al club per vedere gare ed eventi.")).toBeTruthy();
+    });
+
+    it("club non pubblico, membro: i numeri ci sono", () => {
+      state.club = { ...baseClub, visibility: "invite", is_member: true, member_role: "member" };
+      renderClub();
+      expect(state.enabled.weeklyStats).toBe(true);
+      expect(weekHeading()).toBeTruthy();
+    });
+
+    it("FORBIDDEN dal server: niente numeri, nessun errore mostrato", () => {
+      state.statsError = { message: "Forbidden", data: { code: "FORBIDDEN" } };
+      renderClub();
+      expect(weekHeading()).toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.queryByText("Non riesco a caricare i dati")).toBeNull();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(screen.getByRole("heading", { level: 2, name: "Rari Nantes" })).toBeTruthy();
+    });
   });
 });

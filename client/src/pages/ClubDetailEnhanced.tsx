@@ -24,7 +24,7 @@ import { toast } from "sonner";
 
 import ClubHero from "@/components/club/ClubHero";
 import ClubEventsPanel, { type ClubAgendaItem } from "@/components/club/ClubEventsPanel";
-import PulseBar from "@/components/club/PulseBar";
+import PulseBar, { type ClubWeeklyStats } from "@/components/club/PulseBar";
 import QuickActionsFAB from "@/components/club/QuickActionsFAB";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
@@ -215,11 +215,15 @@ export default function ClubDetailEnhanced() {
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
   );
+  const isMemberFromClubQuery = Boolean((clubQuery.data as any | undefined)?.is_member);
+  // A public club shows its weekly numbers to everyone, the others to members only (the server
+  // answers FORBIDDEN otherwise): not even asked for then.
+  const canSeeWeeklyStats =
+    isMemberFromClubQuery || (clubQuery.data as any | undefined)?.visibility === "public";
   const statsQuery = trpc.community.clubs.weeklyStats.useQuery(
     { clubId },
-    { enabled: match && Number.isFinite(clubId) }
+    { enabled: match && Number.isFinite(clubId) && canSeeWeeklyStats }
   );
-  const isMemberFromClubQuery = Boolean((clubQuery.data as any | undefined)?.is_member);
   const announcementsQuery = trpc.community.clubs.announcements.list.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) && isMemberFromClubQuery }
@@ -278,7 +282,8 @@ export default function ClubDetailEnhanced() {
       });
       setEventRoutePoints([]);
       utils.community.clubs.events.list.invalidate();
-      statsQuery.refetch();
+      // Not refetch(): that would run even while the query is disabled.
+      utils.community.clubs.weeklyStats.invalidate({ clubId });
     },
     onError: (e) => toast.error(e.message || "Errore nella creazione"),
   });
@@ -510,7 +515,11 @@ export default function ClubDetailEnhanced() {
           aria-label="Attività e calendario del club"
           className="min-w-0 space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1"
         >
-          <PulseBar stats={statsQuery.data as any} />
+          {/* Quiet on errors (a FORBIDDEN, a network failure): the numbers are just left out. */}
+          <PulseBar
+            stats={canSeeWeeklyStats ? (statsQuery.data as ClubWeeklyStats | undefined) : null}
+            showNextEvent={isMember}
+          />
           {isMember ? (
             <ClubEventsPanel items={agendaItems} />
           ) : (
