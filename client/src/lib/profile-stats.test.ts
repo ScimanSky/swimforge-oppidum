@@ -1,5 +1,5 @@
-// Training days and swims must be compared as local calendar days: pin a timezone east of UTC,
-// where local midnight is the previous day in UTC. Node applies TZ at runtime.
+// Swims are grouped by Rome calendar weeks: pin a timezone east of UTC, where local midnight is
+// the previous day in UTC. Node applies TZ at runtime.
 process.env.TZ = "Europe/Rome";
 
 import { describe, expect, it } from "vitest";
@@ -32,28 +32,28 @@ describe("profile stats (Europe/Rome)", () => {
     expect(localDayKey(oct(26, 23, 30))).toBe("2026-10-26");
   });
 
-  it("Monday, Wednesday and Friday swims make the streak", () => {
-    const now = oct(28, 18);
-    expect(getStreaks([oct(23), oct(26), oct(28, 7)], now)).toEqual({ current: 3, best: 3 });
+  it("weeks with at least two swims make the streak, counted in weeks", () => {
+    // Weeks of 12 and 19 October with two swims each; the current week (26) has none yet.
+    const swims = [oct(13), oct(15), oct(19), oct(22)];
+    expect(getStreaks(swims, oct(28, 18))).toEqual({ current: 2, best: 2 });
   });
 
-  it("a Monday swim at 23:30 and at 00:30 counts for Monday", () => {
-    const now = oct(27, 12); // Tuesday
-    expect(getStreaks([oct(26, 23, 30)], now)).toEqual({ current: 1, best: 1 });
-    expect(getStreaks([oct(26, 0, 30)], now)).toEqual({ current: 1, best: 1 });
+  it("the current week counts once it has two swims; with one it does not break the streak", () => {
+    const twoWeeks = [oct(13), oct(15), oct(19), oct(22)];
+    expect(getStreaks([...twoWeeks, oct(26)], oct(28, 18))).toEqual({ current: 2, best: 2 });
+    expect(getStreaks([...twoWeeks, oct(26), oct(28, 7)], oct(28, 18))).toEqual({ current: 3, best: 3 });
   });
 
-  it("a Tuesday swim is not a training day", () => {
-    expect(getStreaks([oct(27)], oct(28, 18))).toEqual({ current: 0, best: 0 });
+  it("a week with a single swim breaks the streak; the best run is kept", () => {
+    // Weeks of 5 and 12 October with two swims, 19 October with one, 26 October with two.
+    const swims = [oct(5), oct(7), oct(12), oct(14), oct(21), oct(26), oct(27)];
+    expect(getStreaks(swims, oct(28, 18))).toEqual({ current: 1, best: 2 });
   });
 
-  it("today's training day not swum yet does not break the streak", () => {
-    expect(getStreaks([oct(23), oct(26)], oct(28, 18))).toEqual({ current: 2, best: 2 });
-  });
-
-  it("current vs best: a missed Wednesday resets the current streak", () => {
-    const swims = [oct(5), oct(7), oct(9), oct(19), oct(23), oct(26)];
-    expect(getStreaks(swims, oct(27, 12))).toEqual({ current: 2, best: 3 });
+  it("Sunday 23:30 belongs to its own week, Monday 00:30 to the next", () => {
+    const now = oct(28, 18); // Wednesday, no swims this week yet
+    expect(getStreaks([oct(19), oct(25, 23, 30)], now)).toEqual({ current: 1, best: 1 });
+    expect(getStreaks([oct(19), oct(26, 0, 30)], now)).toEqual({ current: 0, best: 0 });
   });
 
   it("no swims, no streak", () => {

@@ -147,7 +147,7 @@ describe("Sfide (Corsia)", () => {
     expect(state.refetch).toHaveBeenCalled();
   });
 
-  describe("«Serie attuale» come nel profilo (lun/mer/ven, giorni locali)", () => {
+  describe("«Serie attuale» come nel profilo (settimane con almeno 2 nuotate)", () => {
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ["Date"] });
       // Wednesday 28 October 2026, evening.
@@ -155,27 +155,29 @@ describe("Sfide (Corsia)", () => {
     });
     afterEach(() => vi.useRealTimers());
 
-    it("lunedì e mercoledì di fila contano 2, anche senza il martedì", () => {
+    it("due settimane di fila con 2 nuotate contano 2 settimane", () => {
       state.activities = [
-        { activityDate: new Date(2026, 9, 26, 7, 0).toISOString() },
-        // Just after local midnight: Wednesday, not Tuesday as in UTC.
-        { activityDate: new Date(2026, 9, 28, 0, 30).toISOString() },
+        { activityDate: new Date(2026, 9, 12, 7, 0).toISOString() },
+        { activityDate: new Date(2026, 9, 15, 7, 0).toISOString() },
+        { activityDate: new Date(2026, 9, 19, 7, 0).toISOString() },
+        { activityDate: new Date(2026, 9, 25, 12, 0).toISOString() },
       ];
       renderChallenges();
       const summary = screen.getByRole("region", { name: "Riepilogo" });
-      expect(within(summary).queryByText("Giorni di fila")).toBeNull();
       const streak = within(summary).getByText("Serie attuale").parentElement!;
-      expect(streak.textContent).toBe("2 g Serie attuale");
+      expect(streak.textContent).toBe("2 sett. Serie attuale");
+      expect(within(summary).getByText("Serie: settimane di fila con almeno 2 nuotate.")).toBeTruthy();
     });
 
-    it("mercoledì non ancora nuotato non interrompe la serie", () => {
+    it("la settimana in corso con una nuotata non interrompe la serie", () => {
       state.activities = [
-        { activityDate: new Date(2026, 9, 23, 7, 0).toISOString() },
+        { activityDate: new Date(2026, 9, 19, 7, 0).toISOString() },
+        { activityDate: new Date(2026, 9, 21, 7, 0).toISOString() },
         { activityDate: new Date(2026, 9, 26, 7, 0).toISOString() },
       ];
       renderChallenges();
       const streak = within(screen.getByRole("region", { name: "Riepilogo" })).getByText("Serie attuale").parentElement!;
-      expect(streak.textContent).toBe("2 g Serie attuale");
+      expect(streak.textContent).toBe("1 sett. Serie attuale");
     });
   });
 

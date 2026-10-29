@@ -208,23 +208,42 @@ describe("Profilo (Corsia)", () => {
   });
 
   it("SWOLF and streaks are scoped to the recent swims; lifetime totals are not", () => {
-    // Wednesday 28 October 2026, 18:00: swims on Fri 23, Mon 26 and Wed 28.
+    // Wednesday 28 October 2026, 18:00: two swims in the week of 19 October, two in this week.
     vi.useFakeTimers({ now: new Date(2026, 9, 28, 18), toFake: ["Date"] });
     state.activities = [
-      { activityDate: new Date(2026, 9, 23, 10), avgSwolf: 40 },
-      { activityDate: new Date(2026, 9, 26, 10), avgSwolf: 36 },
+      { activityDate: new Date(2026, 9, 19, 10), avgSwolf: 40 },
+      { activityDate: new Date(2026, 9, 23, 10), avgSwolf: 36 },
+      { activityDate: new Date(2026, 9, 26, 10), avgSwolf: 38 },
       { activityDate: new Date(2026, 9, 28, 10), avgSwolf: 38 },
     ];
     renderProfile();
 
     const stats = screen.getByRole("region", { name: "Riepilogo" });
-    const recent = within(stats).getByRole("region", { name: "Ultime 3 nuotate" });
+    const recent = within(stats).getByRole("region", { name: "Ultime 4 nuotate" });
     expect(recent).toHaveTextContent("38 SWOLF medio");
     expect(recent).toHaveTextContent("36 SWOLF migliore");
-    expect(recent).toHaveTextContent("3 g Serie attuale");
-    expect(recent).toHaveTextContent("3 g Serie migliore");
+    expect(recent).toHaveTextContent("2 sett. Serie attuale");
+    expect(recent).toHaveTextContent("2 sett. Serie migliore");
+    expect(recent).toHaveTextContent("Serie: settimane di fila con almeno 2 nuotate.");
     expect(recent).not.toHaveTextContent("Distanza totale");
     expect(stats).toHaveTextContent("3,2 km Distanza totale");
+  });
+
+  it("a week with a single swim breaks the current streak, the best one stays", () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 28, 18), toFake: ["Date"] });
+    state.activities = [
+      { activityDate: new Date(2026, 9, 5, 10) },
+      { activityDate: new Date(2026, 9, 7, 10) },
+      { activityDate: new Date(2026, 9, 12, 10) },
+      { activityDate: new Date(2026, 9, 14, 10) },
+      { activityDate: new Date(2026, 9, 21, 10) },
+      { activityDate: new Date(2026, 9, 26, 10) },
+      { activityDate: new Date(2026, 9, 27, 10) },
+    ];
+    renderProfile();
+    const recent = screen.getByRole("region", { name: "Ultime 7 nuotate" });
+    expect(recent).toHaveTextContent("1 sett. Serie attuale");
+    expect(recent).toHaveTextContent("2 sett. Serie migliore");
   });
 
   it("links to Statistiche and Impostazioni", () => {

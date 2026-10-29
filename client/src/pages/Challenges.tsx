@@ -46,7 +46,7 @@ import {
   challengeProgressPercent,
 } from "@/lib/challenges"
 import { formatDistance, formatInteger, toFiniteNumber } from "@/lib/format"
-import { activityDays, getStreaks } from "@/lib/profile-stats"
+import { activityDays, getStreaks, STREAK_EXPLANATION, STREAK_UNIT } from "@/lib/profile-stats"
 import { rankEntries } from "@/lib/ranking"
 
 const formatDaysLeft = (endDate: string | Date) => {
@@ -219,7 +219,7 @@ export default function Challenges() {
   const availablePaging = usePaged(availableChallenges, isDesktopWide ? 2 : 3, [activeTab])
   const leaderboardPaging = usePaged(rankedLeaderboard, isDesktopWide ? 3 : 4, [activeTab])
 
-  // The profile's streak (Mon/Wed/Fri training days, local calendar days), same number as there.
+  // The profile's streak (weeks with at least two swims), same number as there.
   const streak = useMemo(
     () => getStreaks(activityDays(activitiesQuery.data ?? [])).current,
     [activitiesQuery.data]
@@ -238,7 +238,7 @@ export default function Challenges() {
       : null,
     badgesQuery.data ? { label: "Badge", value: formatInteger(badgesQuery.data.length) } : null,
     activitiesQuery.data
-      ? { label: "Serie attuale", value: formatInteger(streak), unit: "g" }
+      ? { label: "Serie attuale", value: formatInteger(streak), unit: STREAK_UNIT }
       : null,
     profileQuery.data
       ? { label: "XP totali", value: formatInteger(profileQuery.data.totalXp ?? 0), unit: "XP", tone: "xp" as const }
@@ -376,6 +376,9 @@ export default function Challenges() {
                 <Metric key={label} size="responsive" label={label} {...metric} />
               ))}
             </div>
+            {activitiesQuery.data ? (
+              <p className="mt-3 text-xs text-muted-foreground">{STREAK_EXPLANATION}</p>
+            ) : null}
           </section>
         ) : null}
 

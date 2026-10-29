@@ -1,8 +1,9 @@
 /**
  * Pure helpers for the profile: activity field pickers (activities come in camelCase or
- * snake_case), stroke/source labels and the Mon/Wed/Fri training streak.
+ * snake_case), stroke/source labels and the streak of weeks with at least two swims.
  */
 
+import { addDaysToKey, weekStartKey, weeklyStreak } from "@shared/swimMetrics"
 import { toFiniteNumber } from "@/lib/format"
 
 export type ActivityLike = Record<string, any>
@@ -20,10 +21,12 @@ export const SOURCE_LABELS: Record<string, string> = {
   training: "Allenamento",
 }
 
-/** Training days of the streak: Monday, Wednesday, Friday (`Date.getDay()`). */
-const TRAINING_DAYS = new Set([1, 3, 5])
-/** How far back the streak looks. */
-const STREAK_WINDOW_DAYS = 365
+/** Swims a week needs to count for the streak (shared with Statistiche and the coach). */
+const STREAK_MIN_PER_WEEK = 2
+/** Short unit of the streak next to its number. */
+export const STREAK_UNIT = "sett."
+/** What the streak counts, shown under it. */
+export const STREAK_EXPLANATION = "Serie: settimane di fila con almeno 2 nuotate."
 
 /** Date or null; «2026-10-26 23:30:00» (no zone) is read as local time. */
 export const parseActivityDate = (value?: string | Date | null) => {
@@ -57,37 +60,27 @@ export const activityDays = (activities: ActivityLike[]) =>
     .filter((date): date is Date => date instanceof Date)
 
 /**
- * Consecutive Mon/Wed/Fri training days with a swim, in local days. `current` ends at the last
- * training day up to today (today, while not swum yet, does not break it); `best` is the longest
- * run in the last year.
+ * Streak in weeks (Monday to Sunday, Rome) with at least two swims. `current` counts back from
+ * this week, which does not break it until it is over; `best` is the longest run among the
+ * given swims (never shorter than `current`).
  */
 export const getStreaks = (swims: Date[], now: Date = new Date()) => {
   if (swims.length === 0) return { current: 0, best: 0 }
-  const swum = new Set(swims.map(localDayKey))
-
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-
-  const trainingDates: string[] = []
-  for (let i = STREAK_WINDOW_DAYS - 1; i >= 0; i -= 1) {
-    const day = new Date(today)
-    day.setDate(day.getDate() - i)
-    if (TRAINING_DAYS.has(day.getDay())) trainingDates.push(localDayKey(day))
+  const perWeek = new Map<string, number>()
+  for (const swim of swims) {
+    const week = weekStartKey(swim)
+    perWeek.set(week, (perWeek.get(week) ?? 0) + 1)
   }
 
+  const thisWeek = weekStartKey(now)
   let best = 0
   let run = 0
-  for (const day of trainingDates) {
-    run = swum.has(day) ? run + 1 : 0
+  for (let week = Array.from(perWeek.keys()).sort()[0]; week <= thisWeek; week = addDaysToKey(week, 7)) {
+    run = (perWeek.get(week) ?? 0) >= STREAK_MIN_PER_WEEK ? run + 1 : 0
     best = Math.max(best, run)
   }
 
-  let end = trainingDates.length - 1
-  if (TRAINING_DAYS.has(today.getDay()) && !swum.has(localDayKey(today))) end -= 1
-  let current = 0
-  for (let i = end; i >= 0 && swum.has(trainingDates[i]); i -= 1) current += 1
-
-  return { current, best }
+  return { current: weeklyStreak(swims, now, STREAK_MIN_PER_WEEK), best }
 }
 
 /** Label of the most frequent stroke of the activities; null without activities or when unknown. */

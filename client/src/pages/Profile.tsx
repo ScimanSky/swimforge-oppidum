@@ -40,6 +40,8 @@ import {
   activityDays,
   getActivityAvgSwolf,
   getStreaks,
+  STREAK_EXPLANATION,
+  STREAK_UNIT,
   primaryStrokeLabel,
 } from "@/lib/profile-stats";
 import { PersonalRecordsBoard } from "@/components/corsia/PersonalRecordsBoard";
@@ -303,12 +305,12 @@ export default function Profile() {
   if (stats.hasActivities) {
     recent.push({
       value: String(stats.streakCurrent),
-      unit: "g",
+      unit: STREAK_UNIT,
       label: "Serie attuale",
     });
     recent.push({
       value: String(stats.streakBest),
-      unit: "g",
+      unit: STREAK_UNIT,
       label: "Serie migliore",
     });
   }
@@ -530,6 +532,11 @@ export default function Profile() {
                   </li>
                 ))}
               </ul>
+              {stats.hasActivities ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {STREAK_EXPLANATION}
+                </p>
+              ) : null}
             </section>
           ) : null}
         </Section>
