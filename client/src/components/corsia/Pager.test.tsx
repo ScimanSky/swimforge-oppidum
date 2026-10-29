@@ -4,7 +4,16 @@ import { useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Pager } from "./Pager";
 
-function Harness({ total = 3, onScroll }: { total?: number; onScroll?: () => void }) {
+function Harness({
+  total = 3,
+  onScroll,
+  listTop = -200,
+}: {
+  total?: number;
+  onScroll?: () => void;
+  /** Where the list top is in the viewport (negative: scrolled past it). */
+  listTop?: number;
+}) {
   const [page, setPage] = useState(1);
   const listRef = useRef<HTMLUListElement>(null);
   return (
@@ -14,8 +23,7 @@ function Harness({ total = 3, onScroll }: { total?: number; onScroll?: () => voi
           listRef.current = node;
           if (node) {
             node.scrollIntoView = onScroll ?? (() => {});
-            // Scrolled past the top of the list.
-            node.getBoundingClientRect = () => ({ top: -200 }) as DOMRect;
+            node.getBoundingClientRect = () => ({ top: listTop }) as DOMRect;
           }
         }}
       />
@@ -67,6 +75,15 @@ describe("Pager", () => {
     render(<Harness onScroll={onScroll} />);
     await user.click(screen.getByRole("button", { name: "Avanti" }));
     expect(onScroll).toHaveBeenCalledTimes(1);
+  });
+
+  it("una lista già in vista non scorre", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onScroll = vi.fn();
+    render(<Harness onScroll={onScroll} listTop={120} />);
+    await user.click(screen.getByRole("button", { name: "Avanti" }));
+    expect(screen.getByRole("status").textContent).toBe("Pagina 2 di 3");
+    expect(onScroll).not.toHaveBeenCalled();
   });
 
   it("niente con una sola pagina", () => {

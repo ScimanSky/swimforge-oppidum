@@ -219,8 +219,8 @@ describe("Sfide (Corsia)", () => {
     renderChallenges();
     const bar = screen.getByRole("progressbar", { name: "Progresso: Sfida 3" });
     // 1:40 is the best pace, mine is 2:05: 80% of the way.
-    const indicator = bar.querySelector<HTMLElement>('[data-slot="progress-indicator"]')!;
-    expect(indicator.style.transform).toBe("translateX(-20%)");
+    expect(bar.getAttribute("aria-valuenow")).toBe("80");
+    expect(bar.getAttribute("aria-valuetext")).toBe("80%");
   });
 
   it("senza h1 né titolo ripetuto; riepilogo con metriche e schede in italiano", () => {
