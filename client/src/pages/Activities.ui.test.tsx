@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Activities from "./Activities";
@@ -127,8 +127,39 @@ vi.mock("@/components/ui/skeleton", () => ({
 }));
 
 vi.mock("wouter", () => ({
-  Link: ({ href, children }: any) => <a href={href}>{children}</a>,
+  Link: ({ href, children, ...rest }: any) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
 }));
+
+/** Viewport ≥ 1280px (selection + detail panel) or narrower (cards open `/track/:id`). */
+function setViewport({ wide }: { wide: boolean }) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockImplementation(() => ({
+      matches: wide,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+}
+
+const swim = (overrides: Record<string, unknown> = {}) => ({
+  id: 101,
+  activityName: "Pool Session",
+  distanceMeters: 2000,
+  durationSeconds: 1800,
+  avgPacePer100m: 90,
+  activityDate: "2026-02-19T10:00:00.000Z",
+  isOpenWater: false,
+  xpEarned: 30,
+  shareToFeed: false,
+  activitySource: "manual",
+  ...overrides,
+});
 
 describe("Activities UI interactions", () => {
   beforeEach(() => {
@@ -140,14 +171,7 @@ describe("Activities UI interactions", () => {
     state.toastSuccess.mockReset();
     state.toastError.mockReset();
 
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: vi.fn().mockImplementation(() => ({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })),
-    });
+    setViewport({ wide: true });
 
     window.localStorage.clear();
   });
@@ -241,5 +265,73 @@ describe("Activities UI interactions", () => {
       expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:false|id:null");
     });
     expect(window.localStorage.getItem(SYNC_PROMPT_SEEN_KEY)).toBe("70");
+  });
+  it("below 1280px cards link to the detail page and there is no side panel", () => {
+    setViewport({ wide: false });
+    state.activitiesData = [swim(), swim({ id: 102, activityName: "Lago", isOpenWater: true })];
+
+    render(<Activities />);
+
+    expect(screen.getByRole("link", { name: "Pool Session" })).toHaveAttribute("href", "/track/101");
+    expect(screen.getByRole("link", { name: "Lago" })).toHaveAttribute("href", "/track/102");
+    expect(screen.queryByRole("checkbox", { name: "Condividi nel feed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Dettaglio vasche" })).not.toBeInTheDocument();
+  });
+
+  it("from 1280px selecting a card shows it in the panel, with only the metrics it has", async () => {
+    state.activitiesData = [
+      swim({ avgHeartRate: 142, hrZone2Seconds: 300, hrZone3Seconds: 900 }),
+      swim({
+        id: 102,
+        activityName: "Lago di Garda",
+        isOpenWater: true,
+        activityDate: "2026-02-18T08:30:00.000Z",
+      }),
+    ];
+
+    render(<Activities />);
+
+    const first = screen.getByRole("button", { name: "Pool Session" });
+    const second = screen.getByRole("button", { name: "Lago di Garda" });
+    expect(first).toHaveAttribute("aria-current", "true");
+    const panel = screen.getByRole("region", { name: "Pool Session" });
+    expect(within(panel).getByText("FC media")).toBeInTheDocument();
+    expect(within(panel).queryByText("FC massima")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Calorie")).not.toBeInTheDocument();
+    expect(within(panel).getByText("Zone cardio")).toBeInTheDocument();
+    expect(within(panel).getByText((_, el) => el?.tagName === "LI" && el.textContent === "Z3 75%")).toHaveClass("font-bold");
+    expect(screen.getByRole("link", { name: "Dettaglio vasche" })).toHaveAttribute("href", "/track/101");
+
+    await userEvent.click(second);
+
+    expect(second).toHaveAttribute("aria-current", "true");
+    expect(first).not.toHaveAttribute("aria-current");
+    const lake = screen.getByRole("region", { name: "Lago di Garda" });
+    // No heart-rate data: neither the metric nor the zones are shown, never a «—».
+    expect(within(lake).queryByText("FC media")).not.toBeInTheDocument();
+    expect(within(lake).queryByText("Zone cardio")).not.toBeInTheDocument();
+    expect(within(lake).queryByText("—")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dettaglio vasche" })).toHaveAttribute("href", "/track/102");
+  });
+
+  it("has no page title, level header or Open Water label", () => {
+    state.activitiesData = [swim()];
+
+    render(<Activities />);
+
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Lv \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Open Water")).not.toBeInTheDocument();
+    expect(screen.getByText("Acque libere")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Questa settimana" })).toBeInTheDocument();
+  });
+
+  it("without matchMedia (jsdom) the layout is the wide one", () => {
+    Object.defineProperty(window, "matchMedia", { writable: true, configurable: true, value: undefined });
+    state.activitiesData = [swim()];
+
+    render(<Activities />);
+
+    expect(screen.getByRole("checkbox", { name: "Condividi nel feed" })).toBeInTheDocument();
   });
 });
