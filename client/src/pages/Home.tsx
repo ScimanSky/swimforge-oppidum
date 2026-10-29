@@ -1,81 +1,131 @@
 import { assetUrl } from "@/lib/asset-base";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { buttonVariants } from "@/components/ui/button";
+import { Chip } from "@/components/corsia/Chip";
+import { Wordmark } from "@/components/corsia/Wordmark";
+import { Button } from "@/components/ui/button";
 import { homePathForPlatform } from "@/lib/navigation";
 import { isNativePlatform } from "@/lib/platform";
-import { cn } from "@/lib/utils";
 import { ArrowRight, Medal, Trophy, Users, Zap } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+
+const highlights = [
+  { icon: <Zap className="size-5" aria-hidden />, title: "XP in diretta", body: "Progressi visibili a ogni sessione" },
+  { icon: <Medal className="size-5" aria-hidden />, title: "Badge", body: "Traguardi motivanti e obiettivi concreti" },
+  { icon: <Trophy className="size-5" aria-hidden />, title: "Sfide", body: "Sfide con la community e classifica aggiornata" },
+  { icon: <Users className="size-5" aria-hidden />, title: "Club e feed", body: "Feed e community per allenarti in gruppo" },
+];
 
 const featureCards = [
   {
-    tag: "AI Coach",
+    tag: "Coach AI",
     title: "Correggi prima, non dopo.",
-    body: "Insight prioritizzati su tecnica, ritmo e carico per sapere cosa cambiare nella prossima sessione.",
+    body: "Consigli in ordine di priorità su tecnica, ritmo e carico per sapere cosa cambiare nella prossima sessione.",
     image: "/images/landing-v5/feature-ai-v3.webp",
-    alt: "Nuotatore in corsia con visual analytics in sovraimpressione",
+    alt: "Nuotatore in corsia con i dati della sessione",
   },
   {
-    tag: "Gamification",
-    title: "XP, badge, streak e ranking.",
-    body: "Ogni allenamento produce progresso visibile: guadagni XP, sblocchi badge e sali nella classifica.",
+    tag: "XP e badge",
+    title: "XP, badge, serie e classifiche.",
+    body: "Ogni allenamento produce progressi visibili: guadagni XP, sblocchi badge e sali in classifica.",
     image: "/images/landing-v5/feature-gamification.webp",
-    alt: "Atleta osserva progressi gamification su smartphone bordo vasca",
+    alt: "Atleta guarda i suoi progressi sullo smartphone a bordo vasca",
   },
   {
-    tag: "Social & Club",
-    title: "Allenati insieme, migliora di piu.",
-    body: "Feed social, sfide con la community, club e confronto con nuotatori del tuo livello.",
+    tag: "Feed e club",
+    title: "Allenati insieme, migliora di più.",
+    body: "Feed, sfide con la community, club e confronto con nuotatori del tuo livello.",
     image: "/images/landing-v5/feature-social-club.webp",
-    alt: "Squadra nuoto e coach durante briefing tecnico",
+    alt: "Squadra di nuoto e allenatore durante un briefing tecnico",
   },
 ];
 
 const workflowSteps = [
   {
     step: "01",
-    title: "Sync",
-    body: "Importa da Garmin/Strava o registra manualmente in un profilo unico.",
+    title: "Sincronizza",
+    body: "Importa da Garmin o Strava, o registra a mano, in un profilo unico.",
   },
   {
     step: "02",
-    title: "Insight",
+    title: "Analizza",
     body: "Leggi analisi pratiche: dove guadagni tempo e dove perdi efficienza.",
   },
   {
     step: "03",
-    title: "Challenge",
+    title: "Sfida",
     body: "Trasforma i dati in sfide: community, classifica e obiettivi settimanali.",
   },
   {
     step: "04",
     title: "Club",
-    body: "Condividi risultati nel feed, confrontati in classifica e cresci con il club.",
+    body: "Condividi i risultati nel feed, confrontati in classifica e cresci con il club.",
   },
 ];
 
 const proofShots = [
   {
     src: "/images/landing-v5/gallery-01.webp",
-    title: "Pace piu stabile",
-    subtitle: "Meno oscillazioni, piu controllo",
+    title: "Passo più stabile",
+    subtitle: "Meno oscillazioni, più controllo",
     alt: "Nuotatore in corsia con ritmo costante",
   },
   {
     src: "/images/landing-v5/gallery-02.webp",
-    title: "Continuita reale",
+    title: "Continuità reale",
     subtitle: "Routine settimanale senza salti",
-    alt: "Atleta prepara allenamento mattutino in piscina",
+    alt: "Atleta prepara l'allenamento del mattino in piscina",
   },
   {
     src: "/images/landing-v5/gallery-03.webp",
     title: "Decisioni migliori",
     subtitle: "Dati chiari prima del prossimo blocco",
-    alt: "Nuotatore analizza dati post sessione su smartphone",
+    alt: "Nuotatore analizza i dati dopo la sessione sullo smartphone",
   },
 ];
 
+const showcases = [
+  {
+    src: "/images/landing-v5/showcase-leaderboard.webp",
+    alt: "Smartphone con la classifica delle sfide e i progressi XP",
+    tag: "Classifiche",
+    text: "Classifiche aggiornate, XP e badge in tempo reale.",
+  },
+  {
+    src: "/images/landing-v5/showcase-club.webp",
+    alt: "Il club in piscina dopo una sessione insieme",
+    tag: "Feed e club",
+    text: "Feed condiviso, sfide interne e motivazione di squadra.",
+  },
+];
+
+/** Section heading of the landing: a short action-blue line above an h2. */
+function SectionTitle({ eyebrow, children }: { eyebrow: string; children: ReactNode }) {
+  return (
+    <div className="mb-8 max-w-3xl md:mb-10">
+      <p className="text-sm font-semibold text-action-text">{eyebrow}</p>
+      <h2 className="mt-2 font-display text-[34px] font-bold leading-tight md:text-5xl">{children}</h2>
+    </div>
+  );
+}
+
+function SignUpActions({ primary }: { primary: string }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row">
+      <Button asChild size="lg" className="w-full sm:w-auto">
+        <Link href="/signup">
+          {primary}
+          <ArrowRight aria-hidden />
+        </Link>
+      </Button>
+      <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+        <Link href="/login">Accedi</Link>
+      </Button>
+    </div>
+  );
+}
+
+/** `/` on the web for visitors: the public landing. Signed in, or in the app, it redirects. */
 export default function Home() {
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
@@ -93,150 +143,102 @@ export default function Home() {
   }
 
   return (
-    <div className="landing-shell bg-[#04101b] text-slate-100">
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-cyan-100/10 bg-[#04101b]/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
-          <Link href="/" className="flex items-center gap-2 rounded-md px-1 py-1">
-            <img
-              src="/brand/swimforge-navbar-logo.png"
-              alt="SwimForge"
-              className="h-7 w-auto object-contain md:h-8"
-              loading="lazy"
-              decoding="async"
-            />
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-50 border-b border-border bg-background">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
+          <Link href="/" aria-label="SwimForge, pagina iniziale" className="rounded-lg">
+            <Wordmark />
           </Link>
-          <nav className="hidden items-center gap-7 text-xs uppercase tracking-[0.16em] text-slate-300 md:flex">
-            <a href="#value" className="transition-colors hover:text-cyan-300">
-              Perche SwimForge
+          <nav aria-label="Sezioni" className="hidden items-center gap-6 text-sm font-semibold text-muted-foreground md:flex">
+            <a href="#value" className="transition-colors hover:text-foreground">
+              Perché SwimForge
             </a>
-            <a href="#workflow" className="transition-colors hover:text-cyan-300">
+            <a href="#workflow" className="transition-colors hover:text-foreground">
               Metodo
             </a>
-            <a href="#gallery" className="transition-colors hover:text-cyan-300">
+            <a href="#gallery" className="transition-colors hover:text-foreground">
               Risultati
             </a>
           </nav>
-          <div className="flex items-center gap-2">
-            <Link href="/login" className={cn(buttonVariants({ variant: "outline-neon", size: "sm" }), "min-h-[44px] px-4")}>
-              Accedi
-            </Link>
-          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/login">Accedi</Link>
+          </Button>
         </div>
       </header>
 
       <main>
-        <section className="landing-grain relative overflow-hidden border-b border-cyan-100/10 pt-20">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute -left-24 top-8 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
-            <div className="absolute right-[-80px] top-20 h-80 w-80 rounded-full bg-blue-500/20 blur-3xl" />
-            <div className="absolute bottom-[-140px] left-1/3 h-80 w-80 rounded-full bg-teal-400/10 blur-3xl" />
-          </div>
-
-          <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 md:px-6 md:py-20 lg:grid-cols-[1.06fr_0.94fr] lg:items-end lg:gap-14">
-            <div className="landing-reveal space-y-7" style={{ animationDelay: "40ms" }}>
-              <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/80">Performance Platform</p>
-              <h1 className="text-balance font-display text-5xl font-semibold leading-[0.88] tracking-tight text-white md:text-7xl lg:text-8xl">
+        <section className="border-b border-border">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:px-6 md:py-16 lg:grid-cols-[1.06fr_0.94fr] lg:items-center lg:gap-14">
+            <div className="landing-reveal space-y-6" style={{ animationDelay: "40ms" }}>
+              <h1 className="text-balance font-display text-5xl font-bold leading-[0.95] md:text-7xl">
                 Nuota con dati chiari.
-                <span className="block text-cyan-300"> Vinci con costanza.</span>
+                <span className="block text-action-text">Vinci con costanza.</span>
               </h1>
-              <p className="max-w-xl border-l-2 border-cyan-300/70 pl-5 text-base text-slate-200 md:text-lg">
-                SwimForge unisce AI Coach, XP, badge, sfide, social feed e club: ogni sessione diventa progresso misurabile e confronto reale.
+              <p className="max-w-xl text-base text-muted-foreground md:text-lg">
+                SwimForge unisce Coach AI, XP, badge, sfide, feed e club: ogni sessione diventa progresso misurabile e
+                confronto reale.
               </p>
-              <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em] text-cyan-100/85">
-                <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">XP & Badge</span>
-                <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">Sfide & Classifica</span>
-                <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">Social Feed</span>
-                <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">Club Ranking</span>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link href="/signup" className={cn(buttonVariants({ variant: "neon", size: "lg" }), "min-h-[48px] w-full sm:w-auto")}>
-                  Inizia ora <ArrowRight className="ml-2 size-4" />
-                </Link>
-                <Link href="/login" className={cn(buttonVariants({ variant: "outline-neon", size: "lg" }), "min-h-[48px] w-full sm:w-auto")}>
-                  Accedi
-                </Link>
-              </div>
+              <ul className="flex flex-wrap gap-2" aria-label="In SwimForge">
+                {["XP e badge", "Sfide e classifiche", "Feed", "Classifiche dei club"].map((label) => (
+                  <li key={label}>
+                    <Chip>{label}</Chip>
+                  </li>
+                ))}
+              </ul>
+              <SignUpActions primary="Inizia ora" />
             </div>
 
-            <figure
-              className="landing-reveal relative overflow-hidden rounded-2xl border border-cyan-100/20 bg-slate-950 shadow-[0_20px_70px_rgba(0,0,0,0.45)]"
-              style={{ animationDelay: "170ms" }}
-            >
+            <figure className="landing-reveal" style={{ animationDelay: "170ms" }}>
               <img
                 src={assetUrl("/images/landing-v5/hero-main.webp")}
                 alt="Due nuotatori preparano la sessione guardando i dati"
-                className="aspect-[4/5] w-full object-cover object-center md:aspect-[3/4] lg:aspect-[4/5]"
+                className="aspect-[4/3] w-full rounded-2xl border border-border object-cover lg:aspect-[4/5]"
                 loading="eager"
                 decoding="async"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#03101b]/85 via-[#03101b]/25 to-transparent" />
-              <div className="absolute left-4 top-4 rounded-xl border border-cyan-100/30 bg-[#062032]/80 px-3 py-2 backdrop-blur">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/80">Session XP</p>
-                <p className="text-xl font-semibold text-cyan-200">+48</p>
-              </div>
-              <div className="absolute bottom-4 right-4 rounded-xl border border-cyan-100/30 bg-[#062032]/80 px-3 py-2 backdrop-blur">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/80">Sfida community</p>
-                <p className="text-sm font-semibold text-white">Rivincita pronta</p>
-              </div>
+              <figcaption className="mt-3 grid grid-cols-2 gap-3">
+                <span className="surface-panel block p-3">
+                  <span className="block text-xs font-medium text-muted-foreground">XP della sessione</span>
+                  <span className="mt-1 block font-display text-2xl font-bold tabular-nums text-xp">+48 XP</span>
+                </span>
+                <span className="surface-panel block p-3">
+                  <span className="block text-xs font-medium text-muted-foreground">Sfida della community</span>
+                  <span className="mt-1 block text-[15px] font-semibold">Rivincita pronta</span>
+                </span>
+              </figcaption>
             </figure>
           </div>
 
-          <div className="relative mx-auto mb-16 grid max-w-7xl grid-cols-2 gap-3 px-4 md:grid-cols-4 md:gap-4 md:px-6">
-            <article className="landing-reveal rounded-xl border border-cyan-100/15 bg-cyan-400/10 p-4" style={{ animationDelay: "220ms" }}>
-              <div className="mb-2 inline-flex rounded-lg bg-cyan-300/15 p-2 text-cyan-200">
-                <Zap className="size-4" />
-              </div>
-              <p className="text-xl font-semibold text-white">XP Live</p>
-              <p className="mt-1 text-xs text-slate-200/80">Progressione visibile ad ogni sessione</p>
-            </article>
-            <article className="landing-reveal rounded-xl border border-cyan-100/15 bg-cyan-400/10 p-4" style={{ animationDelay: "280ms" }}>
-              <div className="mb-2 inline-flex rounded-lg bg-cyan-300/15 p-2 text-cyan-200">
-                <Medal className="size-4" />
-              </div>
-              <p className="text-xl font-semibold text-white">Badge</p>
-              <p className="mt-1 text-xs text-slate-200/80">Traguardi motivanti e obiettivi concreti</p>
-            </article>
-            <article className="landing-reveal rounded-xl border border-cyan-100/15 bg-cyan-400/10 p-4" style={{ animationDelay: "340ms" }}>
-              <div className="mb-2 inline-flex rounded-lg bg-cyan-300/15 p-2 text-cyan-200">
-                <Trophy className="size-4" />
-              </div>
-              <p className="text-xl font-semibold text-white">Sfide</p>
-              <p className="mt-1 text-xs text-slate-200/80">Sfide con la community e classifica aggiornata</p>
-            </article>
-            <article className="landing-reveal rounded-xl border border-cyan-100/15 bg-cyan-400/10 p-4" style={{ animationDelay: "400ms" }}>
-              <div className="mb-2 inline-flex rounded-lg bg-cyan-300/15 p-2 text-cyan-200">
-                <Users className="size-4" />
-              </div>
-              <p className="text-xl font-semibold text-white">Club & Social</p>
-              <p className="mt-1 text-xs text-slate-200/80">Feed e community per allenarti in gruppo</p>
-            </article>
-          </div>
+          <ul className="mx-auto mb-12 grid max-w-7xl grid-cols-2 gap-3 px-4 md:mb-16 md:grid-cols-4 md:gap-4 md:px-6">
+            {highlights.map(({ icon, title, body }) => (
+              <li key={title} className="surface-panel p-4">
+                <span className="inline-flex rounded-xl bg-raised p-2 text-action-text">{icon}</span>
+                <p className="mt-3 font-semibold">{title}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+              </li>
+            ))}
+          </ul>
         </section>
 
-        <section id="value" className="border-b border-cyan-100/10 bg-[#061726] py-16 md:py-20">
+        <section id="value" className="scroll-mt-16 border-b border-border py-12 md:py-16">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="landing-reveal mb-10 md:mb-12" style={{ animationDelay: "60ms" }}>
-              <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/75">Perche SwimForge</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Un solo sistema per migliorare, competere e condividere.</h2>
-            </div>
+            <SectionTitle eyebrow="Perché SwimForge">
+              Un solo sistema per migliorare, competere e condividere.
+            </SectionTitle>
             <div className="grid gap-5 md:grid-cols-3">
-              {featureCards.map((item, index) => (
-                <article
-                  key={item.title}
-                  className="landing-reveal group overflow-hidden rounded-2xl border border-cyan-100/15 bg-[#082033]/80"
-                  style={{ animationDelay: `${120 + index * 90}ms` }}
-                >
+              {featureCards.map((item) => (
+                <article key={item.title} className="surface-panel overflow-hidden">
                   <img
                     src={assetUrl(item.image)}
                     alt={item.alt}
-                    className="aspect-[16/10] w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    className="aspect-[16/10] w-full object-cover"
                     loading="lazy"
                     decoding="async"
                   />
                   <div className="space-y-3 p-4 md:p-5">
-                    <p className="text-xs uppercase tracking-[0.17em] text-cyan-200/70">{item.tag}</p>
-                    <h3 className="text-xl font-semibold text-white">{item.title}</h3>
-                    <p className="text-sm leading-relaxed text-slate-200/85">{item.body}</p>
+                    <Chip>{item.tag}</Chip>
+                    <h3 className="text-[17px] font-bold">{item.title}</h3>
+                    <p className="text-sm text-muted-foreground">{item.body}</p>
                   </div>
                 </article>
               ))}
@@ -244,138 +246,96 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="workflow" className="border-b border-cyan-100/10 bg-[#041320] py-16 md:py-20">
+        <section id="workflow" className="scroll-mt-16 border-b border-border py-12 md:py-16">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="landing-reveal mb-10" style={{ animationDelay: "40ms" }}>
-              <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/75">Come Funziona</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Sync. Insight. Challenge. Club.</h2>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {workflowSteps.map((step, index) => (
-                <div
-                  key={step.step}
-                  className="landing-reveal rounded-2xl border border-cyan-100/15 bg-[#082033] p-5 md:p-6"
-                  style={{ animationDelay: `${130 + index * 90}ms` }}
-                >
-                  <p className="text-4xl font-semibold leading-none text-cyan-200/30">{step.step}</p>
-                  <h3 className="mt-4 text-2xl font-semibold text-white">{step.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-slate-200/80">{step.body}</p>
-                </div>
+            <SectionTitle eyebrow="Come funziona">Sincronizza. Analizza. Sfida. Club.</SectionTitle>
+            <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {workflowSteps.map((step) => (
+                <li key={step.step} className="surface-panel p-5">
+                  <p className="font-display text-4xl font-bold leading-none tabular-nums text-muted-foreground" aria-hidden>
+                    {step.step}
+                  </p>
+                  <h3 className="mt-4 text-[17px] font-bold">{step.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
         </section>
 
-        <section id="gallery" className="border-b border-cyan-100/10 bg-[#061a2a] py-16 md:py-20">
+        <section id="gallery" className="scroll-mt-16 border-b border-border py-12 md:py-16">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="landing-reveal mb-10" style={{ animationDelay: "50ms" }}>
-              <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/75">Proof di Risultato</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Dalla vasca alla classifica, ogni dato produce azione.</h2>
-            </div>
+            <SectionTitle eyebrow="Risultati">Dalla vasca alla classifica, ogni dato produce azione.</SectionTitle>
             <div className="grid gap-4 md:grid-cols-3">
-              {proofShots.map((item, index) => (
-                <figure
-                  key={item.src}
-                  className="landing-reveal group relative overflow-hidden rounded-2xl border border-cyan-100/15"
-                  style={{ animationDelay: `${120 + index * 80}ms` }}
-                >
+              {proofShots.map((item) => (
+                <figure key={item.src} className="surface-panel overflow-hidden">
                   <img
                     src={assetUrl(item.src)}
                     alt={item.alt}
-                    className="aspect-[3/4] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    className="aspect-[4/3] w-full object-cover"
                     loading="lazy"
                     decoding="async"
                   />
-                  <figcaption className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#03101b]/85 to-transparent px-4 py-5">
-                    <p className="text-sm uppercase tracking-[0.14em] text-cyan-100/85">{item.title}</p>
-                    <p className="mt-1 text-xs text-slate-200/85">{item.subtitle}</p>
+                  <figcaption className="p-4">
+                    <span className="block font-semibold">{item.title}</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">{item.subtitle}</span>
                   </figcaption>
                 </figure>
               ))}
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <article className="landing-reveal relative overflow-hidden rounded-2xl border border-cyan-100/15" style={{ animationDelay: "360ms" }}>
-                <img
-                  src={assetUrl("/images/landing-v5/showcase-leaderboard.webp")}
-                  alt="Smartphone con classifica sfide e progressione XP"
-                  className="aspect-[16/10] w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#03101b]/85 via-[#03101b]/15 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/80">Gamification</p>
-                  <p className="mt-1 text-lg font-semibold text-white">Classifiche aggiornate, XP e badge in tempo reale.</p>
-                </div>
-              </article>
-              <article className="landing-reveal relative overflow-hidden rounded-2xl border border-cyan-100/15" style={{ animationDelay: "430ms" }}>
-                <img
-                  src={assetUrl("/images/landing-v5/showcase-club.webp")}
-                  alt="Community club in piscina dopo una sessione condivisa"
-                  className="aspect-[16/10] w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#03101b]/85 via-[#03101b]/15 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/80">Social & Club</p>
-                  <p className="mt-1 text-lg font-semibold text-white">Feed condiviso, sfide interne e motivazione di squadra.</p>
-                </div>
-              </article>
+              {showcases.map((item) => (
+                <figure key={item.src} className="surface-panel overflow-hidden">
+                  <img
+                    src={assetUrl(item.src)}
+                    alt={item.alt}
+                    className="aspect-[16/10] w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <figcaption className="space-y-2 p-4">
+                    <Chip>{item.tag}</Chip>
+                    <span className="block text-[17px] font-bold">{item.text}</span>
+                  </figcaption>
+                </figure>
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="relative overflow-hidden bg-[#030c15] py-16 md:py-20">
-          <img
-            src={assetUrl("/images/landing-v5/cta-banner.webp")}
-            alt="Nuotatore sott acqua in accelerazione verso la corsia"
-            className="absolute inset-0 h-full w-full object-cover opacity-35"
-            loading="lazy"
-            decoding="async"
-          />
-          <div className="absolute inset-0 bg-[#03101b]/75" />
-          <div className="landing-reveal relative z-10 mx-auto max-w-5xl px-4 text-center md:px-6" style={{ animationDelay: "70ms" }}>
-            <p className="text-xs uppercase tracking-[0.22em] text-cyan-100/75">Final CTA</p>
-            <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-tight text-white md:text-6xl">
-              Smetti di allenarti a tentativi.
-            </h2>
-            <p className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-slate-100/85 md:text-base">
-              Entra in SwimForge, traccia ogni sessione, competi nelle sfide, guadagna XP e badge, condividi risultati con social e club.
-            </p>
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link href="/signup" className={cn(buttonVariants({ variant: "neon", size: "lg" }), "min-h-[48px] w-full sm:w-auto")}>
-                Crea account
-              </Link>
-              <Link href="/login" className={cn(buttonVariants({ variant: "outline-neon", size: "lg" }), "min-h-[48px] w-full sm:w-auto")}>
-                Accedi
-              </Link>
+        <section className="py-12 md:py-16">
+          <div className="mx-auto max-w-7xl px-4 md:px-6">
+            <div className="surface-panel flex flex-col items-center p-6 text-center md:p-10">
+              <h2 className="text-balance font-display text-[34px] font-bold leading-tight md:text-5xl">
+                Smetti di allenarti a tentativi.
+              </h2>
+              <p className="mt-4 max-w-2xl text-[15px] text-muted-foreground md:text-base">
+                Entra in SwimForge, traccia ogni sessione, partecipa alle sfide, guadagna XP e badge, condividi i risultati
+                con il feed e il club.
+              </p>
+              <div className="mt-6">
+                <SignUpActions primary="Crea account" />
+              </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-cyan-100/10 bg-[#020913]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 md:flex-row md:items-center md:justify-between md:px-6">
-          <div className="flex items-center gap-2">
-            <img
-              src="/brand/swimforge-navbar-logo.png"
-              alt="SwimForge"
-              className="h-7 w-auto object-contain"
-              loading="lazy"
-              decoding="async"
-            />
-            <span className="text-sm text-slate-300/80">2026 SwimForge</span>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-slate-300/80">
-            <Link href="/privacy" className="transition-colors hover:text-cyan-200">
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 md:flex-row md:items-center md:justify-between md:px-6">
+          <p className="text-sm text-muted-foreground">© 2026 SwimForge</p>
+          <nav aria-label="Documenti legali" className="flex items-center gap-6 text-sm">
+            <Link href="/privacy" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">
               Privacy
             </Link>
-            <Link href="/terms" className="transition-colors hover:text-cyan-200">
+            <Link href="/terms" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">
               Termini
             </Link>
-          </div>
+            <Link href="/cookies" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">
+              Cookie
+            </Link>
+          </nav>
         </div>
       </footer>
     </div>

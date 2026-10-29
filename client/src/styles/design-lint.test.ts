@@ -64,7 +64,6 @@ const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
 const PENDING: Record<Rule, string[]> = {
   "testo-piccolo": [
     "components/metrics/MetricOrb.tsx",
-    "pages/Home.tsx",
   ],
   "alone-neon": [
     "components/onboarding/OnboardingFlow.tsx",
@@ -76,7 +75,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
-    "pages/Home.tsx",
   ],
   "testo-gradiente": [
     "components/BadgeUnlockNotification.tsx",
@@ -105,7 +103,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingWelcomeComposition.tsx",
-    "pages/Home.tsx",
     "pages/Settings.tsx",
   ],
   sfocatura: [
@@ -114,7 +111,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/CookieBanner.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
-    "pages/Home.tsx",
     "pages/StravaConnect.tsx",
   ],
   "titolo-pagina": [
@@ -128,7 +124,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFlow.tsx",
     "components/ui/dialog.tsx",
     "components/ui/sheet.tsx",
-    "pages/Home.tsx",
     "pages/StravaConnect.tsx",
   ],
 };
