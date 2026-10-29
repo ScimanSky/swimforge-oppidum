@@ -297,7 +297,7 @@ export const PACE_ZONE_COLOR: Record<PaceZoneCode, string> = {
   C3: "var(--pace-c3)",
 }
 
-/** A level takes the colour of one of its zones (Soglia the amber of C1, Sopra soglia the orange of C2). */
+/** A level takes the colour of one of its zones (Soglia the amber-yellow of C1, Sopra soglia the coral red of C2). */
 export const LEVEL_COLOR: Record<IntensityLevel, string> = {
   Facile: PACE_ZONE_COLOR.A1,
   Aerobico: PACE_ZONE_COLOR.A2,

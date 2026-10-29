@@ -142,7 +142,9 @@ coach e allenamenti le parlino (sostituiscono le cinque zone Z1–Z5 della prima
   la zona B supera ~35% del volume, «molto lavoro in zona B»; è un'indicazione basata sugli studi,
   non una regola. Nel riquadro: interruttore «7 zone» / «5 livelli» per
   barra, tabella dei passi e barre settimanali impilate (8 settimane) con i colori `--pace-a1..c3`
-  (dal freddo al caldo; le zone cardio restano `--zone-1..5`); «Le tue zone» (editor) e «Le zone
+  (dal freddo al caldo; C1 ambra-giallo, C2 rosso corallo, C3 cremisi-magenta: mai l'arancione,
+  che Corsia tiene per XP e record, e un test ne controlla la distanza; le zone cardio restano
+  `--zone-1..5`); «Le tue zone» (editor) e «Le zone
   A1–C3» (glossario).
 
 ### 4.4 Efficienza della bracciata (Stroke Index)
