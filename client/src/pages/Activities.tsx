@@ -210,10 +210,7 @@ export default function Activities() {
             </TabsList>
           </Tabs>
           <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger
-              aria-label="Ordina"
-              className="shrink-0 rounded-xl border-border bg-card data-[size=default]:h-11"
-            >
+            <SelectTrigger aria-label="Ordina" className="shrink-0">
               <ListFilter className="size-4" aria-hidden />
               <span className="sr-only sm:not-sr-only">
                 <SelectValue />

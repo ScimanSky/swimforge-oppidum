@@ -317,7 +317,7 @@ describe("ActivityDetail (Corsia)", () => {
     expect(screen.getAllByRole("button", { name: /Vasca 1\.2/ }).length).toBeGreaterThan(0);
   });
 
-  it("segments: one distance rule and the «/100» pace of the metrics, rounded on total seconds", () => {
+  it("segments: distances always in metres and the «/100» pace of the metrics, rounded on total seconds", () => {
     state.activity = session({
       garminLaps: [lap(11, 1, 100, 119.6), lap(12, 2, 1500, 1500), lap(13, 3, 0, 30)],
       garminLengths: [],
@@ -330,9 +330,31 @@ describe("ActivityDetail (Corsia)", () => {
       "100 m · 2:00 · 2:00 /100"
     );
     expect(within(laps).getByRole("button", { name: /^Giro 2/ })).toHaveTextContent(
-      "1,5 km · 25:00 · 1:40 /100"
+      "1.500 m · 25:00 · 1:40 /100"
     );
-    expect(screen.queryByText(/1:60|\/100m|1,50 km/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/1:60|\/100m|1,50 km|1,5 km/)).not.toBeInTheDocument();
+  });
+
+  it("a segment of 1.250 m is never rounded to 0.1 km: rows, panel and repeats table", async () => {
+    state.activity = session({
+      garminLaps: [lap(11, 1, 1250, 1250), lap(13, 2, 0, 30)],
+      garminLengths: [],
+    });
+
+    render(<ActivityDetail />);
+
+    const laps = screen.getByRole("region", { name: "Giri" });
+    expect(within(laps).getByRole("button", { name: /^Giro 1/ })).toHaveTextContent("1.250 m");
+    expect(within(laps).getByText("Giro 1 selezionato").parentElement).toHaveTextContent(
+      /1\.250\s*m\s*Distanza/
+    );
+    expect(screen.getByRole("region", { name: "Frazioni" })).toHaveTextContent("1.250 m");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+    expect(screen.getAllByText(/1\.250 m/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/1,3 km|1,2 km/)).not.toBeInTheDocument();
+    // The session summary keeps the km rule.
+    expect(metricCells()[0]).toBe("3,2 km Distanza");
   });
 
   it("summary distance below 1 km is in metres", () => {

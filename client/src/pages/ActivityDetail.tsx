@@ -17,8 +17,6 @@ import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
 import { activityMetrics, activityZoneSeconds } from "@/lib/activity-metrics"
 import {
   NO_VALUE,
-  distanceParts,
-  formatDistance,
   formatInteger,
   formatPaceValue,
   formatSessionDate,
@@ -289,6 +287,18 @@ const positiveNumber = (value: unknown) => {
 /** The summary keeps the 2×3 grid of `Sessione.png`: the first six metrics in display order. */
 const SUMMARY_METRICS = 6
 
+/**
+ * Segments (laps, splits, repeats, lengths) are measured in metres, always: «1.250 m», never
+ * rounded to 0.1 km. The session summary and cards keep `distanceParts`.
+ */
+const segmentDistanceParts = (meters: number) => ({ value: formatInteger(meters), unit: "m" })
+
+/** «1.250 m»; «—» without a positive distance. */
+const formatSegmentDistance = (meters?: number | null) => {
+  const distance = positiveNumber(meters)
+  return distance ? `${formatInteger(distance)} m` : NO_VALUE
+}
+
 /** Distance, time, pace and SWOLF of a lap, split, repeat or length (only those with data). */
 const segmentMetrics = (segment: {
   distance?: number | null
@@ -298,7 +308,7 @@ const segmentMetrics = (segment: {
 }): MetricProps[] => {
   const metrics: MetricProps[] = []
   const distance = positiveNumber(segment.distance)
-  if (distance) metrics.push({ ...distanceParts(distance), label: "Distanza" })
+  if (distance) metrics.push({ ...segmentDistanceParts(distance), label: "Distanza" })
   const duration = positiveNumber(segment.duration)
   if (duration) metrics.push({ value: formatSplitDuration(duration), label: "Tempo" })
   const pace = positiveNumber(segment.pace)
@@ -316,7 +326,7 @@ const segmentLine = (segment: {
   avgHr?: number | null
 }) =>
   [
-    positiveNumber(segment.distance) ? formatDistance(segment.distance) : null,
+    positiveNumber(segment.distance) ? formatSegmentDistance(segment.distance) : null,
     positiveNumber(segment.duration) ? formatSplitDuration(segment.duration) : null,
     positiveNumber(segment.pace) ? formatPacePer100(segment.pace) : null,
     positiveNumber(segment.avgHr) ? `${Math.round(Number(segment.avgHr))} bpm` : null,
@@ -329,7 +339,7 @@ const repeatSummary = (repeat: RepeatRow) =>
   [
     repeat.stroke && repeat.stroke !== "recovery" ? getStrokeLabel(repeat.stroke) : null,
     repeat.lengthsCount > 0 ? `${repeat.lengthsCount} vasche` : null,
-    positiveNumber(repeat.distance) ? formatDistance(repeat.distance) : null,
+    positiveNumber(repeat.distance) ? formatSegmentDistance(repeat.distance) : null,
   ]
     .filter(Boolean)
     .join(" · ")
@@ -486,13 +496,9 @@ function RepeatPagination({
 }
 
 export default function ActivityDetail() {
+  // `/activities/:id` redirects here (ShellRoutes).
   const [, trackParams] = useRoute<{ id: string }>("/track/:id")
-  const [, legacyParams] = useRoute<{ id: string }>("/activities/:id")
-  const activityId = trackParams?.id
-    ? Number(trackParams.id)
-    : legacyParams?.id
-      ? Number(legacyParams.id)
-      : NaN
+  const activityId = trackParams?.id ? Number(trackParams.id) : NaN
 
   const activityQuery = trpc.activities.get.useQuery(
     { id: activityId },
@@ -521,14 +527,16 @@ export default function ActivityDetail() {
     return [] as unknown[]
   }, [garminDetails, persistedLapSource])
 
+  /** Garmin's splits when it has any, otherwise the laps (so splits are never empty while laps exist). */
   const splitSource = useMemo(() => {
-    if (Array.isArray(garminDetails?.typed_splits?.splits)) return garminDetails.typed_splits.splits as unknown[]
-    if (Array.isArray(garminDetails?.typed_splits)) return garminDetails.typed_splits as unknown[]
-    if (Array.isArray(garminDetails?.split_summaries?.splitSummaries)) {
-      return garminDetails.split_summaries.splitSummaries as unknown[]
-    }
-    if (Array.isArray(garminDetails?.split_summaries)) return garminDetails.split_summaries as unknown[]
-    return lapSource
+    const candidates: unknown[] = [
+      garminDetails?.typed_splits?.splits,
+      garminDetails?.typed_splits,
+      garminDetails?.split_summaries?.splitSummaries,
+      garminDetails?.split_summaries,
+    ]
+    const found = candidates.find((candidate) => Array.isArray(candidate) && candidate.length > 0)
+    return (found as unknown[] | undefined) ?? lapSource
   }, [garminDetails, lapSource])
 
   const repeatRows = useMemo<RepeatRow[]>(() => {
@@ -728,36 +736,17 @@ export default function ActivityDetail() {
     [currentRepeatPage, totalRepeatPages],
   )
 
-  const fallbackSplitRows = useMemo<SplitItem[]>(
-    () =>
-      laps.map((lap, index) => ({
-        index,
-        label: lap.label,
-        distance: lap.distance,
-        duration: lap.duration,
-        pace: lap.pace,
-        laps: 1,
-        stroke: lap.displayStroke,
-        avgHr: lap.avgHr,
-        swolf: lap.swolf,
-        cadence: null,
-        strokes: lap.totalStrokes,
-        raw: lap.raw,
-      })),
-    [laps],
-  )
-  const effectiveSplits = splits.length > 0 ? splits : fallbackSplitRows
 
   useEffect(() => {
     if (selectedLapIdx > laps.length - 1) setSelectedLapIdx(0)
   }, [laps.length, selectedLapIdx])
 
   useEffect(() => {
-    if (selectedSplitIdx > effectiveSplits.length - 1) setSelectedSplitIdx(0)
-  }, [effectiveSplits.length, selectedSplitIdx])
+    if (selectedSplitIdx > splits.length - 1) setSelectedSplitIdx(0)
+  }, [splits.length, selectedSplitIdx])
 
   const selectedLap = laps[selectedLapIdx] ?? null
-  const selectedEffectiveSplit = effectiveSplits[selectedSplitIdx] ?? null
+  const selectedSplit = splits[selectedSplitIdx] ?? null
 
   useEffect(() => {
     if (repeatRows.length === 0 || pagedRepeatRows.length === 0) {
@@ -1035,13 +1024,10 @@ export default function ActivityDetail() {
                   <h4 id={splitsTitleId} className="text-base font-bold">
                     Frazioni
                   </h4>
-                  {splits.length === 0 && laps.length > 0 ? (
-                    <p className="mt-1 text-xs text-muted-foreground">Frazioni non disponibili: mostro i giri.</p>
-                  ) : null}
                   <div className="mt-3 space-y-3">
-                    {effectiveSplits.length > 0 ? (
+                    {splits.length > 0 ? (
                       <ul className="max-h-[40dvh] space-y-2 overflow-y-auto pr-1">
-                        {effectiveSplits.map((split, index) => (
+                        {splits.map((split, index) => (
                           <li key={`split-row-${index}`}>
                             <SegmentButton
                               title={split.label}
@@ -1055,25 +1041,25 @@ export default function ActivityDetail() {
                       </ul>
                     ) : null}
 
-                    {selectedEffectiveSplit ? (
+                    {selectedSplit ? (
                       <SegmentDetail
                         title="Frazione selezionata"
-                        metrics={segmentMetrics(selectedEffectiveSplit)}
+                        metrics={segmentMetrics(selectedSplit)}
                         details={[
                           {
                             label: "Stile",
-                            value: getStrokeLabel(selectedEffectiveSplit.stroke ?? activityStroke),
+                            value: getStrokeLabel(selectedSplit.stroke ?? activityStroke),
                           },
-                          { label: "Giri inclusi", value: selectedEffectiveSplit.laps ?? 1 },
+                          { label: "Giri inclusi", value: selectedSplit.laps ?? 1 },
                           {
                             label: "FC media",
-                            value: selectedEffectiveSplit.avgHr ? `${selectedEffectiveSplit.avgHr} bpm` : null,
+                            value: selectedSplit.avgHr ? `${selectedSplit.avgHr} bpm` : null,
                           },
-                          { label: "Bracciate", value: selectedEffectiveSplit.strokes },
-                          { label: "Cadenza", value: selectedEffectiveSplit.cadence },
+                          { label: "Bracciate", value: selectedSplit.strokes },
+                          { label: "Cadenza", value: selectedSplit.cadence },
                           {
                             label: "Calorie",
-                            value: toNumber(pickFirst(selectedEffectiveSplit.raw, ["calories", "caloriesBurned"])),
+                            value: toNumber(pickFirst(selectedSplit.raw, ["calories", "caloriesBurned"])),
                           },
                         ]}
                       />
@@ -1173,7 +1159,7 @@ export default function ActivityDetail() {
                                   </td>
                                   <td className="px-2 py-2">{getStrokeLabel(repeat.stroke)}</td>
                                   <td className="px-2 py-2 text-right">{repeat.lengthsCount}</td>
-                                  <td className="px-2 py-2 text-right">{formatDistance(repeat.distance)}</td>
+                                  <td className="px-2 py-2 text-right">{formatSegmentDistance(repeat.distance)}</td>
                                   <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.duration)}</td>
                                   <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.cumulativeSeconds)}</td>
                                   <td className="px-2 py-2 text-right">{formatPacePer100(repeat.pace)}</td>
@@ -1216,7 +1202,7 @@ export default function ActivityDetail() {
                                       </td>
                                       <td className="px-2 py-2">{getStrokeLabel(length.stroke)}</td>
                                       <td className="px-2 py-2 text-right">1</td>
-                                      <td className="px-2 py-2 text-right">{formatDistance(length.distance)}</td>
+                                      <td className="px-2 py-2 text-right">{formatSegmentDistance(length.distance)}</td>
                                       <td className="px-2 py-2 text-right">{formatSplitDuration(length.duration)}</td>
                                       <td className="px-2 py-2 text-right">{formatSplitDuration(length.cumulativeSeconds)}</td>
                                       <td className="px-2 py-2 text-right">{formatPacePer100(length.pace)}</td>
