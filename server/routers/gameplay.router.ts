@@ -587,10 +587,14 @@ export const garminRouter = router({
     }),
 
     sync: protectedProcedure
-        .input(z.object({ daysBack: z.number().min(1).max(365).default(30) }))
+        .input(z.object({
+            daysBack: z.number().min(1).max(365).default(30),
+            // Import only the last N swims (newest first); omitted = day window.
+            maxActivities: z.union([z.literal(1), z.literal(5), z.literal(10)]).optional(),
+        }))
         .mutation(async ({ ctx, input }) => {
             await assertHealthAndProviderConsent(ctx.user.id, "garmin_sync");
-            return await garmin.syncGarminActivities(ctx.user.id, input.daysBack);
+            return await garmin.syncGarminActivities(ctx.user.id, input.daysBack, input.maxActivities);
         }),
 
     migrateHrZones: protectedProcedure.mutation(async ({ ctx }) => {
