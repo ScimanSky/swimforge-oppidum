@@ -8,8 +8,13 @@ import {
   addDaysToKey,
   dayKey,
   pacingCvReading,
+  poolLengthLabel,
   SWIM_METRIC_THRESHOLDS,
+  TSB_READING_DESCRIPTIONS,
   TSB_READING_LABELS,
+  ZONE_NAMES,
+  zonePaceRanges,
+  type CssPoint,
   type CssResult,
   type SessionMetrics,
   type SwimMetricKey,
@@ -19,6 +24,7 @@ import {
 import {
   formatDayMonth,
   formatDecimal,
+  formatDistance,
   formatInteger,
   formatKm,
   formatPaceValue,
@@ -35,8 +41,8 @@ export const METRIC_ORDER: readonly SwimMetricKey[] = [
   "volume",
 ]
 
-/** Names of the pace zones Z1..Z5 (the bounds are in the shared definition). */
-export const PACE_ZONE_NAMES = ["Facile", "Aerobico", "Medio", "Soglia", "Sopra soglia"] as const
+/** Names of the pace zones Z1..Z5 (names and bounds are in the shared definition). */
+export const PACE_ZONE_NAMES = ZONE_NAMES
 
 export type MetricHeader = {
   /** Main value; null shows «—». */
@@ -48,6 +54,8 @@ export type MetricHeader = {
   basis: string | null
   /** What is missing (shown when the card is open), from the server or ours. */
   missing: string | null
+  /** Today's value read with the conventions, after «Come si legge» (open card). */
+  readingNow?: string | null
 }
 
 // ─── Dates and times ────────────────────────────────────────────────────────
@@ -74,7 +82,7 @@ export const formatMonthKey = (key: string, style: "short" | "long" = "short") =
 export const formatClock = (seconds: number) => formatPaceValue(seconds)
 
 /** «+2,1», «−0,4», «0,0». */
-const formatSignedDecimal = (value: number, digits: number) =>
+export const formatSignedDecimal = (value: number, digits: number) =>
   value > 0 && formatDecimal(value, digits) !== formatDecimal(0, digits)
     ? `+${formatDecimal(value, digits)}`
     : formatDecimal(value, digits)
@@ -96,8 +104,12 @@ const inLast28 = (m: SwimMetrics) => {
   return (session: SessionMetrics) => session.date >= from28
 }
 
-const mean = (values: number[]) =>
-  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+const median = (values: number[]) => {
+  if (values.length === 0) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+}
 
 /** Lower-case stroke name for «6 × 100 m stile libero»; empty when unknown. */
 export const strokeName = (stroke: string) =>
@@ -134,9 +146,33 @@ function cssHeader(m: SwimMetrics): MetricHeader {
   }
 }
 
-/** «400 m in 6:10 · 14 ott», fastest distance last. */
-export const cssPointLabel = (point: CssResult["points"][number]) =>
-  `${formatInteger(point.distanceMeters)} m in ${formatClock(point.seconds)} · ${formatKeyDayMonth(point.date)}`
+/** «400 m», or «200 yd» for an effort in a 25-yard pool (the CSS distance it matched). */
+export const cssDistanceLabel = (point: CssPoint) =>
+  point.distanceUnit === "yd" && point.nominalDistance
+    ? `${formatInteger(point.nominalDistance)} yd`
+    : `${formatInteger(point.nominalDistance ?? point.distanceMeters)} m`
+
+/** Pace per 100 m (real metres) of an effort. */
+const cssPointPace = (point: CssPoint) => (point.seconds / point.distanceMeters) * 100
+
+/** «400 m in 6:57 · 20 ott». */
+export const cssPointLabel = (point: CssPoint) =>
+  `${cssDistanceLabel(point)} in ${formatClock(point.seconds)} · ${formatKeyDayMonth(point.date)}`
+
+/** «300 m in 5:56 · 29 set, a 1:59/100 m: più lento del tuo 400 m (1:44/100 m)». */
+export const cssDroppedLabel = (point: NonNullable<CssResult["droppedPoints"]>[number]) =>
+  `${cssPointLabel(point)}, a ${formatPaceValue(cssPointPace(point))}/100 m: più lento del tuo ${cssDistanceLabel(
+    point.slowerThan
+  )} (${formatPaceValue(cssPointPace(point.slowerThan))}/100 m)`
+
+/** The fitted line of an estimate: «Retta … su 2 tratti: riserva D′ 16 m, R² 1,00 …»; null for a test. */
+export function cssFitText(css: CssResult): string | null {
+  if (css.source !== "stima" || css.dPrimeMeters == null || css.r2 == null) return null
+  const twoPoints = css.points.length === 2 ? " (con due tratti la retta passa per entrambi: R² è sempre 1)" : ""
+  return `Retta distanza = velocità × tempo + D′ su ${formatInteger(css.points.length)} tratti: riserva D′ ${formatInteger(
+    css.dPrimeMeters
+  )} m, R² ${formatDecimal(css.r2, 2)}${twoPoints}.`
+}
 
 export function cssChartSummary(history: SwimMetrics["css"]["history"]): string {
   const months = history.map(
@@ -159,7 +195,15 @@ function loadHeader(m: SwimMetrics): MetricHeader {
     reading: TSB_READING_LABELS[today.reading],
     basis: `Carico di ${formatSwims(counted)} degli ultimi 90 giorni (la curva parte da 180 giorni fa).`,
     missing: m.load.missing,
+    readingNow: `Oggi l'equilibrio è ${formatSignedInteger(today.tsb)}: ${TSB_READING_DESCRIPTIONS[today.reading]}.`,
   }
+}
+
+/** «2 nuotate senza giri: carico stimato …» for the swims of the 90 days whose load is estimated. */
+export function loadEstimatedText(m: SwimMetrics): string | null {
+  const estimated = m.sessions.filter(session => session.loadEstimated && session.stss !== null).length
+  if (estimated === 0) return null
+  return `${formatSwims(estimated)} senza giri: carico stimato su distanza e durata totale, come fa TrainingPeaks.`
 }
 
 /** «Forma +2,1 punti nell'ultima settimana», with the convention when it grows too fast. */
@@ -194,9 +238,51 @@ function intensityHeader(m: SwimMetrics): MetricHeader {
       last28.mediumPct > SWIM_METRIC_THRESHOLDS.mediumZonePct
         ? "molto lavoro in zona media"
         : `${formatInteger(last28.mediumPct)}% medio, ${formatInteger(last28.hardPct)}% intenso`,
-    basis: `Su ${formatSwims(counted)} con i giri degli ultimi 28 giorni (${kmOf(total)}).`,
+    basis: `Su ${formatSwims(counted)} in vasca con i giri degli ultimi 28 giorni: ${kmOf(total)} a stile libero nelle zone.`,
     missing: m.intensity.missing,
   }
+}
+
+/** The swims of the 28 days whose metres are not zoned at all, by reason. */
+const UNZONED_SWIMS: { label: string; matches: (session: SessionMetrics) => boolean }[] = [
+  { label: "in acque libere", matches: session => session.isOpenWater },
+  { label: "di nuotate senza giri", matches: session => !session.isOpenWater && !session.hasLaps },
+  { label: "di nuotate senza passo soglia", matches: session => !session.isOpenWater && session.hasLaps },
+]
+
+/**
+ * How much of the 28 days' volume the zones cover, and what stays out: «Zone calcolate sul 72% del
+ * volume delle ultime 4 settimane. Fuori dalle zone: 1,2 km di altri stili, tecnica o gambe; 2 km
+ * in acque libere.» Null without zones.
+ */
+export function intensityCoverageText(m: SwimMetrics): string | null {
+  const last28 = m.intensity.last28
+  if (!last28 || last28.coveragePct === undefined) return null
+  if (last28.coveragePct >= 100) return "Zone calcolate su tutto il volume delle ultime 4 settimane."
+  const recent = m.sessions.filter(inLast28(m)).filter(session => session.zoneMeters === null)
+  const outside = [
+    last28.unclassifiedMeters ? `${formatDistance(last28.unclassifiedMeters)} di altri stili, tecnica o gambe` : null,
+    ...UNZONED_SWIMS.map(({ label, matches }) => {
+      const meters = recent.filter(matches).reduce((sum, session) => sum + session.distanceMeters, 0)
+      return meters > 0 ? `${formatDistance(meters)} ${label}` : null
+    }),
+  ].filter(part => part !== null)
+  const coverage = `Zone calcolate sul ${formatInteger(last28.coveragePct)}% del volume delle ultime 4 settimane.`
+  return outside.length > 0 ? `${coverage} Fuori dalle zone: ${outside.join("; ")}.` : coverage
+}
+
+/** Z1..Z5 as paces per 100 m from the CSS pace: «più lento di 2:08», «1:58–2:08», «più veloce di 1:45». */
+export function zonePaceRows(cssPaceSecondsPer100: number): { zone: number; name: string; pace: string }[] {
+  return zonePaceRanges(cssPaceSecondsPer100).map(range => ({
+    zone: range.zone,
+    name: range.name,
+    pace:
+      range.slowPace === null
+        ? `più lento di ${formatPaceValue(range.fastPace!)}`
+        : range.fastPace === null
+          ? `più veloce di ${formatPaceValue(range.slowPace)}`
+          : `${formatPaceValue(range.fastPace)}–${formatPaceValue(range.slowPace)}`,
+  }))
 }
 
 export function intensityChartSummary(weeksData: SwimMetrics["intensity"]["weeks"]): string {
@@ -204,9 +290,13 @@ export function intensityChartSummary(weeksData: SwimMetrics["intensity"]["weeks
     (sum, week) => week.zoneMeters.map((meters, index) => sum[index] + meters) as Zones5,
     [0, 0, 0, 0, 0] as Zones5
   )
-  return `Ultime 8 settimane: ${kmOf(zoneSum(total, 0, 4))} con i giri, ${formatKm(
+  const unclassified = weeksData.reduce((sum, week) => sum + (week.unclassifiedMeters ?? 0), 0)
+  const zoned = `Ultime 8 settimane: ${kmOf(zoneSum(total, 0, 4))} a stile libero nelle zone, ${formatKm(
     zoneSum(total, 0, 1)
-  )} in Z1–Z2 (facile), ${formatKm(total[2])} in Z3 (medio), ${formatKm(zoneSum(total, 3, 4))} in Z4–Z5 (intenso).`
+  )} in Z1–Z2 (facile), ${formatKm(total[2])} in Z3 (medio), ${formatKm(zoneSum(total, 3, 4))} in Z4–Z5 (intenso)`
+  return unclassified > 0
+    ? `${zoned}; ${kmOf(unclassified)} di altri stili, tecnica o gambe non classificati.`
+    : `${zoned}.`
 }
 
 // ─── Efficienza ─────────────────────────────────────────────────────────────
@@ -225,25 +315,71 @@ function efficiencyHeader(m: SwimMetrics): MetricHeader {
   if (e.avg28 === null || e.poolLengthMeters === null) {
     return { value: null, reading: null, basis: null, missing: e.missing }
   }
-  const counted = efficiencySessions(m).filter(inLast28(m)).length
+  const pool = poolLengthLabel(e.poolLengthMeters)
+  const counted = e.n28 ?? efficiencySessions(m).filter(inLast28(m)).length
+  const base =
+    e.nBaseline === undefined
+      ? "."
+      : e.baseline === null
+        ? `; nei 90 giorni precedenti ${e.nBaseline === 1 ? "c'è" : "ci sono"} ${formatSwims(e.nBaseline)} in questa vasca.`
+        : `; la tua base è la mediana di ${formatSwims(e.nBaseline)} dei 90 giorni precedenti.`
   return {
     value: formatDecimal(e.avg28, 2),
-    reading:
-      e.deltaPct === null
-        ? `vasca da ${formatInteger(e.poolLengthMeters)} m`
-        : `${formatSignedInteger(e.deltaPct)}% sulla tua base`,
-    basis: `Media di ${formatSwims(counted)} in vasca da ${formatInteger(e.poolLengthMeters)} m degli ultimi 28 giorni.`,
+    reading: e.deltaPct === null ? `vasca da ${pool}` : `${formatSignedInteger(e.deltaPct)}% sulla tua base`,
+    basis: `Mediana di ${formatSwims(counted)} in vasca da ${pool} degli ultimi 28 giorni${base}`,
     missing: e.missing,
   }
 }
 
-/** Distance per cycle and stroke rate, averaged over the sessions of the last 28 days. */
-export function efficiencyDetails(m: SwimMetrics) {
-  const recent = efficiencySessions(m).filter(inLast28(m))
-  return {
-    dps: mean(recent.flatMap(session => (session.dpsMeters === null ? [] : [session.dpsMeters]))),
-    strokeRate: mean(recent.flatMap(session => (session.strokeRate === null ? [] : [session.strokeRate]))),
+/** Median stroke rate (cycles per minute) of the swims of the last 28 days in the summary's pool. */
+export function efficiencyStrokeRate(m: SwimMetrics): number | null {
+  return median(
+    efficiencySessions(m)
+      .filter(inLast28(m))
+      .flatMap(session => (session.strokeRate === null ? [] : [session.strokeRate]))
+  )
+}
+
+export type EfficiencyRow = { label: string; recent: string; baseline: string | null }
+
+/**
+ * Stroke Index, distance per cycle and pace of the last 4 weeks against the base (medians of the
+ * same swims), and in one sentence whether the Stroke Index moved with the stroke length or only
+ * with the speed. Compared as shown: distance per cycle to the centimetre, pace to the second.
+ */
+export function efficiencyComparison(e: SwimMetrics["efficiency"]): { rows: EfficiencyRow[]; reading: string | null } {
+  const dps = (value: number | null | undefined) => (value == null ? null : `${formatDecimal(value, 2)} m`)
+  const pace = (value: number | null | undefined) => (value == null ? null : `${formatPaceValue(value)} /100 m`)
+  const rows: EfficiencyRow[] = []
+  if (e.avg28 !== null) {
+    rows.push({ label: "Stroke Index", recent: formatDecimal(e.avg28, 2), baseline: e.baseline === null ? null : formatDecimal(e.baseline, 2) })
   }
+  if (e.dps28 != null) rows.push({ label: "Distanza per ciclo", recent: dps(e.dps28)!, baseline: dps(e.dpsBaseline) })
+  if (e.pace28 != null) rows.push({ label: "Passo", recent: pace(e.pace28)!, baseline: pace(e.paceBaseline) })
+
+  const siChange = e.deltaPct == null ? 0 : Math.round(e.deltaPct)
+  if (siChange === 0 || e.dps28 == null || e.dpsBaseline == null || e.pace28 == null || e.paceBaseline == null) {
+    return { rows, reading: null }
+  }
+  const dpsChange = Math.round(e.dps28 * 100) - Math.round(e.dpsBaseline * 100)
+  const paceChange = Math.round(e.pace28) - Math.round(e.paceBaseline) // negative: faster
+  let reading: string
+  if (siChange > 0) {
+    reading =
+      dpsChange <= 0
+        ? "Lo Stroke Index sale solo perché vai più veloce: la distanza per ciclo non cresce."
+        : paceChange < 0
+          ? "Lo Stroke Index sale con una bracciata più lunga e un passo più veloce."
+          : "Lo Stroke Index sale con una bracciata più lunga."
+  } else {
+    reading =
+      dpsChange >= 0
+        ? "Lo Stroke Index scende perché vai più piano: la distanza per ciclo non cala."
+        : paceChange > 0
+          ? "Lo Stroke Index scende con una bracciata più corta e un passo più lento."
+          : "Lo Stroke Index scende con una bracciata più corta."
+  }
+  return { rows, reading }
 }
 
 export function efficiencyChartSummary(m: SwimMetrics): string | null {
@@ -252,15 +388,13 @@ export function efficiencyChartSummary(m: SwimMetrics): string | null {
   const values = sessions.map(session => session.strokeIndex)
   const base =
     m.efficiency.baseline === null ? "" : `; la tua base è ${formatDecimal(m.efficiency.baseline, 2)}`
-  return `Stroke Index per nuotata in vasca da ${formatInteger(
-    m.efficiency.poolLengthMeters
-  )} m, ultimi 90 giorni: ${formatSwims(sessions.length)}, da ${formatDecimal(Math.min(...values), 2)} a ${formatDecimal(
+  return `Stroke Index per nuotata in vasca da ${poolLengthLabel(m.efficiency.poolLengthMeters)}, ultimi 90 giorni: ${formatSwims(sessions.length)}, da ${formatDecimal(Math.min(...values), 2)} a ${formatDecimal(
     Math.max(...values),
     2
   )}, ultima ${formatDecimal(values[values.length - 1], 2)}${base}.`
 }
 
-// ─── Regolarità nelle ripetute ──────────────────────────────────────────────
+// ─── Regolarità e tenuta nelle ripetute ─────────────────────────────────────
 
 function pacingHeader(m: SwimMetrics): MetricHeader {
   const p = m.pacing
@@ -286,6 +420,60 @@ export function pacingSetSummary(set: NonNullable<SwimMetrics["pacing"]["latestS
   return `Ultima serie, ${formatKeyDayMonth(set.date)}: ${setTitle(set)} in ${set.repSeconds
     .map(formatClock)
     .join(", ")}.`
+}
+
+/** «la bracciata si accorcia nel finale» above the shared threshold, else «la bracciata tiene». */
+export const dpsDropReading = (dropPct: number) =>
+  dropPct > SWIM_METRIC_THRESHOLDS.dpsDropPct ? "la bracciata si accorcia nel finale" : "la bracciata tiene"
+
+/** Distance per cycle of each rep of the latest set, with its drop and reading; null without stroke data. */
+export function pacingDpsSummary(set: NonNullable<SwimMetrics["pacing"]["latestSet"]>): string | null {
+  if (!set.repDps || set.repDps.length === 0) return null
+  const values = `${set.repDps.map(dps => formatDecimal(dps, 2)).join(", ")} m`
+  if (set.dpsDropPct == null) return `Distanza per bracciata nell'ultima serie: ${values}.`
+  const change =
+    set.dpsDropPct >= 0
+      ? `cala del ${formatDecimal(set.dpsDropPct, 1)}%`
+      : `cresce del ${formatDecimal(-set.dpsDropPct, 1)}%`
+  return `Distanza per bracciata nell'ultima serie: ${values}; dal primo all'ultimo terzo ${change}: ${dpsDropReading(
+    set.dpsDropPct
+  )}.`
+}
+
+/**
+ * «Tenuta della bracciata»: median DPS drop and stroke rate rise of the last 28 days, the reading
+ * and the swims behind them; what is missing without stroke data in the sets.
+ */
+export function strokeHolding(m: SwimMetrics): {
+  dpsChange: number | null
+  strokeRateRise: number | null
+  text: string
+} | null {
+  const p = m.pacing
+  if (p.cv28 === null) return null
+  if (p.dpsDrop28 == null) {
+    return {
+      dpsChange: null,
+      strokeRateRise: null,
+      text: "servono serie con le bracciate registrate in ogni ripetuta.",
+    }
+  }
+  const counted = m.sessions.filter(session => session.dpsDropPct != null && inLast28(m)(session)).length
+  const change =
+    p.dpsDrop28 >= 0
+      ? `cala del ${formatDecimal(p.dpsDrop28, 1)}%`
+      : `cresce del ${formatDecimal(-p.dpsDrop28, 1)}%`
+  const rate =
+    p.strokeRateRise28 == null
+      ? ""
+      : `, la frequenza ${p.strokeRateRise28 >= 0 ? "sale" : "scende"} del ${formatDecimal(Math.abs(p.strokeRateRise28), 1)}%`
+  return {
+    dpsChange: -p.dpsDrop28,
+    strokeRateRise: p.strokeRateRise28 ?? null,
+    text: `dal primo all'ultimo terzo delle serie la distanza per bracciata ${change}${rate}: ${dpsDropReading(
+      p.dpsDrop28
+    )}. Mediana di ${formatSwims(counted)} degli ultimi 28 giorni.`,
+  }
 }
 
 export const pacingSessions = (m: SwimMetrics) =>

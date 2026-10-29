@@ -103,7 +103,7 @@ describe("Statistiche", () => {
       "Forma e fatica",
       "Intensità",
       "Efficienza della bracciata",
-      "Regolarità nelle ripetute",
+      "Regolarità e tenuta nelle ripetute",
       "Volume e costanza",
     ]);
     for (const heading of cards) {

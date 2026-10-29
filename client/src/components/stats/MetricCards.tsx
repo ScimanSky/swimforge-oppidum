@@ -20,14 +20,22 @@ import {
 } from "@/components/ui/dialog";
 import { Metric } from "@/components/corsia/Metric";
 import { ZoneBar } from "@/components/corsia/ZoneBar";
-import { formatDecimal, formatInteger, formatSignedInteger, NO_VALUE } from "@/lib/format";
+import { formatDecimal, formatInteger, formatPaceValue, formatSignedInteger, NO_VALUE } from "@/lib/format";
 import {
+  cssDroppedLabel,
+  cssFitText,
   cssPointLabel,
-  efficiencyDetails,
+  efficiencyComparison,
+  efficiencyStrokeRate,
+  formatSignedDecimal,
+  intensityCoverageText,
+  loadEstimatedText,
   loadRampText,
   METRIC_ORDER,
   metricHeaders,
   PACE_ZONE_NAMES,
+  strokeHolding,
+  zonePaceRows,
   type MetricHeader,
 } from "@/lib/swim-metrics-view";
 import {
@@ -36,6 +44,7 @@ import {
   IntensityChart,
   LoadChart,
   PacingCvChart,
+  PacingDpsChart,
   PacingSetChart,
   VolumeChart,
 } from "./MetricCharts";
@@ -45,6 +54,7 @@ import { CssTestDialog } from "./CssTestDialog";
 const NO_DATA_READING = "servono più dati";
 
 const metricGrid = "grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4";
+const sectionTitle = "text-xs font-semibold text-muted-foreground";
 
 function MetricCard({
   metricKey,
@@ -86,6 +96,7 @@ function MetricCard({
         {children}
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">Come si legge:</span> {definition.howToRead}
+          {header.readingNow ? <> {header.readingNow}</> : null}
         </p>
         {header.basis ? <p className="text-xs text-muted-foreground">{header.basis}</p> : null}
         <div className="flex flex-wrap gap-2">
@@ -103,17 +114,33 @@ function CssBody({ metrics }: { metrics: SwimMetrics }) {
   const css = metrics.css.current;
   const listTitle = css?.source === "test" ? "I tempi del test" : "Tratti usati per la stima";
   const listTitleId = useId();
+  const droppedTitleId = useId();
+  const dropped = css?.source === "stima" ? (css.droppedPoints ?? []) : [];
+  const fit = css ? cssFitText(css) : null;
   return (
     <>
       <CssHistoryChart history={metrics.css.history} />
       {css && css.points.length > 0 ? (
         <div>
-          <p id={listTitleId} className="text-xs font-semibold text-muted-foreground">
+          <p id={listTitleId} className={sectionTitle}>
             {listTitle}
           </p>
           <ul aria-labelledby={listTitleId} className="mt-1 space-y-0.5 text-sm tabular-nums">
             {css.points.map((point) => (
               <li key={`${point.distanceMeters}-${point.date}`}>{cssPointLabel(point)}</li>
+            ))}
+          </ul>
+          {fit ? <p className="mt-2 text-xs text-muted-foreground">{fit}</p> : null}
+        </div>
+      ) : null}
+      {dropped.length > 0 ? (
+        <div>
+          <p id={droppedTitleId} className={sectionTitle}>
+            Non usati: più lenti per 100 m di un tratto più lungo, quindi non a tutta
+          </p>
+          <ul aria-labelledby={droppedTitleId} className="mt-1 space-y-0.5 text-sm tabular-nums">
+            {dropped.map((point) => (
+              <li key={`${point.distanceMeters}-${point.date}`}>{cssDroppedLabel(point)}</li>
             ))}
           </ul>
         </div>
@@ -124,24 +151,62 @@ function CssBody({ metrics }: { metrics: SwimMetrics }) {
 
 function LoadBody({ metrics }: { metrics: SwimMetrics }) {
   const ramp = loadRampText(metrics.load.rampPerWeek);
+  const estimated = metrics.load.today ? loadEstimatedText(metrics) : null;
   return (
     <>
-      <LoadChart load={metrics.load} />
+      <LoadChart load={metrics.load} sessions={metrics.sessions} />
       {ramp ? <p className="text-sm">{ramp}</p> : null}
+      {estimated ? <p className="text-sm">{estimated}</p> : null}
     </>
+  );
+}
+
+/** Z1..Z5 as paces you can swim, from today's threshold pace. */
+function ZonePaceTable({ cssPace }: { cssPace: number }) {
+  return (
+    <table className="w-full text-sm tabular-nums">
+      <caption className={`${sectionTitle} mb-1 text-left`}>
+        Passo delle zone, dal passo soglia {formatPaceValue(cssPace)}
+      </caption>
+      <thead className="sr-only">
+        <tr>
+          <th scope="col">Zona</th>
+          <th scope="col">Passo per 100 m</th>
+        </tr>
+      </thead>
+      <tbody>
+        {zonePaceRows(cssPace).map((row) => (
+          <tr key={row.zone} className="border-b border-border last:border-0">
+            <th scope="row" className="py-1.5 pr-3 text-left font-normal">
+              <span className="flex items-center gap-2">
+                <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={{ background: `var(--zone-${row.zone})` }} />
+                Z{row.zone} {row.name}
+              </span>
+            </th>
+            <td className="py-1.5 text-right">
+              {row.pace} <span className="text-xs text-muted-foreground">/100 m</span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
 function IntensityBody({ metrics }: { metrics: SwimMetrics }) {
   const last28 = metrics.intensity.last28;
+  const coverage = intensityCoverageText(metrics);
+  const css = metrics.css.current;
   return (
     <>
       {last28 ? (
         <div>
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">Ultime 4 settimane</p>
+          <p className={`${sectionTitle} mb-2`}>Ultime 4 settimane, a stile libero</p>
           <ZoneBar seconds={last28.zoneMeters} names={PACE_ZONE_NAMES} />
+          {coverage ? <p className="mt-2 text-sm">{coverage}</p> : null}
         </div>
       ) : null}
+      {css && last28 ? <ZonePaceTable cssPace={css.paceSecondsPer100} /> : null}
       <IntensityChart weeks={metrics.intensity.weeks} />
     </>
   );
@@ -149,16 +214,50 @@ function IntensityBody({ metrics }: { metrics: SwimMetrics }) {
 
 function EfficiencyBody({ metrics }: { metrics: SwimMetrics }) {
   const e = metrics.efficiency;
-  const details = efficiencyDetails(metrics);
+  const comparison = efficiencyComparison(e);
+  const hasBaseline = e.baseline !== null;
+  const strokeRate = efficiencyStrokeRate(metrics);
   const numbers = [
     e.latest !== null ? { value: formatDecimal(e.latest, 2), label: "Ultima nuotata" } : null,
-    e.baseline !== null ? { value: formatDecimal(e.baseline, 2), label: "La tua base" } : null,
-    details.dps !== null ? { value: formatDecimal(details.dps, 2), unit: "m", label: "Distanza per ciclo" } : null,
-    details.strokeRate !== null ? { value: formatInteger(details.strokeRate), label: "Bracciate al minuto" } : null,
+    strokeRate !== null ? { value: formatInteger(strokeRate), label: "Bracciate al minuto" } : null,
   ].filter((number) => number !== null);
   return (
     <>
       <EfficiencyChart metrics={metrics} />
+      {comparison.rows.length > 0 ? (
+        <div>
+          <table className="w-full text-sm tabular-nums">
+            <caption className={`${sectionTitle} mb-1 text-left`}>
+              {hasBaseline ? "Ultime 4 settimane e la tua base (mediane)" : "Ultime 4 settimane (mediane)"}
+            </caption>
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                <td />
+                <th scope="col" className="py-1 text-right font-semibold">
+                  Ultime 4 settimane
+                </th>
+                {hasBaseline ? (
+                  <th scope="col" className="py-1 pl-3 text-right font-semibold">
+                    La tua base
+                  </th>
+                ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {comparison.rows.map((row) => (
+                <tr key={row.label} className="border-b border-border last:border-0">
+                  <th scope="row" className="py-1.5 pr-3 text-left font-normal">
+                    {row.label}
+                  </th>
+                  <td className="py-1.5 text-right">{row.recent}</td>
+                  {hasBaseline ? <td className="py-1.5 pl-3 text-right">{row.baseline ?? NO_VALUE}</td> : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {comparison.reading ? <p className="mt-2 text-sm">{comparison.reading}</p> : null}
+        </div>
+      ) : null}
       {numbers.length > 0 ? (
         <ul className={metricGrid}>
           {numbers.map((number) => (
@@ -172,20 +271,39 @@ function EfficiencyBody({ metrics }: { metrics: SwimMetrics }) {
   );
 }
 
+const signedPctValue = (value: number) => formatSignedDecimal(value, 1);
+
 function PacingBody({ metrics }: { metrics: SwimMetrics }) {
   const p = metrics.pacing;
+  const holding = strokeHolding(metrics);
+  const numbers = [
+    p.fade28 !== null ? { value: signedPctValue(p.fade28), unit: "%", label: "Calo nel finale" } : null,
+    holding?.dpsChange != null
+      ? { value: signedPctValue(holding.dpsChange), unit: "%", label: "Distanza per bracciata nel finale" }
+      : null,
+    holding?.strokeRateRise != null
+      ? { value: signedPctValue(holding.strokeRateRise), unit: "%", label: "Frequenza nel finale" }
+      : null,
+  ].filter((number) => number !== null);
   return (
     <>
       {p.latestSet ? <PacingSetChart set={p.latestSet} /> : null}
-      <PacingCvChart metrics={metrics} />
-      {p.fade28 !== null ? (
-        <Metric
-          value={p.fade28 > 0 ? `+${formatDecimal(p.fade28, 1)}` : formatDecimal(p.fade28, 1)}
-          unit="%"
-          label="Calo nel finale"
-          size="sm"
-        />
+      {p.latestSet ? <PacingDpsChart set={p.latestSet} /> : null}
+      {numbers.length > 0 ? (
+        <ul className={metricGrid}>
+          {numbers.map((number) => (
+            <li key={number.label}>
+              <Metric {...number} size="sm" />
+            </li>
+          ))}
+        </ul>
       ) : null}
+      {holding ? (
+        <p className="text-sm">
+          <span className="font-semibold">Tenuta della bracciata:</span> {holding.text}
+        </p>
+      ) : null}
+      <PacingCvChart metrics={metrics} />
     </>
   );
 }

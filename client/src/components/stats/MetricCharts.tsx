@@ -3,7 +3,7 @@
  * hairline grid, one y axis). Each chart is a `role="img"` with a text summary for screen
  * readers; the legend and the numbers around it stay as text. Mounted only while its card is open.
  */
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -17,8 +17,9 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  type TooltipProps,
 } from "recharts";
-import type { SwimMetrics } from "@shared/swimMetrics";
+import { TSB_READING_LABELS, tsbReadingOf, type SessionMetrics, type SwimMetrics } from "@shared/swimMetrics";
 import { formatDecimal, formatInteger, formatKm, formatPaceValue, formatSignedInteger } from "@/lib/format";
 import {
   cssChartSummary,
@@ -27,11 +28,13 @@ import {
   formatClock,
   formatKeyDayMonth,
   formatMonthKey,
+  formatSignedDecimal,
   formatSwims,
   intensityChartSummary,
   loadChartSummary,
   PACE_ZONE_NAMES,
   pacingCvSummary,
+  pacingDpsSummary,
   pacingSessions,
   pacingSetSummary,
   setTitle,
@@ -71,6 +74,36 @@ const LINE_CURSOR = { stroke: "var(--border)" };
 const dot = (color: string) => ({ r: 4, fill: color, stroke: "var(--card)", strokeWidth: 2 });
 
 const dayLabel = (key: unknown) => formatKeyDayMonth(String(key));
+
+type TooltipRow = { label: string; value: string };
+
+/**
+ * Tooltip content with several rows per point (values that are not series of the chart), in the
+ * same style as TOOLTIP: title in grey, label and value in text colours.
+ */
+function detailTooltip<T>(render: (datum: T) => { title: string; rows: TooltipRow[] }) {
+  return function DetailTooltip({ active, payload }: TooltipProps<number, string>): ReactNode {
+    const datum = payload?.[0]?.payload as T | undefined;
+    if (!active || !datum) return null;
+    const { title, rows } = render(datum);
+    return (
+      <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs text-foreground">
+        <p className="text-muted-foreground">{title}</p>
+        <dl className="mt-1 space-y-0.5">
+          {rows.map((row) => (
+            <div key={row.label} className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">{row.label}</dt>
+              <dd className="tabular-nums">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    );
+  };
+}
+
+/** «+3,1%»: a signed percentage with one decimal. */
+const signedPct = (value: number) => `${formatSignedDecimal(value, 1)}%`;
 
 /**
  * Round axis bounds and evenly spaced ticks (at most 5) covering `values`: the first step of
@@ -193,11 +226,52 @@ export function CssHistoryChart({ history }: { history: SwimMetrics["css"]["hist
 
 const LOAD_NAMES: Record<string, string> = { forma: "Forma", fatica: "Fatica", equilibrio: "Equilibrio" };
 
+export type LoadDatum = {
+  date: string;
+  forma: number;
+  fatica: number;
+  equilibrio: number;
+  stss: number;
+  sessions: SessionMetrics[];
+};
+
+/** «1:49 /100 m (stima)»: the CSS a swim's load uses. */
+const cssUsedLabel = (session: SessionMetrics) =>
+  session.cssPaceSecondsPer100 == null
+    ? null
+    : `${formatPaceValue(session.cssPaceSecondsPer100)} /100 m (${session.cssSource === "test" ? "test" : "stima"})`;
+
+/** Tooltip of a day of the load chart: the balance read with the shared bands, the day's load and CSS. */
+export const LoadTooltipContent = detailTooltip<LoadDatum>((day) => {
+  const rows: TooltipRow[] = [
+    { label: "Forma", value: formatInteger(day.forma) },
+    { label: "Fatica", value: formatInteger(day.fatica) },
+    {
+      label: "Equilibrio",
+      value: `${formatSignedInteger(day.equilibrio)} · ${TSB_READING_LABELS[tsbReadingOf(day.equilibrio)]}`,
+    },
+  ];
+  if (day.stss > 0) {
+    const estimated = day.sessions.some((session) => session.loadEstimated);
+    rows.push({ label: "Carico del giorno", value: `${formatInteger(day.stss)}${estimated ? " (stimato)" : ""}` });
+    const cssUsed = Array.from(new Set(day.sessions.map(cssUsedLabel).filter((label) => label !== null)));
+    if (cssUsed.length > 0) rows.push({ label: "Passo soglia usato", value: cssUsed.join(", ") });
+  }
+  return { title: dayLabel(day.date), rows };
+});
+
 /** Form and fatigue (lines) and their balance (bars) over the last 90 days, one axis in points. */
-export function LoadChart({ load }: { load: SwimMetrics["load"] }) {
+export function LoadChart({ load, sessions }: { load: SwimMetrics["load"]; sessions: SessionMetrics[] }) {
   const summary = loadChartSummary(load);
   if (!summary) return null;
-  const data = load.days.map((day) => ({ date: day.date, forma: day.ctl, fatica: day.atl, equilibrio: day.tsb }));
+  const data: LoadDatum[] = load.days.map((day) => ({
+    date: day.date,
+    forma: day.ctl,
+    fatica: day.atl,
+    equilibrio: day.tsb,
+    stss: day.stss,
+    sessions: sessions.filter((session) => session.date === day.date && session.stss !== null),
+  }));
   return (
     <div>
       <ChartFrame title="Ultimi 90 giorni (punti di carico)" summary={summary} height={200}>
@@ -206,18 +280,7 @@ export function LoadChart({ load }: { load: SwimMetrics["load"] }) {
           <XAxis dataKey="date" {...X_AXIS} minTickGap={24} tickFormatter={dayLabel} />
           <YAxis {...Y_AXIS} width={32} allowDecimals={false} />
           <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.6} />
-          <Tooltip
-            {...TOOLTIP}
-            cursor={LINE_CURSOR}
-            labelFormatter={dayLabel}
-            formatter={(value, name) => {
-              const number = Number(value);
-              return [
-                name === "Equilibrio" ? formatSignedInteger(number) : formatInteger(number),
-                String(name),
-              ];
-            }}
-          />
+          <Tooltip cursor={LINE_CURSOR} isAnimationActive={false} content={LoadTooltipContent} />
           <Bar
             dataKey="equilibrio"
             name={LOAD_NAMES.equilibrio}
@@ -257,6 +320,7 @@ export function LoadChart({ load }: { load: SwimMetrics["load"] }) {
 // ─── Intensità ──────────────────────────────────────────────────────────────
 
 const ZONE_KEYS = ["z1", "z2", "z3", "z4", "z5"] as const;
+const UNCLASSIFIED_NAME = "Non classificati (altri stili, tecnica, gambe)";
 
 export const zoneLegendItems = (): LegendItem[] =>
   PACE_ZONE_NAMES.map((name, index) => ({
@@ -265,12 +329,17 @@ export const zoneLegendItems = (): LegendItem[] =>
     shape: "box",
   }));
 
-/** Weekly km per pace zone, stacked, over the last 8 weeks. */
+/**
+ * Weekly km per pace zone, stacked, over the last 8 weeks; the metres not zoned (other strokes,
+ * drill, kick) on top in a neutral grey, so the bar is the whole pool volume with laps.
+ */
 export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["weeks"] }) {
-  if (!weeks.some((week) => week.zoneMeters.some((meters) => meters > 0))) return null;
+  const hasUnclassified = weeks.some((week) => (week.unclassifiedMeters ?? 0) > 0);
+  if (!hasUnclassified && !weeks.some((week) => week.zoneMeters.some((meters) => meters > 0))) return null;
   const data = weeks.map((week) => ({
     week: week.weekStart,
     ...Object.fromEntries(ZONE_KEYS.map((key, index) => [key, week.zoneMeters[index] / 1000])),
+    altro: (week.unclassifiedMeters ?? 0) / 1000,
   }));
   return (
     <div>
@@ -304,9 +373,29 @@ export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["wee
               isAnimationActive={false}
             />
           ))}
+          {hasUnclassified ? (
+            <Bar
+              dataKey="altro"
+              stackId="zone"
+              name={UNCLASSIFIED_NAME}
+              fill="var(--muted-foreground)"
+              fillOpacity={0.35}
+              stroke="var(--card)"
+              strokeWidth={1}
+              maxBarSize={24}
+              isAnimationActive={false}
+            />
+          ) : null}
         </BarChart>
       </ChartFrame>
-      <ChartLegend items={zoneLegendItems()} />
+      <ChartLegend
+        items={[
+          ...zoneLegendItems(),
+          ...(hasUnclassified
+            ? [{ label: UNCLASSIFIED_NAME, color: "var(--muted-foreground)", shape: "box" as const, faded: true }]
+            : []),
+        ]}
+      />
     </div>
   );
 }
@@ -369,7 +458,7 @@ export function EfficiencyChart({ metrics }: { metrics: SwimMetrics }) {
   );
 }
 
-// ─── Regolarità nelle ripetute ──────────────────────────────────────────────
+// ─── Regolarità e tenuta nelle ripetute ─────────────────────────────────────
 
 /** Times of the most recent set; the axis starts near the fastest rep so differences show. */
 export function PacingSetChart({ set }: { set: NonNullable<SwimMetrics["pacing"]["latestSet"]> }) {
@@ -413,11 +502,66 @@ export function PacingSetChart({ set }: { set: NonNullable<SwimMetrics["pacing"]
   );
 }
 
+const DPS_STEPS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5] as const;
+
+/**
+ * Distance per cycle of each rep of the same set, under the times: a separate small chart with
+ * its own axis (one axis per chart reads better at 360 px than a second axis on the bars).
+ */
+export function PacingDpsChart({ set }: { set: NonNullable<SwimMetrics["pacing"]["latestSet"]> }) {
+  const summary = pacingDpsSummary(set);
+  if (!summary || !set.repDps) return null;
+  const data = set.repDps.map((dps, index) => ({ rep: index + 1, dps }));
+  const scale = niceScale([Math.min(...set.repDps) - 0.01, Math.max(...set.repDps) + 0.01], DPS_STEPS);
+  return (
+    <ChartFrame title="Distanza per bracciata per ripetuta (m)" summary={summary} height={130}>
+      <LineChart data={data} margin={MARGIN}>
+        {GRID}
+        <XAxis dataKey="rep" {...X_AXIS} />
+        <YAxis
+          {...Y_AXIS}
+          domain={scale.domain}
+          ticks={scale.ticks}
+          interval={0}
+          tickFormatter={(value: number) => formatDecimal(value, 2)}
+        />
+        <Tooltip
+          {...TOOLTIP}
+          cursor={LINE_CURSOR}
+          labelFormatter={(rep) => `Ripetuta ${rep}`}
+          formatter={(value) => [`${formatDecimal(Number(value), 2)} m`, "Distanza per bracciata"]}
+        />
+        <Line
+          dataKey="dps"
+          name="Distanza per bracciata"
+          stroke="var(--chart-2)"
+          strokeWidth={2}
+          dot={dot("var(--chart-2)")}
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </ChartFrame>
+  );
+}
+
+/** Tooltip of a swim of the variability chart, with its fade and stroke holding. */
+export const PacingTooltipContent = detailTooltip<SessionMetrics & { pacingCv: number }>((session) => {
+  const rows: TooltipRow[] = [{ label: "Variabilità", value: `${formatDecimal(session.pacingCv, 1)}%` }];
+  if (session.pacingFade !== null) rows.push({ label: "Calo nel finale", value: signedPct(session.pacingFade) });
+  if (session.dpsDropPct != null) {
+    rows.push({ label: "Distanza per bracciata nel finale", value: signedPct(-session.dpsDropPct) });
+  }
+  if (session.strokeRateRisePct != null) {
+    rows.push({ label: "Frequenza nel finale", value: signedPct(session.strokeRateRisePct) });
+  }
+  return { title: dayLabel(session.date), rows };
+});
+
 /** Pace variability (CV) of each swim with repeat sets, last 90 days. */
 export function PacingCvChart({ metrics }: { metrics: SwimMetrics }) {
   const summary = pacingCvSummary(metrics);
   if (!summary) return null;
-  const data = pacingSessions(metrics).map((session) => ({ date: session.date, cv: session.pacingCv }));
+  const data = pacingSessions(metrics);
   return (
     <ChartFrame title="Variabilità per nuotata (%)" summary={summary}>
       <LineChart data={data} margin={MARGIN}>
@@ -430,14 +574,9 @@ export function PacingCvChart({ metrics }: { metrics: SwimMetrics }) {
           allowDecimals={false}
           tickFormatter={(value: number) => formatInteger(value)}
         />
-        <Tooltip
-          {...TOOLTIP}
-          cursor={LINE_CURSOR}
-          labelFormatter={dayLabel}
-          formatter={(value) => [`${formatDecimal(Number(value), 1)}%`, "Variabilità"]}
-        />
+        <Tooltip cursor={LINE_CURSOR} isAnimationActive={false} content={PacingTooltipContent} />
         <Line
-          dataKey="cv"
+          dataKey="pacingCv"
           name="Variabilità"
           stroke="var(--chart-2)"
           strokeWidth={2}
