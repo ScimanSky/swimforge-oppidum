@@ -87,7 +87,7 @@ describe("push hooks in db_social_enhanced", () => {
     ).resolves.toEqual({ id: 2 });
   });
 
-  it("sendDirectMessage pushes to the receiver with the sender name and /messages", async () => {
+  it("sendDirectMessage pushes to the receiver with the sender name and a link to that chat", async () => {
     insertReturning({ id: 3, senderId: 1, receiverId: 2 });
     h.db.execute.mockResolvedValue({ rows: [{ name: "Ada" }] });
     await sendDirectMessage({ senderId: 1, receiverId: 2, content: "Ciao, domani in vasca?" });
@@ -95,7 +95,7 @@ describe("push hooks in db_social_enhanced", () => {
       expect(h.sendPushToUser).toHaveBeenCalledWith(2, {
         title: "Ada",
         body: "Ciao, domani in vasca?",
-        url: "/messages",
+        url: "/messages?con=1",
         tag: "dm",
       }),
     );

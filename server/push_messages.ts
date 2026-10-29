@@ -64,7 +64,9 @@ export function buildNotificationPush(params: {
 
 const DM_PREVIEW_LENGTH = 100;
 
+/** A tap opens the chat with the sender (`/messages?con=<id>`), else the conversation list. */
 export function buildDirectMessagePush(params: {
+  senderId: number;
   senderName: string | null | undefined;
   content: string;
   messageType?: "text" | "forward_post";
@@ -77,7 +79,9 @@ export function buildDirectMessagePush(params: {
     const text = params.content.replace(/\s+/g, " ").trim();
     body = text.length > DM_PREVIEW_LENGTH ? `${text.slice(0, DM_PREVIEW_LENGTH)}…` : text || "Nuovo messaggio";
   }
-  return { title, body, url: "/messages", tag: "dm" };
+  const validSender = Number.isInteger(params.senderId) && params.senderId > 0;
+  const url = validSender ? `/messages?con=${params.senderId}` : "/messages";
+  return { title, body, url, tag: "dm" };
 }
 
 export function buildGarminSyncPush(newActivities: number): PushPayload {
