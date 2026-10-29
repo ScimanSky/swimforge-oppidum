@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import {
+  resetGarminQuickSyncForTests,
   GARMIN_CONNECT_PATH,
   GARMIN_SYNC_TOAST_ID,
   useGarminQuickSync,
@@ -16,6 +17,7 @@ const state = vi.hoisted(() => ({
   syncOptions: null as any,
   invalidateActivities: vi.fn(),
   invalidateProfile: vi.fn(),
+  invalidateInsights: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   toastLoading: vi.fn(),
@@ -36,6 +38,7 @@ vi.mock("@/lib/trpc", () => ({
       garmin: { status: { fetch: state.fetchStatus } },
       activities: { list: { invalidate: state.invalidateActivities } },
       profile: { get: { invalidate: state.invalidateProfile } },
+      activityInsights: { list: { invalidate: state.invalidateInsights } },
     }),
     garmin: {
       status: {
@@ -82,8 +85,8 @@ describe("useGarminQuickSync", () => {
     state.fetchStatus.mockReset();
   });
   afterEach(() => {
-    // The in-flight guard is module-level: settle whatever a test left running.
-    if (state.syncOptions) act(() => state.syncOptions.onSettled());
+    // The in-flight guard is module-level: reset whatever a test left running.
+    act(() => resetGarminQuickSyncForTests());
     cleanup();
   });
 
@@ -183,6 +186,8 @@ describe("useGarminQuickSync", () => {
     expect(state.toastSuccess).toHaveBeenCalledWith("Nuovi PB rilevati: 1");
     expect(state.invalidateActivities).toHaveBeenCalled();
     expect(state.invalidateProfile).toHaveBeenCalled();
+    // The coach summary of the new swim (Today).
+    expect(state.invalidateInsights).toHaveBeenCalled();
 
     state.syncOptions.onSuccess({ error: "Sessione Garmin scaduta" });
     expect(state.toastError).toHaveBeenCalledWith("Sessione Garmin scaduta", { id: GARMIN_SYNC_TOAST_ID });

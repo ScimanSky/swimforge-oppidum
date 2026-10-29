@@ -153,8 +153,9 @@ export default function SocialFeed() {
           <div className="w-full min-w-0">
             <div className="mb-2 w-full">
               {firstPageQuery.isFetching && !isInitialLoading && (
-                <div className="mb-1.5 flex justify-center py-1">
-                  <RefreshCw className="size-4 animate-spin text-muted-foreground" aria-label="Aggiornamento" />
+                <div className="mb-1.5 flex justify-center py-1" role="status">
+                  <RefreshCw className="size-4 animate-spin text-muted-foreground" aria-hidden />
+                  <span className="sr-only">Aggiornamento…</span>
                 </div>
               )}
               <FeedSubTabs tab={tab} onChange={setTab} />

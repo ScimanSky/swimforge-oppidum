@@ -6,6 +6,7 @@ import {
   Sparkles,
   SquarePen,
   Target,
+  Waves,
   type LucideIcon,
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
@@ -14,6 +15,7 @@ import { LevelStrip } from "@/components/corsia/LevelCard";
 import { WeekCard } from "@/components/corsia/WeekCard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCurrentDay } from "@/hooks/useCurrentDay";
 import { GARMIN_CONNECT_PATH, useGarminQuickSync } from "@/hooks/useGarminQuickSync";
 import { formatWeekdayDayMonth } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -26,7 +28,7 @@ const timeOf = (value: string | Date) => {
 
 const sectionTitle = "text-[17px] font-bold";
 const actionClass =
-  "surface-panel flex h-20 w-full items-center gap-3 px-4 text-left text-[15px] font-semibold transition-colors hover:border-action-text/40 disabled:opacity-60";
+  "surface-panel flex h-20 w-full items-center gap-3 px-4 text-left text-[15px] font-semibold transition-colors hover:border-action-text/40 aria-disabled:opacity-60";
 
 function QuickAction({
   icon,
@@ -54,8 +56,14 @@ function QuickAction({
         {content}
       </Link>
     );
+  // aria-disabled, not disabled: the button keeps the keyboard focus while it is busy.
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={actionClass}>
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      aria-disabled={disabled || undefined}
+      className={actionClass}
+    >
       {content}
     </button>
   );
@@ -82,8 +90,9 @@ export default function Today() {
   const garmin = useGarminQuickSync({ watchStatus: true });
 
   const activities = activitiesQuery.data;
-  const now = new Date();
-  const week = useMemo(() => summarizeWeek(activities ?? [], new Date()), [activities]);
+  // Kept mounted across days (app resumed the next morning): `now` changes with the day.
+  const { now } = useCurrentDay();
+  const week = useMemo(() => summarizeWeek(activities ?? [], now), [activities, now]);
   const lastSwim = useMemo<ActivityCardData | null>(() => {
     if (!activities?.length) return null;
     return [...activities].sort((a, b) => timeOf(b.activityDate) - timeOf(a.activityDate))[0];
@@ -104,13 +113,22 @@ export default function Today() {
 
   const profile = profileQuery.data;
   const notConnected = garmin.connected === false;
-  const syncAction = notConnected ? (
+  const showsEmptyState = !activitiesQuery.isLoading && !activitiesQuery.isError && !lastSwim;
+  const syncLabel = garmin.isPending ? "Sincronizzazione…" : "Sincronizza Garmin";
+  const startSync = () => {
+    if (garmin.isPending) return;
+    void garmin.sync();
+  };
+  // The empty state already offers the Garmin action: the tile becomes «Attività».
+  const syncAction = showsEmptyState ? (
+    <QuickAction icon={Waves} label="Attività" href="/track" />
+  ) : notConnected ? (
     <QuickAction icon={Link2} label="Collega Garmin" href={GARMIN_CONNECT_PATH} />
   ) : (
     <QuickAction
       icon={RefreshCw}
-      label={garmin.isPending ? "Sincronizzazione…" : "Sincronizza Garmin"}
-      onClick={() => void garmin.sync()}
+      label={syncLabel}
+      onClick={startSync}
       disabled={garmin.isPending}
     />
   );
@@ -123,7 +141,8 @@ export default function Today() {
   let main: ReactNode;
   if (activitiesQuery.isLoading) {
     main = (
-      <div className="space-y-6" aria-busy="true" aria-label="Caricamento">
+      <div className="space-y-6" role="status">
+        <span className="sr-only">Caricamento…</span>
         <Skeleton className="h-[172px] rounded-2xl" />
         <div className="space-y-3">
           <Skeleton className="h-5 w-32" />
@@ -156,12 +175,12 @@ export default function Today() {
         ) : (
           <Button
             type="button"
-            className="mt-4"
-            onClick={() => void garmin.sync()}
-            disabled={garmin.isPending}
+            className="mt-4 aria-disabled:opacity-60"
+            onClick={startSync}
+            aria-disabled={garmin.isPending || undefined}
           >
             <RefreshCw aria-hidden />
-            {garmin.isPending ? "Sincronizzazione…" : "Sincronizza Garmin"}
+            {syncLabel}
           </Button>
         )}
       </div>

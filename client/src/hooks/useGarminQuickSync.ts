@@ -63,6 +63,8 @@ export function useGarminQuickSync({
       }
       utils.activities.list.invalidate();
       utils.profile.get.invalidate();
+      // The coach summary of the new swim (Today).
+      utils.activityInsights.list.invalidate();
     },
     onError: error => {
       toast.error("Errore nella sincronizzazione: " + error.message, {
@@ -101,5 +103,12 @@ export function useGarminQuickSync({
     mutate({ daysBack: QUICK_SYNC_DAYS });
   }, [connected, mutate, navigate, utils]);
 
-  return { sync, isPending: syncMutation.isPending || sharedSyncing, connected };
+  // The shared flag is set before mutate and cleared on settle: it covers this instance's
+  // mutation too.
+  return { sync, isPending: sharedSyncing, connected };
+}
+
+/** Tests only: clears the module-level guard a test may leave set (a sync never settled). */
+export function resetGarminQuickSyncForTests() {
+  setSyncState({ inFlight: false, syncing: false });
 }

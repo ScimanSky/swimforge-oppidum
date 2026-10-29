@@ -39,7 +39,7 @@ function CreateMenuList({
   isGarminSyncing: boolean
 }) {
   const rowClass =
-    "flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-semibold text-foreground transition-colors hover:bg-raised disabled:opacity-60"
+    "flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-semibold text-foreground transition-colors hover:bg-raised aria-disabled:opacity-60"
   return (
     <ul className="space-y-1">
       {CREATE_ITEMS.map((item) => {
@@ -58,7 +58,15 @@ function CreateMenuList({
         const syncing = item.action === "garmin" && isGarminSyncing
         return (
           <li key={item.label}>
-            <button type="button" onClick={() => onAction(item.action)} disabled={syncing} className={rowClass}>
+            {/* aria-disabled, not disabled: the row keeps the keyboard focus while syncing. */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!syncing) onAction(item.action)
+              }}
+              aria-disabled={syncing || undefined}
+              className={rowClass}
+            >
               {icon}
               {syncing ? "Sincronizzazione…" : item.label}
             </button>

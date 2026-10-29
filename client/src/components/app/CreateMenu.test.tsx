@@ -9,7 +9,13 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { CreateSheet, type CreateAction } from "./CreateMenu"
 
 /** The shell's wiring: the «Crea» sheet closes and, for «Nuovo post», a second real dialog opens. */
-function Harness({ onAction }: { onAction?: (action: CreateAction) => void }) {
+function Harness({
+  onAction,
+  isGarminSyncing = false,
+}: {
+  onAction?: (action: CreateAction) => void
+  isGarminSyncing?: boolean
+}) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [postOpen, setPostOpen] = useState(false)
   return (
@@ -17,7 +23,7 @@ function Harness({ onAction }: { onAction?: (action: CreateAction) => void }) {
       <CreateSheet
         open={menuOpen}
         onOpenChange={setMenuOpen}
-        isGarminSyncing={false}
+        isGarminSyncing={isGarminSyncing}
         onAction={(action) => {
           onAction?.(action)
           setMenuOpen(false)
@@ -42,6 +48,17 @@ describe("CreateSheet", () => {
   afterEach(() => {
     cleanup()
     document.body.style.pointerEvents = ""
+  })
+
+  it("Garmin in sincronizzazione: la riga resta focalizzabile (aria-disabled) e non riparte", async () => {
+    const onAction = vi.fn()
+    render(<Harness onAction={onAction} isGarminSyncing />)
+    await userEvent.click(screen.getByRole("button", { name: "Crea" }))
+    const row = await screen.findByRole("button", { name: "Sincronizzazione…" })
+    expect(row).not.toBeDisabled()
+    expect(row).toHaveAttribute("aria-disabled", "true")
+    await userEvent.click(row)
+    expect(onAction).not.toHaveBeenCalled()
   })
 
   it("Nuovo post: il fuoco resta nel nuovo dialogo, non torna al +, e la pagina resta cliccabile alla chiusura", async () => {

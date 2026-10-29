@@ -3,7 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 /** Placeholder posts with the Corsia feed layout: header, text, activity card, actions. */
 export default function FeedSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Caricamento del feed">
+    <div role="status">
+      <span className="sr-only">Caricamento…</span>
       {[1, 2, 3].map((i) => (
         <div key={i} className="space-y-3 border-b border-border pb-4 pt-4">
           <div className="flex items-center gap-3">

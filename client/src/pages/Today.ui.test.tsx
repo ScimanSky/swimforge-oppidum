@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
+import { resetGarminQuickSyncForTests } from "@/hooks/useGarminQuickSync";
 import Today from "./Today";
 
 const MONDAY_SWIM = {
@@ -55,6 +56,7 @@ vi.mock("@/lib/trpc", () => ({
       garmin: { status: { fetch: async () => ({ connected: state.garminConnected }) } },
       activities: { list: { invalidate: vi.fn() } },
       profile: { get: { invalidate: vi.fn() } },
+      activityInsights: { list: { invalidate: vi.fn() } },
     }),
     activities: {
       list: {
@@ -120,8 +122,8 @@ describe("Oggi", () => {
     vi.clearAllMocks();
   });
   afterEach(() => {
-    // The Garmin sync guard is shared module state: settle a sync a test started.
-    act(() => state.syncOptions?.onSettled());
+    // The Garmin sync guard is shared module state: reset whatever a test left running.
+    act(() => resetGarminQuickSyncForTests());
     cleanup();
     vi.useRealTimers();
   });
@@ -191,21 +193,62 @@ describe("Oggi", () => {
     expect(screen.queryByRole("button", { name: "Sincronizza Garmin" })).toBeNull();
   });
 
-  it("nessuna attività: «Ancora nessuna nuotata» con la sincronizzazione", async () => {
+  it("nessuna attività: «Ancora nessuna nuotata» con la sincronizzazione, una volta sola", async () => {
     state.activities.data = [];
     renderToday();
     expect(screen.getByText("Ancora nessuna nuotata")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Questa settimana" })).toBeNull();
     expect(screen.queryByText("Ultima nuotata")).toBeNull();
-    // Card button + quick action.
-    expect(screen.getAllByRole("button", { name: "Sincronizza Garmin" })).toHaveLength(2);
+    // Only the card button: the quick action becomes «Attività».
+    expect(screen.getAllByRole("button", { name: "Sincronizza Garmin" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Attività" })).toHaveAttribute("href", "/track");
   });
 
-  it("caricamento: scheletri, niente stato vuoto", () => {
+  it("nessuna attività e Garmin non collegato: un solo «Collega Garmin»", () => {
+    state.activities.data = [];
+    state.garminConnected = false;
+    renderToday();
+    expect(screen.getAllByRole("link", { name: "Collega Garmin" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Attività" })).toHaveAttribute("href", "/track");
+  });
+
+  it("con nuotate le azioni rapide tengono Garmin, non «Attività»", () => {
+    renderToday();
+    expect(screen.queryByRole("link", { name: "Attività" })).toBeNull();
+  });
+
+  it("caricamento: scheletri annunciati come stato, niente stato vuoto", () => {
     state.activities = { data: undefined, isLoading: true, isError: false };
     renderToday();
-    expect(screen.getByLabelText("Caricamento")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("Caricamento…");
     expect(screen.queryByText("Ancora nessuna nuotata")).toBeNull();
+  });
+
+  it("durante la sincronizzazione il pulsante resta focalizzabile (aria-disabled)", async () => {
+    renderToday();
+    const button = screen.getByRole("button", { name: "Sincronizza Garmin" });
+    await userEvent.click(button);
+    const syncing = screen.getByRole("button", { name: "Sincronizzazione…" });
+    expect(syncing).not.toBeDisabled();
+    expect(syncing).toHaveAttribute("aria-disabled", "true");
+    expect(syncing).toHaveFocus();
+    await userEvent.click(syncing);
+    expect(state.syncMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("il giorno dopo (lunedì) la settimana riparte da zero e la data si aggiorna", () => {
+    renderToday();
+    expect(within(screen.getByRole("region", { name: "Questa settimana" })).getByText("5,6")).toBeInTheDocument();
+
+    // The app comes back to the foreground on Monday 2 November.
+    vi.setSystemTime(new Date(2026, 10, 2, 8));
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const week = screen.getByRole("region", { name: "Questa settimana" });
+    expect(within(week).queryByText("5,6")).toBeNull();
+    expect(within(week).getByText("0 nuotate")).toBeInTheDocument();
+    expect(screen.getByText("lun 2 nov")).toBeInTheDocument();
   });
 
   it("errore: messaggio e «Riprova» rilancia le query", async () => {

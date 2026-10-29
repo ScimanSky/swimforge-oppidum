@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Router } from "wouter"
 import { memoryLocation } from "wouter/memory-location"
 import FeedPost from "./FeedPost"
+import FeedSkeleton from "./FeedSkeleton"
 import FeedSubTabs from "./FeedSubTabs"
 import type { FeedPostRecord } from "./feed-types"
 
@@ -204,5 +205,14 @@ describe("FeedSubTabs", () => {
     expect(screen.getByRole("button", { name: "Seguiti" })).toHaveAttribute("aria-pressed", "false")
     await userEvent.click(screen.getByRole("button", { name: "Seguiti" }))
     expect(onChange).toHaveBeenCalledWith("seguiti")
+  })
+})
+
+describe("FeedSkeleton", () => {
+  afterEach(cleanup)
+
+  it("annunciato come stato di caricamento", () => {
+    render(<FeedSkeleton />)
+    expect(screen.getByRole("status")).toHaveTextContent("Caricamento…")
   })
 })
