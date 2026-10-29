@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   sendError: null as unknown,
   marks: [] as unknown[],
   searches: [] as unknown[],
+  profiles: {} as Record<number, any>,
+  previous: null as string | null,
   refetch: vi.fn(),
 }));
 
@@ -65,6 +67,7 @@ vi.mock("@/lib/trpc", () => {
             state.searches.push(input);
             return state.people;
           }),
+          getPublicProfile: query("profile", (input) => state.profiles[input.userId]),
         },
       },
     },
@@ -76,6 +79,7 @@ vi.mock("@/lib/supabase", () => {
   return { supabase: { channel: () => channel, removeChannel: vi.fn() } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/in-app-history", () => ({ previousInAppPath: () => state.previous }));
 // Radix ScrollArea measures itself; jsdom has no ResizeObserver.
 vi.stubGlobal(
   "ResizeObserver",
@@ -107,9 +111,13 @@ const conversation = (otherId: number, name: string, content: string, unreadCoun
   unreadCount,
 });
 
-function renderIn(ui: React.ReactElement) {
-  const location = memoryLocation({ path: "/messages", record: true });
-  render(<Router hook={location.hook}>{ui}</Router>);
+function renderIn(ui: React.ReactElement, path = "/messages") {
+  const location = memoryLocation({ path, record: true });
+  render(
+    <Router hook={location.hook} searchHook={location.searchHook}>
+      {ui}
+    </Router>
+  );
   return location;
 }
 
@@ -143,6 +151,8 @@ describe("DirectMessages (Corsia)", () => {
     state.sendError = null;
     state.marks = [];
     state.searches = [];
+    state.profiles = {};
+    state.previous = null;
     state.refetch.mockClear();
     vi.mocked(toast.error).mockClear();
   });
@@ -273,6 +283,102 @@ describe("DirectMessages (Corsia)", () => {
       state.chatError = new Error("boom");
       renderIn(<DirectMessages mode="page" />);
       expect(screen.getByRole("alert")).toHaveTextContent("Non riesco a caricare i dati");
+    });
+  });
+
+  describe("the URL says what is open", () => {
+    it("on desktop the newest chat opens in place of the list's URL: no extra history entry", () => {
+      const location = renderIn(<DirectMessages mode="page" />);
+      expect(screen.getByRole("heading", { level: 2, name: "Ada Rossi" })).toBeInTheDocument();
+      expect(location.history).toEqual(["/messages?con=5"]);
+    });
+
+    it("?con= opens that chat, on desktop and on a phone", () => {
+      renderIn(<DirectMessages mode="page" />, "/messages?con=6");
+      expect(screen.getByRole("heading", { level: 2, name: "Bruno" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Bruno/ })).toHaveAttribute("aria-current", "true");
+      expect(screen.getByText("Nessun messaggio: scrivi il primo.")).toBeInTheDocument();
+      cleanup();
+
+      setPhone(true);
+      renderIn(<DirectMessages mode="page" />, "/messages?con=5");
+      expect(screen.getByRole("heading", { level: 2, name: "Ada Rossi" })).toBeInTheDocument();
+      expect(screen.getByRole("log", { name: "Messaggi con Ada Rossi" })).toBeInTheDocument();
+    });
+
+    it("?con= of someone not in the recent conversations: their name from the profile", () => {
+      state.profiles[8] = { name: "Carla Bianchi", username: "carla", avatarUrl: null };
+      state.chats[8] = [];
+      renderIn(<DirectMessages mode="page" />, "/messages?con=8");
+      expect(screen.getByRole("heading", { level: 2, name: "Carla Bianchi" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Carla Bianchi" })).toHaveAttribute("href", "/u/8");
+    });
+
+    it("«Crea» → «Messaggio» (?new=1) opens «Nuovo messaggio», and no chat opens by itself", () => {
+      const location = renderIn(<DirectMessages mode="page" />, "/messages?new=1");
+      expect(screen.getByRole("heading", { level: 2, name: "Nuovo messaggio" })).toBeInTheDocument();
+      expect(screen.getByRole("searchbox", { name: "Cerca un nuotatore" })).toBeInTheDocument();
+      expect(screen.getByText("Scrivi un nome per cercare un nuotatore.")).toBeInTheDocument();
+      expect(screen.queryByRole("log")).toBeNull();
+      expect(location.history).toEqual(["/messages?new=1"]);
+    });
+
+    it("on a phone a chat is a history entry: back (Android, browser) returns to the list", async () => {
+      setPhone(true);
+      const location = renderIn(<DirectMessages mode="page" />);
+      await userEvent.click(screen.getByRole("button", { name: /^Ada Rossi/ }));
+      expect(location.history).toEqual(["/messages", "/messages?con=5"]);
+      expect(screen.getByRole("log", { name: "Messaggi con Ada Rossi" })).toBeInTheDocument();
+
+      // What history.back() does: the URL of the list again.
+      act(() => location.navigate("/messages"));
+      expect(screen.getByRole("heading", { level: 2, name: "Conversazioni" })).toBeInTheDocument();
+      expect(screen.queryByRole("log")).toBeNull();
+    });
+
+    it("«Torna alle conversazioni» goes back in history when the list is the previous entry", async () => {
+      setPhone(true);
+      state.previous = "/messages";
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const location = renderIn(<DirectMessages mode="page" />, "/messages?con=5");
+      await userEvent.click(screen.getByRole("button", { name: "Torna alle conversazioni" }));
+      expect(back).toHaveBeenCalled();
+      expect(location.history).toEqual(["/messages?con=5"]);
+      back.mockRestore();
+    });
+
+    it("«Torna alle conversazioni» after a link from elsewhere replaces the chat with the list", async () => {
+      setPhone(true);
+      state.previous = "/home";
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const location = renderIn(<DirectMessages mode="page" />, "/messages?con=5");
+      await userEvent.click(screen.getByRole("button", { name: "Torna alle conversazioni" }));
+      expect(back).not.toHaveBeenCalled();
+      expect(location.history).toEqual(["/messages"]);
+      expect(screen.getByRole("heading", { level: 2, name: "Conversazioni" })).toBeInTheDocument();
+      back.mockRestore();
+    });
+
+    it("a person picked in «Nuovo messaggio» takes the search's place in the history", async () => {
+      state.people = [{ userId: 8, name: "Carla Bianchi", username: "carla", avatarUrl: null, level: 3 }];
+      state.chats[8] = [];
+      const location = renderIn(<DirectMessages mode="page" />);
+      await userEvent.click(screen.getByRole("button", { name: "Nuovo messaggio" }));
+      expect(location.history).toEqual(["/messages?con=5", "/messages?con=5&new=1"]);
+      await userEvent.type(screen.getByRole("searchbox", { name: "Cerca un nuotatore" }), "car");
+      await userEvent.click(await screen.findByRole("button", { name: "Carla Bianchi @carla" }));
+      expect(location.history).toEqual(["/messages?con=5", "/messages?con=8"]);
+      expect(screen.getByRole("heading", { level: 2, name: "Carla Bianchi" })).toBeInTheDocument();
+    });
+
+    it("«Annulla» goes back in history when the previous entry is the page without the search", async () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      renderIn(<DirectMessages mode="page" />);
+      await userEvent.click(screen.getByRole("button", { name: "Nuovo messaggio" }));
+      state.previous = "/messages?con=5";
+      await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+      expect(back).toHaveBeenCalled();
+      back.mockRestore();
     });
   });
 

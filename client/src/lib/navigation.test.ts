@@ -6,6 +6,7 @@ import {
   isPublicPath,
   normalizePath,
   pageTitleForPath,
+  inPageParentPath,
   parentPathForPath,
   toInAppPath,
 } from "./navigation";
@@ -173,5 +174,18 @@ describe("toInAppPath", () => {
     [undefined],
   ])("%s → null (mai fuori dall'app, mai un'eccezione)", (raw) => {
     expect(toInAppPath(raw)).toBeNull();
+  });
+});
+
+describe("inPageParentPath", () => {
+  it.each([
+    ["/messages?con=5", "/messages"],
+    ["/messages/?new=1", "/messages"],
+    ["/messages?con=5&new=1#x", "/messages"],
+    ["/messages", null],
+    ["/messages?x=1", null],
+    ["/post/5?con=5", null],
+  ])("%s → %s", (location, parent) => {
+    expect(inPageParentPath(location)).toBe(parent);
   });
 });

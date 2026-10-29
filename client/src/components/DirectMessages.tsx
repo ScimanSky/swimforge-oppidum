@@ -3,12 +3,14 @@
  * - `mode="link"`: the header icon to /messages, with the unread count (and the Realtime
  *   subscription that refreshes every message query: the header is always mounted);
  * - `mode="page"`: the Messages page, conversations and the open chat side by side on desktop,
- *   one at a time on phones;
+ *   one at a time on phones. The URL says what is open: `?con=<userId>` the chat, `?new=1`
+ *   «Nuovo messaggio» (the person search), so back returns to the list and a link (a push
+ *   notification, «Crea» → «Messaggio») opens the right view;
  * - a dialog with one swimmer (`recipientId`), opened from their public profile.
  */
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { ChevronLeft, MessageCircle, PenSquare, Search, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,6 +29,7 @@ import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { formatSessionDate, getInitials } from "@/lib/format";
+import { previousInAppPath } from "@/lib/in-app-history";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
@@ -69,6 +72,25 @@ type ForwardMetadata = {
   previewText?: string | null;
   previewMediaUrl?: string | null;
 };
+
+const MESSAGES_PATH = "/messages";
+
+type MessagesView = { conId: number | null; composing: boolean };
+
+/** `?con=<userId>` (a positive id, else nothing) and `?new=1`. */
+function readMessagesView(search: string): MessagesView {
+  const params = new URLSearchParams(search);
+  const con = Number(params.get("con"));
+  return { conId: Number.isInteger(con) && con > 0 ? con : null, composing: params.get("new") === "1" };
+}
+
+function messagesHref({ conId, composing }: MessagesView) {
+  const params = new URLSearchParams();
+  if (conId !== null) params.set("con", String(conId));
+  if (composing) params.set("new", "1");
+  const query = params.toString();
+  return query ? `${MESSAGES_PATH}?${query}` : MESSAGES_PATH;
+}
 
 const RETENTION_DAYS = (() => {
   const days = Number(import.meta.env.VITE_DM_RETENTION_DAYS ?? 60);
@@ -420,9 +442,14 @@ function MessageDialog({ recipientId, recipientName }: { recipientId: number; re
 
 function MessagesPage() {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
-  const [selected, setSelected] = useState<Partner | null>(null);
-  const [composing, setComposing] = useState(false);
-  const [search, setSearch] = useState("");
+  const [, navigate] = useLocation();
+  const { conId, composing } = readMessagesView(useSearch());
+  // The last person opened from the list or the search: their name until the list has them.
+  const [picked, setPicked] = useState<Partner | null>(null);
+  // The search text belongs to one view: it starts empty whenever «Nuovo messaggio» opens or closes.
+  const [searchState, setSearchState] = useState({ composing, text: "" });
+  const search = searchState.composing === composing ? searchState.text : "";
+  const setSearch = (text: string) => setSearchState({ composing, text });
   const searchRef = useRef<HTMLInputElement>(null);
   const listHeadingRef = useRef<HTMLHeadingElement>(null);
   const newButtonRef = useRef<HTMLButtonElement>(null);
@@ -450,22 +477,47 @@ function MessagesPage() {
     );
   }, [conversationsQuery.data]);
 
+  // Who `?con=` is: the conversation list, else the person just picked, else their profile.
+  const listed = conId === null ? undefined : conversations.find((conv) => conv.otherUser.id === conId);
+  const knownPick = picked !== null && picked.id === conId ? picked : null;
+  const profileQuery = trpc.community.users.getPublicProfile.useQuery(
+    { userId: conId ?? 0 },
+    { enabled: conId !== null && !listed && !knownPick && !conversationsQuery.isPending }
+  );
+  let selected: Partner | null = null;
+  if (conId !== null) {
+    if (listed) {
+      selected = {
+        id: conId,
+        name: listed.otherUser.username || "Utente",
+        avatarUrl: listed.otherUser.profilePicture,
+      };
+    } else if (knownPick) {
+      selected = knownPick;
+    } else {
+      const profile = (profileQuery.data ?? null) as Record<string, unknown> | null;
+      const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+      selected = {
+        id: conId,
+        name: text(profile?.name) || text(profile?.username) || "Nuotatore",
+        avatarUrl: text(profile?.avatarUrl) || null,
+      };
+    }
+  }
+
   const query = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
   const peopleQuery = trpc.community.users.search.useQuery(
     { query, limit: 10 },
     { enabled: composing && query.length >= 1 }
   );
 
-  // Desktop shows the chat next to the list: the newest conversation opens by itself.
+  // Desktop shows the chat next to the list: the newest conversation opens by itself, in place
+  // of the list's URL (no history entry of its own).
+  const newestId = conversations[0]?.otherUser.id ?? null;
   useEffect(() => {
-    if (!isDesktop || selected || composing || conversations.length === 0) return;
-    const first = conversations[0];
-    setSelected({
-      id: first.otherUser.id,
-      name: first.otherUser.username || "Utente",
-      avatarUrl: first.otherUser.profilePicture,
-    });
-  }, [isDesktop, selected, composing, conversations]);
+    if (!isDesktop || conId !== null || composing || newestId === null) return;
+    navigate(messagesHref({ conId: newestId, composing: false }), { replace: true });
+  }, [isDesktop, conId, composing, newestId, navigate]);
 
   useEffect(() => {
     const target = pendingFocus.current;
@@ -478,28 +530,35 @@ function MessagesPage() {
       composer: composerRef.current,
     }[target];
     element?.focus();
-  }, [composing, selected, isDesktop]);
+  }, [composing, conId, isDesktop]);
+
+  /** To `target`: back in history when it is the previous entry, else in place of this one. */
+  const leaveTo = (target: string) => {
+    if (previousInAppPath() === target) window.history.back();
+    else navigate(target, { replace: true });
+  };
 
   const open = (partner: Partner) => {
-    setSelected(partner);
-    setComposing(false);
+    setPicked(partner);
     setSearch("");
+    if (partner.id === conId && !composing) return;
     // On phones the list disappears: focus moves to the new message field.
     if (!isDesktop) pendingFocus.current = "composer";
+    // A chat is a history entry (back returns to the list); one picked in «Nuovo messaggio»
+    // takes the search's place, so back never reopens a search that was done.
+    navigate(messagesHref({ conId: partner.id, composing: false }), { replace: composing });
   };
   const startComposing = () => {
     pendingFocus.current = "search";
-    setSearch("");
-    setComposing(true);
+    navigate(messagesHref({ conId, composing: true }));
   };
   const stopComposing = () => {
     pendingFocus.current = "new";
-    setSearch("");
-    setComposing(false);
+    leaveTo(messagesHref({ conId, composing: false }));
   };
   const backToList = () => {
     pendingFocus.current = "list";
-    setSelected(null);
+    leaveTo(MESSAGES_PATH);
   };
 
   const filter = search.trim().toLowerCase();

@@ -200,6 +200,17 @@ export function parentPathForPath(location: string): string | null {
 }
 
 /**
+ * A page that keeps a sub-view in its query has that page as its way back: Messages with an
+ * open chat (`?con=`) or «Nuovo messaggio» (`?new=1`) goes up to the conversation list.
+ */
+export function inPageParentPath(location: string): string | null {
+  const [path, query = ""] = location.split("#")[0].split("?");
+  if (normalizePath(path) !== "/messages") return null;
+  const params = new URLSearchParams(query);
+  return params.has("con") || params.has("new") ? "/messages" : null;
+}
+
+/**
  * `raw` as an in-app path (pathname + query + hash), resolved against this site; null for
  * anything that leaves it: another origin, «//host», «/\host» (browsers read the backslash as
  * a slash), an encoded backslash or double slash, an unparsable value. Never throws.

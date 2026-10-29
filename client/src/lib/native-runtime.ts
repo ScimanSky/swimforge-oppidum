@@ -3,7 +3,7 @@ import { SystemBars, SystemBarsStyle, type PluginListenerHandle } from "@capacit
 import { SplashScreen } from "@capacitor/splash-screen";
 import { resolveDeepLink } from "./deep-links";
 import { canGoBackInApp } from "./in-app-history";
-import { isPublicPath, normalizePath, TODAY_PATH } from "./navigation";
+import { inPageParentPath, isPublicPath, normalizePath, TODAY_PATH } from "./navigation";
 import { isNativePlatform } from "./platform";
 import { setPushNavigate } from "./push";
 
@@ -34,18 +34,21 @@ export function claimLaunchUrl(url: string): boolean {
   return true;
 }
 
-export type BackButtonAction = "back" | "home" | "exit";
+export type BackButtonAction = "back" | "parent" | "home" | "exit";
 
 /**
- * Android back button: on the native home (Oggi) close the app; elsewhere go back in the
- * history when the previous entry belongs to the app. Without such an entry a shell page lands
- * on Oggi (replacing the current entry) instead of closing the app from a deep page, while a
- * public page (login, privacy…) closes the app: signed out, Oggi would bounce back to the login.
+ * Android back button (`location`: path and query): on the native home (Oggi) close the app;
+ * elsewhere go back in the history when the previous entry belongs to the app. Without such an
+ * entry a page whose query holds a sub-view (a chat opened from a notification) goes up to its
+ * own page (`parent`, see inPageParentPath), another shell page lands on Oggi (replacing the
+ * current entry) instead of closing the app from a deep page, while a public page (login,
+ * privacy…) closes the app: signed out, Oggi would bounce back to the login.
  */
-export function backButtonAction(path: string, canGoBack: boolean): BackButtonAction {
-  if (normalizePath(path) === TODAY_PATH) return "exit";
+export function backButtonAction(location: string, canGoBack: boolean): BackButtonAction {
+  if (normalizePath(location) === TODAY_PATH) return "exit";
   if (canGoBack) return "back";
-  return isPublicPath(path) ? "exit" : "home";
+  if (inPageParentPath(location)) return "parent";
+  return isPublicPath(location) ? "exit" : "home";
 }
 
 /**
@@ -107,9 +110,11 @@ export function initNativeRuntime(options: NativeRuntimeOptions): () => void {
     App.addListener("backButton", ({ canGoBack }) => {
       // Only entries created by the app: never back to the login page or a pre-app entry.
       const canGoBackInHistory = canGoBack !== false && canGoBackInApp();
-      const action = backButtonAction(window.location.pathname, canGoBackInHistory);
+      const location = window.location.pathname + window.location.search;
+      const action = backButtonAction(location, canGoBackInHistory);
       if (action === "exit") App.exitApp().catch(() => {});
       else if (action === "back") window.history.back();
+      else if (action === "parent") options.navigate(inPageParentPath(location) ?? TODAY_PATH, { replace: true });
       else options.navigate(TODAY_PATH, { replace: true });
     }),
     App.addListener("appUrlOpen", ({ url }) => {

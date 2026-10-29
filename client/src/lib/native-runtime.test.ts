@@ -22,6 +22,12 @@ describe("backButtonAction", () => {
   it("lands on Oggi instead of exiting when there is nowhere to go back to", () => {
     expect(backButtonAction("/post/7", false)).toBe("home");
     expect(backButtonAction("/home", false)).toBe("home");
+    expect(backButtonAction("/messages", false)).toBe("home");
+  });
+  it("a chat or «Nuovo messaggio» opened from a link goes up to the conversation list", () => {
+    expect(backButtonAction("/messages?con=5", false)).toBe("parent");
+    expect(backButtonAction("/messages?new=1", false)).toBe("parent");
+    expect(backButtonAction("/messages?con=5", true)).toBe("back");
   });
   // Signed out on a cold start: Oggi would 401 and reload the login page, looping.
   it.each(["/login", "/", "/register", "/auth/callback", "/privacy", "/login/?next=1"])(
@@ -58,6 +64,8 @@ describe("createDeepLinkHandler", () => {
     const { handle, navigate } = setup();
     expect(handle("https://www.swimforge.it/post/7?c=1")).toBe(true);
     expect(navigate).toHaveBeenCalledWith("/post/7?c=1");
+    expect(handle("https://swimforge.it/messages?con=5")).toBe(true);
+    expect(navigate).toHaveBeenLastCalledWith("/messages?con=5");
   });
 
   it("ignores unknown and empty URLs", () => {
@@ -237,6 +245,15 @@ describe("Android back button", () => {
       wentBack: false,
       navigated: [["/today", { replace: true }]],
     });
+  });
+
+  it("a chat opened from a notification goes back to the list, not to Oggi", async () => {
+    expect(await pressBack({ sfIdx: 0 }, "/messages?con=5")).toEqual({
+      exited: false,
+      wentBack: false,
+      navigated: [["/messages", { replace: true }]],
+    });
+    expect(await pressBack({ sfIdx: 2 }, "/messages?con=5")).toEqual({ exited: false, wentBack: true, navigated: [] });
   });
 
   it("exits on Oggi, with or without history behind", async () => {
