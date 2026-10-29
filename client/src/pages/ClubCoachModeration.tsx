@@ -31,6 +31,7 @@ import {
 import { formatSessionDay } from "@/lib/club-workouts";
 import { NO_VALUE, formatInteger, formatSessionDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { cn } from "@/lib/utils";
@@ -421,7 +422,7 @@ export default function ClubCoachModeration() {
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Errore durante creazione convocazione");
+      toast.error(errorToastMessage(error, "Errore durante creazione convocazione"));
     },
   });
 
@@ -438,7 +439,7 @@ export default function ClubCoachModeration() {
       ]);
     },
     onError: (error) => {
-      toast.error(error.message || "Errore pubblicazione elenco iscritti");
+      toast.error(errorToastMessage(error, "Errore pubblicazione elenco iscritti"));
     },
   });
 
@@ -448,7 +449,7 @@ export default function ClubCoachModeration() {
       invitesQuery.refetch();
     },
     onError: (error) => {
-      toast.error(error.message || "Errore creazione invito");
+      toast.error(errorToastMessage(error, "Errore creazione invito"));
     },
   });
 
@@ -460,7 +461,7 @@ export default function ClubCoachModeration() {
       utils.community.clubs.history.meets.list.invalidate({ clubId });
     },
     onError: (error) => {
-      toast.error(error.message || "Import storico non riuscito");
+      toast.error(errorToastMessage(error, "Import storico non riuscito"));
     },
   });
   const generateWorkoutDraftMutation = trpc.community.clubs.workouts.coach.generateDraft.useMutation({
@@ -476,7 +477,7 @@ export default function ClubCoachModeration() {
       void workoutByDateQuery.refetch();
     },
     onError: (error) => {
-      toast.error(error.message || "Generazione allenamento non riuscita");
+      toast.error(errorToastMessage(error, "Generazione allenamento non riuscita"));
       void workoutGenerationStatusQuery.refetch();
     },
   });
@@ -496,7 +497,7 @@ export default function ClubCoachModeration() {
       void workoutByDateQuery.refetch();
     },
     onError: (error) => {
-      toast.error(error.message || "Pubblicazione workout non riuscita");
+      toast.error(errorToastMessage(error, "Pubblicazione workout non riuscita"));
     },
   });
   const upsertAiCoachConfigMutation = trpc.community.clubs.aiCoach.upsertConfig.useMutation({
@@ -506,7 +507,7 @@ export default function ClubCoachModeration() {
       void aiCoachRunsQuery.refetch();
     },
     onError: (error) => {
-      toast.error(error.message || "Aggiornamento configurazione Coach AI non riuscito");
+      toast.error(errorToastMessage(error, "Aggiornamento configurazione Coach AI non riuscito"));
     },
   });
   const manualAiCoachRunMutation = trpc.community.clubs.aiCoach.manualRun.useMutation({
@@ -515,7 +516,7 @@ export default function ClubCoachModeration() {
       void aiCoachRunsQuery.refetch();
     },
     onError: (error) => {
-      toast.error(error.message || "Esecuzione manuale Coach AI non riuscita");
+      toast.error(errorToastMessage(error, "Esecuzione manuale Coach AI non riuscita"));
     },
   });
 

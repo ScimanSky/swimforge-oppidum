@@ -15,6 +15,7 @@ import { clubAccess } from "@/lib/club-access";
 import { formatSessionDay, planFact } from "@/lib/club-workouts";
 import { NO_VALUE } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 
 const NOT_MEMBER_TEXT = "Iscriviti al club per vedere gli allenamenti pubblicati.";
@@ -39,7 +40,7 @@ export default function ClubWorkoutDetailPage() {
       toast.success("Allenamento segnato come completato.");
     },
     onError: (error) => {
-      toast.error(error.message || "Non riesco a segnare l'allenamento come completato.");
+      toast.error(errorToastMessage(error, "Non riesco a segnare l'allenamento come completato."));
     },
   });
 

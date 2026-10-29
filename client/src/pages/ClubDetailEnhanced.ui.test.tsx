@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   joinCalls: [] as any[],
   leaveCalls: [] as any[],
   updateCalls: [] as any[],
+  updateError: null as any,
   // `enabled` option of the last call of each query, by name.
   enabled: {} as Record<string, unknown>,
   refetch: vi.fn(),
@@ -39,11 +40,17 @@ const helpers = vi.hoisted(() => {
       return { ...base, data: data(), isPending: false, isError: false, error: null };
     },
   });
-  const mutation = (calls?: any[]) => ({
-    useMutation: () => ({
+  // Like TanStack Query: a failing mutateAsync runs onError, then rejects.
+  const mutation = (calls?: any[], failure: () => unknown = () => null) => ({
+    useMutation: (options?: { onError?: (error: any) => void }) => ({
       mutate: (vars: any) => calls?.push(vars),
       mutateAsync: async (vars: any) => {
         calls?.push(vars);
+        const error = failure();
+        if (error) {
+          options?.onError?.(error);
+          throw error;
+        }
       },
       isPending: false,
     }),
@@ -67,7 +74,7 @@ vi.mock("@/lib/trpc", () => {
           join: mutation(state.joinCalls),
           leave: mutation(state.leaveCalls),
           createInvite: mutation(),
-          update: mutation(state.updateCalls),
+          update: mutation(state.updateCalls, () => state.updateError),
           delete: mutation(),
           media: { imageKitAuth: mutation(), generateBrandAsset: mutation() },
         },
@@ -134,6 +141,7 @@ describe("ClubDetailEnhanced (Corsia)", () => {
     state.clubLoading = false;
     state.statsError = null;
     state.updateCalls.length = 0;
+    state.updateError = null;
     state.enabled = {};
     state.refetch.mockClear();
     toast.error.mockClear();
@@ -285,6 +293,17 @@ describe("ClubDetailEnhanced (Corsia)", () => {
     expect(within(colours).getByRole("radio", { name: "Verde" })).toBeChecked();
     await user.click(screen.getByRole("button", { name: "Salva modifiche" }));
     expect(state.updateCalls).toEqual([expect.objectContaining({ clubId: 7, themeColor: "lime" })]);
+  });
+
+  it("impostazioni rifiutate dal server: un solo avviso, in italiano", async () => {
+    state.club = { ...baseClub, is_member: true, member_role: "admin" };
+    state.updateError = { message: "FORBIDDEN", data: { code: "FORBIDDEN" } };
+    renderClub();
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByRole("button", { name: "Impostazioni del club" }));
+    await user.click(screen.getByRole("button", { name: "Salva modifiche" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(toast.error.mock.calls).toEqual([["Errore nel salvataggio"]]);
   });
 
   describe("menu «Crea» del club (al posto del «+» fluttuante)", () => {

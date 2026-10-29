@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import PostReactions from "@/components/PostReactions";
@@ -121,7 +122,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Errore nella pubblicazione");
+      toast.error(errorToastMessage(error, "Errore nella pubblicazione"));
     },
   });
 
@@ -147,7 +148,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
     },
     onError: (error) => {
       setDeletingPostId(null);
-      toast.error(error.message || "Impossibile eliminare il post");
+      toast.error(errorToastMessage(error, "Impossibile eliminare il post"));
     },
   });
 

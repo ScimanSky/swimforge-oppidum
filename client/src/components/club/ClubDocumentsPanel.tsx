@@ -7,6 +7,7 @@ import { Chip } from "@/components/corsia/Chip";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { NO_VALUE, formatInteger, formatSessionDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { toast } from "sonner";
 
 type ClubDocumentsPanelProps = {
@@ -65,7 +66,7 @@ export default function ClubDocumentsPanel({ clubId, isMember, canUpload, clubNa
       utils.community.clubs.media.list.invalidate({ clubId, mediaType: "pdf", limit: 100 });
     },
     onError: (error) => {
-      toast.error(error.message || "Caricamento del PDF non riuscito.");
+      toast.error(errorToastMessage(error, "Caricamento del PDF non riuscito."));
     },
   });
 

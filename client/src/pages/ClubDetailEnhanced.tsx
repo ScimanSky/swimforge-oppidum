@@ -20,6 +20,7 @@ import { ChoiceGroup, type ChoiceOption } from "@/components/corsia/ChoiceGroup"
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { toast } from "sonner";
 
 import ClubHero from "@/components/club/ClubHero";
@@ -259,7 +260,7 @@ export default function ClubDetailEnhanced() {
       utils.community.clubs.get.invalidate({ clubId });
     },
     onError: (error) => {
-      toast.error(error.message || "Impossibile iscriversi al club.");
+      toast.error(errorToastMessage(error, "Impossibile iscriversi al club."));
     },
   });
   const leaveMutation = trpc.community.clubs.leave.useMutation({
@@ -288,14 +289,14 @@ export default function ClubDetailEnhanced() {
       // Not refetch(): that would run even while the query is disabled.
       utils.community.clubs.weeklyStats.invalidate({ clubId });
     },
-    onError: (e) => toast.error(e.message || "Errore nella creazione"),
+    onError: (e) => toast.error(errorToastMessage(e, "Errore nella creazione")),
   });
   const createInviteMutation = trpc.community.clubs.createInvite.useMutation({
     onSuccess: () => {
       toast.success("Invito creato!");
       invitesQuery.refetch();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(errorToastMessage(e, "Invito non creato")),
   });
   const invitesQuery = trpc.community.clubs.invites.useQuery(
     { clubId },
@@ -320,7 +321,7 @@ export default function ClubDetailEnhanced() {
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Errore durante creazione convocazione");
+      toast.error(errorToastMessage(error, "Errore durante creazione convocazione"));
     },
   });
 
@@ -1020,18 +1021,18 @@ function ClubSettingsForm({
 
   const imageKitAuth = trpc.community.clubs.media.imageKitAuth.useMutation();
   const generateBrandAssetMutation = trpc.community.clubs.media.generateBrandAsset.useMutation({
-    onError: (e) => toast.error(e.message || "Generazione AI non riuscita"),
+    onError: (e) => toast.error(errorToastMessage(e, "Generazione AI non riuscita")),
   });
+  // No onError toast: handleSave's catch shows one for this and for the image uploads.
   const updateMutation = trpc.community.clubs.update.useMutation({
     onSuccess: () => { toast.success("Club aggiornato!"); onSaved(); },
-    onError: (e) => toast.error(e.message),
   });
   const deleteMutation = trpc.community.clubs.delete.useMutation({
     onSuccess: () => {
       toast.success("Club eliminato");
       setLocation("/home/community");
     },
-    onError: (e) => toast.error(e.message || "Impossibile eliminare il club"),
+    onError: (e) => toast.error(errorToastMessage(e, "Impossibile eliminare il club")),
   });
 
   const handleFilePick = (file: File, target: "logo" | "cover") => {
@@ -1126,8 +1127,7 @@ function ClubSettingsForm({
         ...(coverImageUrl !== undefined ? { coverImageUrl } : {}),
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Errore nel salvataggio";
-      toast.error(msg);
+      toast.error(errorToastMessage(e, "Errore nel salvataggio"));
     } finally {
       setSaving(false);
     }
