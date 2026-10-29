@@ -19,7 +19,8 @@ export function BottomBar({ activeTab, createOpen, onCreateOpenChange, onCreateA
     <nav
       data-tour="main-navigation"
       aria-label="Navigazione principale"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background lg:hidden"
+      // Native app (edge-to-edge): also fills the area under the system navigation bar.
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] lg:hidden"
     >
       <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 px-1">
         {NAV_TABS.map((tab, index) => (

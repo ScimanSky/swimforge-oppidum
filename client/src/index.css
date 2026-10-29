@@ -206,10 +206,20 @@ body,
     @apply border-border outline-ring/50;
   }
 
+  /* Native app (edge-to-edge, viewport-fit=cover): the page scrolls under the system bars, so
+     scrollIntoView lands below the taller fixed header (targets add their own scroll-margin for
+     the header) and, in landscape, content stays clear of the side bar and the camera cutout.
+     The insets are 0 on the web. */
+  html {
+    scroll-padding-top: env(safe-area-inset-top);
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-size: 15px;
     line-height: 1.5;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }
 

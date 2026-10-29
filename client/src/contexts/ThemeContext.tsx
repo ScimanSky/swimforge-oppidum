@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { syncNativeStatusBar } from "@/lib/native-runtime";
+import { syncNativeSystemBars } from "@/lib/native-runtime";
 
 type Theme = "light" | "dark";
 
@@ -39,7 +39,7 @@ export function ThemeProvider({
     } else {
       root.classList.remove("dark");
     }
-    syncNativeStatusBar(theme);
+    syncNativeSystemBars(theme);
 
     if (switchable) {
       localStorage.setItem("theme", theme);

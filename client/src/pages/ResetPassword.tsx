@@ -79,8 +79,8 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)]">
-      <ThemeToggleButton className="absolute right-4 top-4 z-20" />
+    <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <ThemeToggleButton className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20" />
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-r border-border/50 bg-[linear-gradient(146deg,#0e1722_0%,#152839_46%,#0f1b27_100%)]">
         <div className="absolute inset-0 bg-[radial-gradient(72%_84%_at_12%_0%,rgba(14,165,233,0.26),transparent_70%),radial-gradient(58%_72%_at_84%_18%,rgba(34,211,238,0.2),transparent_72%)]" />
         <div className="absolute -left-20 bottom-[-2rem] size-80 rounded-full bg-[rgba(6,182,212,0.22)] blur-3xl" />

@@ -159,8 +159,8 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] flex relative">
-      <ThemeToggleButton className="absolute right-4 top-4 z-20" />
+    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] flex relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <ThemeToggleButton className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20" />
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-r border-border/50 bg-[linear-gradient(148deg,#0d1722_0%,#132332_44%,#101b27_100%)]">
         <div className="absolute inset-0 bg-[radial-gradient(68%_82%_at_16%_0%,rgba(6,182,212,0.3),transparent_70%),radial-gradient(62%_76%_at_86%_16%,rgba(56,189,248,0.2),transparent_72%)]" />

@@ -928,7 +928,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
 
   if (isPageMode) {
     return (
-      <section className="surface-panel overflow-hidden h-[calc(100dvh-178px)] min-h-[620px]">
+      <section className="surface-panel overflow-hidden h-[calc(100dvh-178px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-[620px]">
         <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
           {renderPageList()}
           {renderPageConversation()}

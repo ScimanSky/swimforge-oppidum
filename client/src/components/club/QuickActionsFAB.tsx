@@ -83,7 +83,7 @@ export default function QuickActionsFAB({
   );
 
   return createPortal(
-    <div className={`fixed right-4 z-[75] ${isMobile ? "bottom-[calc(env(safe-area-inset-bottom)+5rem)]" : "bottom-6"}`}>
+    <div className={`fixed right-[calc(1rem+env(safe-area-inset-right))] z-[75] ${isMobile ? "bottom-[calc(env(safe-area-inset-bottom)+5rem)]" : "bottom-6"}`}>
       {fab}
     </div>,
     document.body,
