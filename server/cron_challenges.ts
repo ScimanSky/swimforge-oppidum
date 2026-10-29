@@ -101,14 +101,20 @@ export async function completeChallenges(): Promise<{
               break;
           }
 
+          // A failed statement aborts the whole Postgres transaction, and catching it here
+          // would not undo that: the challenge would never complete. The badge insert runs
+          // in a savepoint (nested transaction), so its failure (e.g. no `badges` table)
+          // rolls back only the savepoint.
           try {
-            await tx.execute(sql`
-              INSERT INTO user_badges (user_id, badge_id)
-              SELECT ${winner.user_id}, id
-              FROM badges
-              WHERE name = ${badgeName}
-              ON CONFLICT (user_id, badge_id) DO NOTHING
-            `);
+            await tx.transaction(async (savepoint) => {
+              await savepoint.execute(sql`
+                INSERT INTO user_badges (user_id, badge_id)
+                SELECT ${winner.user_id}, id
+                FROM badges
+                WHERE name = ${badgeName}
+                ON CONFLICT (user_id, badge_id) DO NOTHING
+              `);
+            });
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             if (errorMessage.includes("not found") || errorMessage.includes("no rows")) {

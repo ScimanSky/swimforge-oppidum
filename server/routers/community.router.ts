@@ -14,6 +14,7 @@ import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
+import { authorClubNameSql } from "../db_social";
 import { createCommunityClubsRouter } from "./community.clubs.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
@@ -245,15 +246,7 @@ export const communityRouter = router({
                   u.name AS user_name,
                   sp.username AS user_username,
                   sp.avatar_url AS user_avatar,
-                  (
-                    SELECT c.name
-                    FROM community_club_members m
-                    JOIN community_clubs c ON c.id = m.club_id
-                    WHERE m.user_id = p.user_id
-                      AND m.status = 'active'
-                    ORDER BY m.joined_at DESC NULLS LAST, m.id DESC
-                    LIMIT 1
-                  ) AS user_club_name,
+                  ${authorClubNameSql(ctx.user.id)} AS user_club_name,
                   EXISTS(
                     SELECT 1 FROM user_presence up
                     WHERE up.user_id = p.user_id
@@ -401,6 +394,7 @@ export const communityRouter = router({
             postId: z.number(),
         }))
         .mutation(async ({ ctx, input }) => {
+            await requirePostReadable(ctx.user.id, input.postId);
             const splashResult = await toggleSplash(ctx.user.id, input.postId);
             let actionXp = null;
             if (splashResult?.splashed) {
@@ -423,6 +417,7 @@ export const communityRouter = router({
             content: z.string().min(1).max(1000),
         }))
         .mutation(async ({ ctx, input }) => {
+            await requirePostReadable(ctx.user.id, input.postId);
             const commentId = await addComment(ctx.user.id, input.postId, input.content);
             const actionXp = await awardActionXp({
                 userId: ctx.user.id,
@@ -440,7 +435,8 @@ export const communityRouter = router({
         .input(z.object({
             postId: z.number(),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            await requirePostReadable(ctx.user.id, input.postId);
             return getComments(input.postId);
         }),
 
