@@ -76,6 +76,7 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
             p.media_url,
             p.visibility,
             p.activity_id,
+            p.club_id,
             u.name AS owner_name
           FROM social_posts p
           JOIN users u ON u.id = p.user_id
@@ -91,6 +92,7 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
               media_url: string | null;
               visibility: string | null;
               activity_id: number | null;
+              club_id: number | null;
               owner_name: string | null;
             }
           | undefined;
@@ -105,6 +107,7 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
         const previewMediaUrl = post.media_url ?? null;
         const visibility = post.visibility ?? "public";
         const isActivityPost = post.activity_id != null;
+        const clubId = post.club_id == null ? null : Number(post.club_id);
 
         const ownerPrivacy = await getUserForwardPrivacySettings(ownerId);
         const senderAccess = await checkForwardRecipientAllowed({
@@ -114,6 +117,7 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
           ownerPrivacy,
           visibility,
           isActivityPost,
+          clubId,
         });
 
         if (!senderAccess.allowed && ctx.user.id !== ownerId) {
@@ -134,6 +138,7 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
             ownerPrivacy,
             visibility,
             isActivityPost,
+            clubId,
           });
           if (allowed.allowed) {
             allowedRecipientIds.push(recipientId);

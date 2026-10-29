@@ -1,5 +1,7 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { apiUrl } from "@/lib/api-base";
+import { authenticatedApiInit } from "@/lib/api-auth";
+import { isNativePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 const CONTENT_TOKEN_SPLIT = /(\s+)/g;
@@ -188,6 +190,39 @@ function parseLinkPreview(url: string): ParsedLinkPreview | null {
 }
 
 /**
+ * Native only: the image proxy needs the bearer token, which an <img> cannot send, so the
+ * image is fetched with it and shown from a blob URL (revoked on change and unmount).
+ */
+function useAuthenticatedImage(path: string | null, enabled: boolean) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !path) {
+      setSrc(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+    fetch(apiUrl(path), authenticatedApiInit({ method: "GET", signal: controller.signal }))
+      .then((response) => (response.ok ? response.blob() : null))
+      .then((blob) => {
+        if (!blob || controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch(() => setSrc(null));
+
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [path, enabled]);
+
+  return src;
+}
+
+/**
  * Card for the first link of a post: site, title and description (from /api/link-preview when
  * the server can read them), else the bare address. Nothing for an unsafe or invalid URL.
  */
@@ -218,11 +253,10 @@ export function LinkPreviewCard({
       linkPreviewCache.set(previewHref, data);
       setFetched({ href: previewHref, data });
     };
-    fetch(apiUrl(`/api/link-preview?url=${encodeURIComponent(previewHref)}`), {
-      method: "GET",
-      credentials: "include",
-      signal: controller.signal,
-    })
+    fetch(
+      apiUrl(`/api/link-preview?url=${encodeURIComponent(previewHref)}`),
+      authenticatedApiInit({ method: "GET", signal: controller.signal }),
+    )
       .then(async (response) => {
         settle(response.ok ? parseRemoteLinkPreview(await response.json()) : null);
       })
@@ -233,9 +267,16 @@ export function LinkPreviewCard({
     return () => controller.abort();
   }, [previewHref]);
 
+  const remotePreview = preview
+    ? fetched?.href === preview.href
+      ? fetched.data
+      : (linkPreviewCache.get(preview.href) ?? null)
+    : null;
+  const isNative = isNativePlatform();
+  const imageProxyPath = remotePreview?.imageProxyUrl ?? null;
+  // Hooks before the early return: the image hook must run on every render.
+  const nativeImageSrc = useAuthenticatedImage(imageProxyPath, isNative);
   if (!preview) return null;
-  const remotePreview =
-    fetched?.href === preview.href ? fetched.data : (linkPreviewCache.get(preview.href) ?? null);
 
   // Where the server says the link ends up, when that is still an http(s) address.
   const resolvedUrl = remotePreview?.resolvedUrl;
@@ -243,7 +284,12 @@ export function LinkPreviewCard({
   const title = remotePreview?.title ?? preview.pathLabel;
   const description = remotePreview?.description;
   const siteName = remotePreview?.siteName ?? preview.host;
-  const imageSrc = remotePreview?.imageProxyUrl ? apiUrl(remotePreview.imageProxyUrl) : remotePreview?.imageUrl;
+  // The web loads the proxy straight from <img>: same origin, so the session cookie goes along.
+  const imageSrc = imageProxyPath
+    ? isNative
+      ? nativeImageSrc
+      : apiUrl(imageProxyPath)
+    : remotePreview?.imageUrl;
   const initial = siteName.trim().slice(0, 1).toUpperCase() || preview.host.slice(0, 1).toUpperCase();
 
   return (

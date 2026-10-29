@@ -1,17 +1,21 @@
 import dns from "node:dns/promises";
 import net from "node:net";
-import { fetchWithTimeout } from "./fetchWithTimeout";
+import { pinnedRequest, type PinnedResponse, type PinnedTarget } from "./pinned_http";
 import { logger } from "../middleware/logger";
 
 const log = logger.child({ component: "link_preview" });
 
-const LINK_PREVIEW_TIMEOUT_MS = 7_000;
-const LINK_PREVIEW_HTML_MAX_BYTES = 600 * 1024;
-const LINK_PREVIEW_IMAGE_MAX_BYTES = 6 * 1024 * 1024;
+/** Whole fetch budget: every redirect hop and the body included. */
+export const LINK_PREVIEW_TIMEOUT_MS = 7_000;
+export const LINK_PREVIEW_HTML_MAX_BYTES = 1024 * 1024;
+export const LINK_PREVIEW_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const LINK_PREVIEW_MAX_REDIRECTS = 3;
+const ALLOWED_PORTS = new Set([80, 443]);
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const LINK_PREVIEW_USER_AGENT =
   "Mozilla/5.0 (compatible; SwimForgeLinkPreview/1.0; +https://swimforge.app)";
 
-const DISALLOWED_HOST_SUFFIXES = [".local", ".internal", ".localhost"];
+const DISALLOWED_HOST_SUFFIXES = [".local", ".internal", ".localhost", ".home.arpa"];
 
 export class LinkPreviewInputError extends Error {
   constructor(message: string) {
@@ -132,84 +136,127 @@ function findDocumentTitle(html: string) {
   return sanitizeText(titleMatch?.[1] ?? null, 140);
 }
 
-function isPrivateIpv4(ip: string) {
-  const parts = ip.split(".").map((part) => Number(part));
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return true;
-  }
-  const [a, b] = parts;
+/**
+ * Addresses a preview must never reach: loopback, private, link-local (incl. the cloud
+ * metadata endpoint 169.254.169.254), CGNAT, multicast, reserved, documentation and the
+ * IPv6 transition prefixes that embed an IPv4 address. net.BlockList also matches the
+ * IPv4-mapped IPv6 form (::ffff:127.0.0.1, ::ffff:7f00:1) against the IPv4 rules.
+ */
+const BLOCKED_ADDRESSES = (() => {
+  const list = new net.BlockList();
+  const ipv4: Array<[string, number]> = [
+    ["0.0.0.0", 8], // "this" network, incl. the unspecified address
+    ["10.0.0.0", 8],
+    ["100.64.0.0", 10], // CGNAT
+    ["127.0.0.0", 8],
+    ["169.254.0.0", 16], // link-local, cloud metadata
+    ["172.16.0.0", 12],
+    ["192.0.0.0", 24],
+    ["192.0.2.0", 24],
+    ["192.88.99.0", 24],
+    ["192.168.0.0", 16],
+    ["198.18.0.0", 15],
+    ["198.51.100.0", 24],
+    ["203.0.113.0", 24],
+    ["224.0.0.0", 4], // multicast
+    ["240.0.0.0", 4], // reserved, broadcast
+  ];
+  const ipv6: Array<[string, number]> = [
+    ["::", 96], // unspecified (::), loopback (::1), IPv4-compatible
+    ["64:ff9b::", 96], // NAT64
+    ["64:ff9b:1::", 48], // local-use NAT64
+    ["100::", 64], // discard
+    ["2001::", 32], // Teredo
+    ["2001:db8::", 32], // documentation
+    ["2002::", 16], // 6to4
+    ["fc00::", 7], // unique local
+    ["fe80::", 10], // link-local
+    ["fec0::", 10], // site-local (deprecated)
+    ["ff00::", 8], // multicast
+  ];
+  for (const [network, prefix] of ipv4) list.addSubnet(network, prefix, "ipv4");
+  for (const [network, prefix] of ipv6) list.addSubnet(network, prefix, "ipv6");
+  return list;
+})();
 
-  if (a === 0 || a === 10 || a === 127) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 100 && b >= 64 && b <= 127) return true;
-  if (a === 198 && (b === 18 || b === 19)) return true;
-  if (a >= 224) return true;
-
-  return false;
-}
-
-function isPrivateIpv6(ip: string) {
-  const normalized = ip.toLowerCase();
-  if (normalized === "::" || normalized === "::1") return true;
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  if (/^fe[89ab]/.test(normalized)) return true;
-
-  if (normalized.startsWith("::ffff:")) {
-    const mapped = normalized.slice("::ffff:".length);
-    if (net.isIPv4(mapped)) return isPrivateIpv4(mapped);
-  }
-
-  return false;
-}
-
-function isDisallowedIp(address: string) {
+export function isDisallowedIp(address: string) {
   const family = net.isIP(address);
   if (!family) return true;
-  if (family === 4) return isPrivateIpv4(address);
-  return isPrivateIpv6(address);
+  try {
+    return BLOCKED_ADDRESSES.check(address, family === 4 ? "ipv4" : "ipv6");
+  } catch {
+    return true;
+  }
 }
 
-async function assertHostnameIsPublic(hostname: string) {
-  const normalized = hostname.trim().toLowerCase();
-  if (!normalized) {
+function hostNotAllowed() {
+  return new LinkPreviewInputError("Host non consentito per anteprima link.");
+}
+
+/**
+ * Resolves `hostname` and returns the address to connect to. Every address DNS returns
+ * must be public: a name that also points inside the network is refused as a whole.
+ */
+async function resolvePublicTarget(rawHostname: string): Promise<PinnedTarget> {
+  // URL keeps IPv6 literals in brackets; a trailing dot is the same name.
+  const hostname = rawHostname.trim().toLowerCase().replace(/^\[(.*)\]$/, "$1").replace(/\.$/, "");
+  if (!hostname) {
     throw new LinkPreviewInputError("URL non valida.");
   }
 
-  if (normalized === "localhost" || DISALLOWED_HOST_SUFFIXES.some((suffix) => normalized.endsWith(suffix))) {
-    throw new LinkPreviewInputError("Host non consentito per anteprima link.");
+  if (hostname === "localhost" || DISALLOWED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) {
+    throw hostNotAllowed();
   }
 
-  if (net.isIP(normalized) && isDisallowedIp(normalized)) {
-    throw new LinkPreviewInputError("Host non consentito per anteprima link.");
+  const literalFamily = net.isIP(hostname);
+  if (literalFamily) {
+    if (isDisallowedIp(hostname)) throw hostNotAllowed();
+    return { address: hostname, family: literalFamily === 6 ? 6 : 4 };
   }
 
-  if (!net.isIP(normalized)) {
-    try {
-      const addresses = await dns.lookup(normalized, { all: true, verbatim: true });
-      if (!addresses.length) {
-        throw new LinkPreviewInputError("Host non raggiungibile.");
-      }
-      if (addresses.some((entry) => isDisallowedIp(entry.address))) {
-        throw new LinkPreviewInputError("Host non consentito per anteprima link.");
-      }
-    } catch (error) {
-      if (error instanceof LinkPreviewInputError) {
-        throw error;
-      }
-      throw new LinkPreviewInputError("Host non raggiungibile.");
-    }
+  let addresses: Array<{ address: string; family: number }>;
+  try {
+    addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new LinkPreviewInputError("Host non raggiungibile.");
+  }
+  if (!addresses.length) {
+    throw new LinkPreviewInputError("Host non raggiungibile.");
+  }
+  if (addresses.some((entry) => isDisallowedIp(entry.address))) {
+    throw hostNotAllowed();
+  }
+  // All of them are vetted; prefer IPv4, since the server may have no IPv6 route.
+  const chosen = addresses.find((entry) => entry.family === 4) ?? addresses[0];
+  return { address: chosen.address, family: chosen.family === 6 ? 6 : 4 };
+}
+
+/** Scheme, credentials and port rules, checked on the first URL and on every redirect. */
+function assertAllowedUrl(parsed: URL) {
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new LinkPreviewInputError("Sono consentiti solo link http/https.");
+  }
+  if (parsed.username || parsed.password) {
+    throw new LinkPreviewInputError("URL non valida.");
+  }
+  const port = parsed.port ? Number(parsed.port) : parsed.protocol === "https:" ? 443 : 80;
+  if (!ALLOWED_PORTS.has(port)) {
+    throw new LinkPreviewInputError("Porta non consentita per anteprima link.");
   }
 }
 
-export async function normalizeAndValidateExternalPreviewUrl(rawUrl: string) {
+async function validateExternalUrl(rawUrl: string): Promise<{ url: URL; target: PinnedTarget }> {
   const trimmed = rawUrl.trim();
   if (!trimmed) {
     throw new LinkPreviewInputError("Inserisci un URL valido.");
   }
 
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  // Bare domains get https://, but an explicit other scheme (ftp://, file://) is refused.
+  const explicitScheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(trimmed);
+  if (explicitScheme && !/^https?$/i.test(explicitScheme[1])) {
+    throw new LinkPreviewInputError("Sono consentiti solo link http/https.");
+  }
+  const withProtocol = explicitScheme ? trimmed : `https://${trimmed}`;
 
   let parsed: URL;
   try {
@@ -218,63 +265,114 @@ export async function normalizeAndValidateExternalPreviewUrl(rawUrl: string) {
     throw new LinkPreviewInputError("URL non valida.");
   }
 
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new LinkPreviewInputError("Sono consentiti solo link http/https.");
-  }
-
-  if (parsed.username || parsed.password) {
-    throw new LinkPreviewInputError("URL non valida.");
-  }
-
+  assertAllowedUrl(parsed);
   parsed.hash = "";
-  await assertHostnameIsPublic(parsed.hostname);
-
-  return parsed.toString();
+  const target = await resolvePublicTarget(parsed.hostname);
+  return { url: parsed, target };
 }
 
-async function readBodyWithLimit(response: Response, maxBytes: number) {
-  const contentLengthHeader = response.headers.get("content-length");
-  const contentLength = contentLengthHeader ? Number(contentLengthHeader) : null;
-  if (contentLength && Number.isFinite(contentLength) && contentLength > maxBytes) {
+export async function normalizeAndValidateExternalPreviewUrl(rawUrl: string) {
+  const { url } = await validateExternalUrl(rawUrl);
+  return url.toString();
+}
+
+function headerValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Runs `run` with a signal that aborts after LINK_PREVIEW_TIMEOUT_MS, redirects and body included. */
+async function withDeadline<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("Link preview timed out")), LINK_PREVIEW_TIMEOUT_MS);
+  try {
+    return await run(controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * GET with redirects handled here, not by the HTTP client: every hop is checked (scheme,
+ * port, resolved addresses) before its connection is opened, and the socket goes to the
+ * vetted address. At most LINK_PREVIEW_MAX_REDIRECTS redirects are followed.
+ */
+async function requestFollowingRedirects(
+  first: { url: URL; target: PinnedTarget },
+  accept: string,
+  signal: AbortSignal,
+): Promise<{ url: URL; response: PinnedResponse }> {
+  let { url, target } = first;
+  for (let redirects = 0; ; redirects += 1) {
+    const response = await pinnedRequest(url, target, {
+      headers: {
+        "User-Agent": LINK_PREVIEW_USER_AGENT,
+        Accept: accept,
+        "Accept-Encoding": "identity",
+      },
+      signal,
+    });
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      return { url, response };
+    }
+    response.destroy();
+    if (redirects >= LINK_PREVIEW_MAX_REDIRECTS) {
+      throw new Error("Too many redirects");
+    }
+    const location = headerValue(response.headers.location);
+    if (!location) {
+      throw new Error("Redirect without location");
+    }
+    let next: URL;
+    try {
+      next = new URL(location, url);
+    } catch {
+      throw new LinkPreviewInputError("URL non valida.");
+    }
+    assertAllowedUrl(next);
+    next.hash = "";
+    target = await resolvePublicTarget(next.hostname);
+    url = next;
+  }
+}
+
+async function readBodyWithLimit(response: PinnedResponse, maxBytes: number, signal: AbortSignal) {
+  const declaredLength = Number(headerValue(response.headers["content-length"]));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    response.destroy();
     throw new Error("Response body too large");
   }
 
-  if (!response.body) {
-    const arrayBuffer = await response.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-    if (bytes.byteLength > maxBytes) {
-      throw new Error("Response body too large");
+  const onAbort = () => response.destroy();
+  signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of response.body) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += bytes.byteLength;
+      if (total > maxBytes) {
+        response.destroy();
+        throw new Error("Response body too large");
+      }
+      chunks.push(bytes);
     }
-    return bytes;
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      throw new Error("Response body too large");
+    if (signal.aborted) {
+      throw new Error("Link preview timed out");
     }
-    chunks.push(value);
+    return Buffer.concat(chunks, total);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
   }
+}
 
-  const output = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    output.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return output;
+function isSuccess(status: number) {
+  return status >= 200 && status < 300;
 }
 
 export async function fetchLinkPreviewMetadata(rawUrl: string): Promise<LinkPreviewMetadata> {
-  const normalizedUrl = await normalizeAndValidateExternalPreviewUrl(rawUrl);
-  const requested = new URL(normalizedUrl);
+  const first = await validateExternalUrl(rawUrl);
+  const normalizedUrl = first.url.toString();
+  const requested = first.url;
 
   const fallback: LinkPreviewMetadata = {
     requestedUrl: normalizedUrl,
@@ -287,79 +385,72 @@ export async function fetchLinkPreviewMetadata(rawUrl: string): Promise<LinkPrev
   };
 
   try {
-    const response = await fetchWithTimeout(
-      normalizedUrl,
-      {
-        method: "GET",
-        redirect: "follow",
-        headers: {
-          "User-Agent": LINK_PREVIEW_USER_AGENT,
-          Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5",
-        },
-      },
-      LINK_PREVIEW_TIMEOUT_MS,
-      "link_preview_metadata",
-    );
+    return await withDeadline(async (signal) => {
+      const { url: resolvedParsed, response } = await requestFollowingRedirects(
+        first,
+        "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5",
+        signal,
+      );
 
-    if (!response.ok) {
-      return fallback;
-    }
+      if (!isSuccess(response.status)) {
+        response.destroy();
+        return fallback;
+      }
 
-    const resolvedUrl = response.url || normalizedUrl;
-    const resolvedParsed = new URL(resolvedUrl);
-    await assertHostnameIsPublic(resolvedParsed.hostname);
+      const resolvedUrl = resolvedParsed.toString();
+      const contentType = (headerValue(response.headers["content-type"]) ?? "").toLowerCase();
+      if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+        response.destroy();
+        return {
+          ...fallback,
+          resolvedUrl,
+          host: resolvedParsed.hostname,
+          siteName: resolvedParsed.hostname,
+        };
+      }
 
-    const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
-    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+      const htmlBytes = await readBodyWithLimit(response, LINK_PREVIEW_HTML_MAX_BYTES, signal);
+      const html = toUtf8String(htmlBytes);
+      const attrsByTag = parseMetaTags(html);
+
+      const title =
+        findMetaContent(attrsByTag, [
+          { attr: "property", value: "og:title" },
+          { attr: "name", value: "twitter:title" },
+        ]) ?? findDocumentTitle(html);
+
+      const description = findMetaContent(attrsByTag, [
+        { attr: "property", value: "og:description" },
+        { attr: "name", value: "twitter:description" },
+        { attr: "name", value: "description" },
+      ]);
+
+      const siteName =
+        findMetaContent(attrsByTag, [{ attr: "property", value: "og:site_name" }]) ?? resolvedParsed.hostname;
+
+      const rawImageUrl = findMetaImage(attrsByTag);
+      let imageUrl: string | null = null;
+      if (rawImageUrl) {
+        try {
+          const resolvedImageUrl = new URL(rawImageUrl, resolvedUrl);
+          if (resolvedImageUrl.protocol === "http:" || resolvedImageUrl.protocol === "https:") {
+            imageUrl = resolvedImageUrl.toString();
+          }
+        } catch {
+          imageUrl = null;
+        }
+      }
+
       return {
-        ...fallback,
+        requestedUrl: normalizedUrl,
         resolvedUrl,
         host: resolvedParsed.hostname,
-        siteName: resolvedParsed.hostname,
+        siteName,
+        title,
+        description,
+        imageUrl,
       };
-    }
-
-    const htmlBytes = await readBodyWithLimit(response, LINK_PREVIEW_HTML_MAX_BYTES);
-    const html = toUtf8String(htmlBytes);
-    const attrsByTag = parseMetaTags(html);
-
-    const title =
-      findMetaContent(attrsByTag, [
-        { attr: "property", value: "og:title" },
-        { attr: "name", value: "twitter:title" },
-      ]) ?? findDocumentTitle(html);
-
-    const description = findMetaContent(attrsByTag, [
-      { attr: "property", value: "og:description" },
-      { attr: "name", value: "twitter:description" },
-      { attr: "name", value: "description" },
-    ]);
-
-    const siteName =
-      findMetaContent(attrsByTag, [{ attr: "property", value: "og:site_name" }]) ?? resolvedParsed.hostname;
-
-    const rawImageUrl = findMetaImage(attrsByTag);
-    let imageUrl: string | null = null;
-    if (rawImageUrl) {
-      try {
-        const resolvedImageUrl = new URL(rawImageUrl, resolvedUrl);
-        if (resolvedImageUrl.protocol === "http:" || resolvedImageUrl.protocol === "https:") {
-          imageUrl = resolvedImageUrl.toString();
-        }
-      } catch {
-        imageUrl = null;
-      }
-    }
-
-    return {
-      requestedUrl: normalizedUrl,
-      resolvedUrl,
-      host: resolvedParsed.hostname,
-      siteName,
-      title,
-      description,
-      imageUrl,
-    };
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log.warn("link preview metadata fallback", {
@@ -372,42 +463,35 @@ export async function fetchLinkPreviewMetadata(rawUrl: string): Promise<LinkPrev
 }
 
 export async function fetchLinkPreviewImage(rawUrl: string) {
-  const normalizedUrl = await normalizeAndValidateExternalPreviewUrl(rawUrl);
+  const first = await validateExternalUrl(rawUrl);
 
-  const response = await fetchWithTimeout(
-    normalizedUrl,
-    {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        "User-Agent": LINK_PREVIEW_USER_AGENT,
-        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.7",
-      },
-    },
-    LINK_PREVIEW_TIMEOUT_MS,
-    "link_preview_image",
-  );
+  return withDeadline(async (signal) => {
+    const { response } = await requestFollowingRedirects(
+      first,
+      "image/avif,image/webp,image/apng,image/*;q=0.8",
+      signal,
+    );
 
-  if (!response.ok) {
-    throw new Error(`Image fetch failed with status ${response.status}`);
-  }
+    if (!isSuccess(response.status)) {
+      response.destroy();
+      throw new Error(`Image fetch failed with status ${response.status}`);
+    }
 
-  const resolvedUrl = response.url || normalizedUrl;
-  const resolvedParsed = new URL(resolvedUrl);
-  await assertHostnameIsPublic(resolvedParsed.hostname);
+    const contentTypeHeader = (headerValue(response.headers["content-type"]) ?? "").toLowerCase();
+    const mimeType = contentTypeHeader.split(";")[0]?.trim() ?? "";
+    // SVG can carry scripts and would be served from our origin: raster images only.
+    if (!mimeType.startsWith("image/") || mimeType === "image/svg+xml") {
+      response.destroy();
+      throw new Error("Unsupported preview image content type");
+    }
 
-  const contentTypeHeader = (response.headers.get("content-type") ?? "").toLowerCase();
-  const mimeType = contentTypeHeader.split(";")[0]?.trim();
-  if (!mimeType || !mimeType.startsWith("image/")) {
-    throw new Error("Unsupported preview image content type");
-  }
+    const imageBytes = await readBodyWithLimit(response, LINK_PREVIEW_IMAGE_MAX_BYTES, signal);
 
-  const imageBytes = await readBodyWithLimit(response, LINK_PREVIEW_IMAGE_MAX_BYTES);
-
-  return {
-    buffer: Buffer.from(imageBytes),
-    mimeType,
-  };
+    return {
+      buffer: imageBytes,
+      mimeType,
+    };
+  });
 }
 
 export function buildLinkPreviewImageProxyUrl(imageUrl: string) {
