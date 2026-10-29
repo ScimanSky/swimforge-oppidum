@@ -75,15 +75,9 @@ const PENDING: Record<Rule, string[]> = {
   "testo-primario": [],
   "accento-lime": [],
   gradiente: [],
-  sfocatura: [
-    "pages/StravaConnect.tsx",
-  ],
+  sfocatura: [],
   "titolo-pagina": [],
-  "colore-fisso": [
-    "components/ui/dialog.tsx",
-    "components/ui/sheet.tsx",
-    "pages/StravaConnect.tsx",
-  ],
+  "colore-fisso": [],
 };
 
 const contents = new Map(

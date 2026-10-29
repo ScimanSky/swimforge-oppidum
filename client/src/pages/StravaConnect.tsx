@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { Activity, CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
 import { trpc } from "../lib/trpc";
-import { motion } from "framer-motion";
-import { Activity, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import { Wordmark } from "@/components/corsia/Wordmark";
+import { Button } from "@/components/ui/button";
 
+/** `/strava/callback`: return from the Strava authorisation. A public page: its state is the page's h1. */
 export default function StravaConnect() {
   const [, setLocation] = useLocation();
   const navigate = (path: string) => setLocation(path);
@@ -43,76 +45,42 @@ export default function StravaConnect() {
   }, []);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-[oklch(0.15_0.03_220_/_0.7)] backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-[oklch(0.25_0.05_220)] shadow-2xl"
-      >
-        {/* Icon */}
-        <div className="flex justify-center mb-6">
-          {status === "loading" && (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              <Loader2 className="w-16 h-16 text-orange-500" />
-            </motion.div>
-          )}
-          {status === "success" && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 200 }}
-            >
-              <CheckCircle className="w-16 h-16 text-green-500" />
-            </motion.div>
-          )}
-          {status === "error" && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 200 }}
-            >
-              <XCircle className="w-16 h-16 text-red-500" />
-            </motion.div>
-          )}
-        </div>
-
-        {/* Title */}
-        <h1 className="text-2xl font-bold text-white text-center mb-4">
-          {status === "loading" && "Connessione a Strava..."}
-          {status === "success" && "Connesso!"}
-          {status === "error" && "Errore"}
-        </h1>
-
-        {/* Message */}
-        <p className="text-gray-300 text-center mb-6">{message}</p>
-
-        {/* Strava Logo */}
-        <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
-          <Activity className="w-5 h-5 text-orange-500" />
-          <span>Powered by Strava</span>
-        </div>
-
-        {/* Error Actions */}
-        {status === "error" && (
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={() => navigate("/settings")}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition"
-            >
-              Impostazioni
-            </button>
-            <button
-              onClick={() => navigate("/home")}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition"
-            >
-              Home
-            </button>
+    <AppLayout className="flex items-center justify-center p-4" withShell={false}>
+      <main className="w-full max-w-md text-center">
+        <Wordmark />
+        <div className="surface-panel mt-6 space-y-3 p-6">
+          {/* Keyed by state: each state is a fresh live region, so it is announced. */}
+          <div key={status} role={status === "error" ? "alert" : "status"} className="space-y-3">
+            {status === "loading" && (
+              <Loader2 className="mx-auto size-8 animate-spin text-action-text" aria-hidden />
+            )}
+            {status === "success" && <CheckCircle2 className="mx-auto size-8 text-success" aria-hidden />}
+            {status === "error" && <TriangleAlert className="mx-auto size-8 text-danger" aria-hidden />}
+            <h1 className="font-display text-[30px] font-bold leading-tight">
+              {status === "loading" && "Connessione a Strava..."}
+              {status === "success" && "Connesso!"}
+              {status === "error" && "Errore"}
+            </h1>
+            {message ? <p className="text-[15px] text-muted-foreground">{message}</p> : null}
           </div>
-        )}
-      </motion.div>
+
+          <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Activity className="size-5" aria-hidden />
+            <span>Powered by Strava</span>
+          </p>
+
+          {status === "error" && (
+            <div className="flex gap-3 pt-3">
+              <Button variant="outline" className="flex-1" onClick={() => navigate("/settings")}>
+                Impostazioni
+              </Button>
+              <Button className="flex-1" onClick={() => navigate("/home")}>
+                Home
+              </Button>
+            </div>
+          )}
+        </div>
+      </main>
     </AppLayout>
   );
 }

@@ -176,3 +176,11 @@ describe("zone di passo A1–C3", () => {
     });
   });
 });
+
+describe("velo di dialoghi e fogli", () => {
+  it("--overlay è dichiarato in :root e in .dark ed esposto come colore", () => {
+    expect(light.overlay, ":root senza --overlay").toBeDefined();
+    expect(dark.overlay, ".dark senza --overlay").toBeDefined();
+    expect(css).toMatch(/--color-overlay:\s*var\(--overlay\);/);
+  });
+});

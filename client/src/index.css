@@ -23,6 +23,8 @@ body,
   --card-elevated: #E7EDF2;
   --border: #DCE4EA;
   --input: #DCE4EA;
+  /* Scrim behind dialogs and sheets: the ink at half opacity. */
+  --overlay: rgb(13 27 39 / 0.5);
 
   --primary: #34C6EB;
   --primary-foreground: #062030;
@@ -91,6 +93,7 @@ body,
   --card-elevated: #182838;
   --border: #233649;
   --input: #233649;
+  --overlay: rgb(0 0 0 / 0.5);
 
   --primary: #34C6EB;
   --primary-foreground: #062030;
@@ -180,6 +183,7 @@ body,
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-overlay: var(--overlay);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
