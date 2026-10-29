@@ -62,39 +62,23 @@ const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
  * `index.css` (alone-neon, token-legacy) is the legacy alias block: it stays until Task 22.
  */
 const PENDING: Record<Rule, string[]> = {
-  "testo-piccolo": [
-    "components/metrics/MetricOrb.tsx",
-  ],
+  "testo-piccolo": [],
   "alone-neon": [
     "index.css",
   ],
-  "maiuscolo-spaziato": [
-    "components/metrics/MetricOrb.tsx",
-  ],
-  "testo-gradiente": [
-    "components/metrics/MetricOrb.tsx",
-    "pages/Settings.tsx",
-  ],
+  "maiuscolo-spaziato": [],
+  "testo-gradiente": [],
   "token-legacy": [
-    "components/metrics/MetricOrb.tsx",
     "index.css",
   ],
-  "variante-neon": [
-    "pages/Settings.tsx",
-  ],
+  "variante-neon": [],
   "testo-primario": [],
   "accento-lime": [],
-  gradiente: [
-    "components/metrics/MetricOrb.tsx",
-    "pages/Settings.tsx",
-  ],
+  gradiente: [],
   sfocatura: [
-    "components/metrics/MetricOrb.tsx",
     "pages/StravaConnect.tsx",
   ],
-  "titolo-pagina": [
-    "pages/Settings.tsx",
-  ],
+  "titolo-pagina": [],
   "colore-fisso": [
     "components/ui/dialog.tsx",
     "components/ui/sheet.tsx",
