@@ -40,10 +40,12 @@ type Rule = keyof typeof RULES;
 /** Files allowed to match a rule for good (justify each entry). */
 const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
   gradiente: ["index.css"], // skeleton shimmer animation
-  // The shell header owns the page title; Home and StravaConnect are public pages outside the shell;
-  // club-print builds standalone print documents (own tab or hidden iframe), never shell pages.
+  // The shell header owns the page title. Public pages render outside the shell (no header), so
+  // their own title is the h1: the landing (Home), StravaConnect and the legal documents
+  // (LegalPage). club-print builds standalone print documents (own tab or hidden iframe).
   "titolo-pagina": [
     "components/app/ShellHeader.tsx",
+    "components/legal/LegalPage.tsx",
     "lib/club-print.ts",
     "pages/Home.tsx",
     "pages/StravaConnect.tsx",
