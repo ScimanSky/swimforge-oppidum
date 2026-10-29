@@ -752,9 +752,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                     meetId: result.meetId,
                                     audience: "staff",
                                 });
-                                const actorName = String(ctx.user.name ?? "").trim()
-                                    || String(ctx.user.email ?? "").split("@")[0]
-                                    || "Un atleta";
+                                const actorName = String(ctx.user.name ?? "").trim() || "Un atleta";
                                 await Promise.allSettled(
                                     recipients
                                         .filter((recipient) => recipient.userId !== ctx.user.id)

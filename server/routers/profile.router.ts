@@ -39,8 +39,11 @@ export const profileRouter = router({
             targetUserId: ctx.user.id,
         });
 
+        // The encrypted Garmin token never leaves the server, not even to its owner.
+        const { garminTokenEncrypted: _garminTokenEncrypted, ...ownProfile } = profile;
+
         return {
-            ...profile,
+            ...ownProfile,
             notificationSettings: normalizeBooleanRecord(profile.notificationSettings),
             levelTitle: currentLevelInfo.title,
             levelColor: currentLevelInfo.color,

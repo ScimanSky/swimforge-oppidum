@@ -464,8 +464,10 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
  * Cache key builders
  */
 export const cacheKeys = {
+  // v3: payloads cached up to v2 carried users' emails; bumping the version makes
+  // the server never read them again (they expire on their own TTL).
   leaderboard: (orderBy: string, period: string, limit: number, offset: number) =>
-    `leaderboard:v2:${orderBy}:${period}:${limit}:${offset}`,
+    `leaderboard:v3:${orderBy}:${period}:${limit}:${offset}`,
   userStats: (userId: string) => `user:stats:${userId}`,
   userProfile: (userId: string) => `user:profile:${userId}`,
   badges: (userId: string) => `user:badges:${userId}`,

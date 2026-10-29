@@ -89,14 +89,14 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
   });
 
   const displayName = (member: any) =>
-    member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`;
+    member.user_name || member.user_username || `Utente #${member.user_id}`;
 
   const memberAvatar = (member: any, size: string) => (
     <Link href={`/u/${member.user_id}`} aria-label={`Profilo di ${displayName(member)}`} className="shrink-0">
       <Avatar className={size}>
         <AvatarImage src={member.user_avatar || undefined} alt="" />
         <AvatarFallback className="text-sm font-semibold">
-          {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
+          {(member.user_name || member.user_username || "U")?.[0]?.toUpperCase() || "U"}
         </AvatarFallback>
       </Avatar>
     </Link>
@@ -131,8 +131,8 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                       <Link href={`/u/${member.user_id}`} className="block truncate font-semibold hover:underline">
                         {displayName(member)}
                       </Link>
-                      {member.user_email && (
-                        <p className="truncate text-sm text-muted-foreground">{member.user_email}</p>
+                      {member.user_username && (
+                        <p className="truncate text-sm text-muted-foreground">@{member.user_username}</p>
                       )}
                     </div>
                     {member.role ? (

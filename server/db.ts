@@ -406,6 +406,24 @@ export async function updateSwimmerProfile(userId: number, data: Partial<InsertS
   await db.update(swimmerProfiles).set({ ...data, updatedAt: new Date() }).where(eq(swimmerProfiles.userId, userId));
 }
 
+// Public columns of a ranked swimmer. leaderboard.get is visible to every logged-in
+// user: never add the email or private profile columns (Garmin token, birth date,
+// privacy/notification settings, ...) here.
+const leaderboardProfileColumns = {
+  id: swimmerProfiles.id,
+  userId: swimmerProfiles.userId,
+  avatarUrl: swimmerProfiles.avatarUrl,
+  username: swimmerProfiles.username,
+  level: swimmerProfiles.level,
+  totalXp: swimmerProfiles.totalXp,
+  totalDistanceMeters: swimmerProfiles.totalDistanceMeters,
+  totalTimeSeconds: swimmerProfiles.totalTimeSeconds,
+  totalSessions: swimmerProfiles.totalSessions,
+  garminConnected: swimmerProfiles.garminConnected,
+  createdAt: swimmerProfiles.createdAt,
+  updatedAt: swimmerProfiles.updatedAt,
+};
+
 export async function getLeaderboard(
   orderBy: 'level' | 'totalXp' | 'badges' = 'totalXp',
   limit: number = 50,
@@ -426,20 +444,8 @@ export async function getLeaderboard(
       const badgeCountExpr = sql<number>`count(${userBadges.id})`;
       return await db
         .select({
-          id: swimmerProfiles.id,
-          userId: swimmerProfiles.userId,
-          avatarUrl: swimmerProfiles.avatarUrl,
-          username: swimmerProfiles.username,
-          level: swimmerProfiles.level,
-          totalXp: swimmerProfiles.totalXp,
-          totalDistanceMeters: swimmerProfiles.totalDistanceMeters,
-          totalTimeSeconds: swimmerProfiles.totalTimeSeconds,
-          totalSessions: swimmerProfiles.totalSessions,
-          garminConnected: swimmerProfiles.garminConnected,
-          createdAt: swimmerProfiles.createdAt,
-          updatedAt: swimmerProfiles.updatedAt,
+          ...leaderboardProfileColumns,
           name: users.name,
-          email: users.email,
           badgeCount: badgeCountExpr,
         })
         .from(swimmerProfiles)
@@ -451,12 +457,12 @@ export async function getLeaderboard(
     }
 
     const orderColumn = orderByValidated === "level" ? swimmerProfiles.level : swimmerProfiles.totalXp;
-    // Keep existing shape for non-badges "all" (some clients expect entry.profile)
+    // Keep existing shape for non-badges "all" (some clients expect entry.profile),
+    // but only with the public columns: never the whole swimmer_profiles row.
     return await db
       .select({
-        profile: swimmerProfiles,
+        profile: leaderboardProfileColumns,
         userName: users.name,
-        userEmail: users.email,
       })
       .from(swimmerProfiles)
       .innerJoin(users, eq(swimmerProfiles.userId, users.id))
@@ -496,7 +502,6 @@ export async function getLeaderboard(
       sp.created_at as "createdAt",
       sp.updated_at as "updatedAt",
       u.name,
-      u.email,
       COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id AND earned_at >= ${startDate}), 0) as "badgeCount",
       COALESCE(
         NULLIF(
