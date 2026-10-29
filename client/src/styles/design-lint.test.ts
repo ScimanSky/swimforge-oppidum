@@ -40,9 +40,11 @@ type Rule = keyof typeof RULES;
 /** Files allowed to match a rule for good (justify each entry). */
 const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
   gradiente: ["index.css"], // skeleton shimmer animation
-  // The shell header owns the page title; Home and StravaConnect are public pages outside the shell.
+  // The shell header owns the page title; Home and StravaConnect are public pages outside the shell;
+  // club-print builds standalone print documents (own tab or hidden iframe), never shell pages.
   "titolo-pagina": [
     "components/app/ShellHeader.tsx",
+    "lib/club-print.ts",
     "pages/Home.tsx",
     "pages/StravaConnect.tsx",
   ],
@@ -75,8 +77,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
     "pages/ClubCoachModeration.tsx",
-    "pages/ClubMeetDetail.tsx",
-    "pages/ClubMeetProgramBuilder.tsx",
     "pages/Home.tsx",
   ],
   "testo-gradiente": [
@@ -104,8 +104,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingIdentitySetup.tsx",
     "pages/AdminReports.tsx",
     "pages/ClubCoachModeration.tsx",
-    "pages/ClubMeetDetail.tsx",
-    "pages/ClubMeetProgramBuilder.tsx",
     "pages/ForgotPassword.tsx",
     "pages/Login.tsx",
     "pages/PostDetail.tsx",
@@ -150,8 +148,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingWelcomeComposition.tsx",
     "pages/AdminReports.tsx",
     "pages/ClubCoachModeration.tsx",
-    "pages/ClubMeetDetail.tsx",
-    "pages/ClubMeetProgramBuilder.tsx",
     "pages/Messages.tsx",
     "pages/NotFound.tsx",
     "pages/PublicProfile.tsx",
