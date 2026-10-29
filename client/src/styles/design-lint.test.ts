@@ -81,7 +81,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/BadgeUnlockNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "pages/Messages.tsx",
-    "pages/PublicProfile.tsx",
     "pages/Settings.tsx",
   ],
   "token-legacy": [
@@ -104,7 +103,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ForgotPassword.tsx",
     "pages/Login.tsx",
     "pages/PostDetail.tsx",
-    "pages/PublicProfile.tsx",
     "pages/Register.tsx",
     "pages/ReportPost.tsx",
     "pages/ResetPassword.tsx",
@@ -112,7 +110,6 @@ const PENDING: Record<Rule, string[]> = {
   ],
   "testo-primario": [],
   "accento-lime": [
-    "pages/PublicProfile.tsx",
   ],
   gradiente: [
     "components/ActivityInsightNotification.tsx",
@@ -126,7 +123,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/Home.tsx",
     "pages/Login.tsx",
     "pages/NotFound.tsx",
-    "pages/PublicProfile.tsx",
     "pages/Register.tsx",
     "pages/ResetPassword.tsx",
     "pages/Settings.tsx",
@@ -146,7 +142,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/AdminReports.tsx",
     "pages/Messages.tsx",
     "pages/NotFound.tsx",
-    "pages/PublicProfile.tsx",
     "pages/ReportPost.tsx",
     "pages/Settings.tsx",
   ],

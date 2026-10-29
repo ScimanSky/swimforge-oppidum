@@ -1,32 +1,18 @@
 import type { ReactNode } from "react";
-import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
-import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { LoadError, LoadingSkeleton, Notice } from "@/components/corsia/LoadState";
 import type { ClubAccess } from "@/lib/club-access";
-import { cn } from "@/lib/utils";
 
-/** A short message in a card («Evento non trovato.»), with an optional way back. */
+/** A short message in a card («Evento non trovato.»), with an optional way back to the club. */
 export function ClubNotice({
-  children,
-  backHref,
   backLabel = "Torna al club",
-  className,
+  ...props
 }: {
   children: ReactNode;
   backHref?: string;
   backLabel?: string;
   className?: string;
 }) {
-  return (
-    <div className={cn("surface-panel p-4 text-center", className)}>
-      <p className="text-sm text-muted-foreground">{children}</p>
-      {backHref ? (
-        <Button variant="outline" className="mt-3" asChild>
-          <Link href={backHref}>{backLabel}</Link>
-        </Button>
-      ) : null}
-    </div>
-  );
+  return <Notice backLabel={backLabel} {...props} />;
 }
 
 /**

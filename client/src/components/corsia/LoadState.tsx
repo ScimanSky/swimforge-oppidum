@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -39,6 +41,33 @@ export function LoadError({ onRetry, className }: { onRetry: () => void; classNa
       <Button size="sm" variant="outline" onClick={onRetry}>
         Riprova
       </Button>
+    </div>
+  );
+}
+
+/**
+ * An answer that is not data («Profilo non trovato.», «Questo profilo è privato.»): a short
+ * message in a card, with an optional link back.
+ */
+export function Notice({
+  children,
+  backHref,
+  backLabel,
+  className,
+}: {
+  children: ReactNode;
+  backHref?: string;
+  backLabel?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("surface-panel p-4 text-center", className)}>
+      <p className="text-sm text-muted-foreground">{children}</p>
+      {backHref && backLabel ? (
+        <Button variant="outline" className="mt-3" asChild>
+          <Link href={backHref}>{backLabel}</Link>
+        </Button>
+      ) : null}
     </div>
   );
 }
