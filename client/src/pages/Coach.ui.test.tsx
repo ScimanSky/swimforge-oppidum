@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   metrics: undefined as any,
   metricsError: false,
   coachInsights: undefined as any,
+  insightsOptions: undefined as any,
   workouts: undefined as any,
   insights: [] as any[],
   generateCalls: 0,
@@ -22,7 +23,12 @@ vi.mock("@/lib/trpc", () => ({
     auth: { me: { useQuery: () => ({ data: { id: 7 } }) } },
     statistics: {
       getMetrics: { useQuery: () => ({ data: state.metrics, isError: state.metricsError }) },
-      getInsights: { useQuery: () => ({ data: state.coachInsights }) },
+      getInsights: {
+        useQuery: (_input: unknown, options: unknown) => {
+          state.insightsOptions = options;
+          return { data: state.coachInsights };
+        },
+      },
     },
     aiCoach: {
       getWorkouts: { useQuery: () => ({ data: state.workouts }) },
@@ -130,6 +136,11 @@ describe("Coach AI", () => {
     expect(screen.getByText("4,5 %")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Consiglio 2" }));
     expect(screen.getByText("Aggiungi una nuotata")).toBeTruthy();
+  });
+
+  it("chiede i consigli AI fuori dal batch, così le metriche non aspettano Gemini", () => {
+    render(<Coach />);
+    expect(state.insightsOptions).toMatchObject({ trpc: { context: { skipBatch: true } } });
   });
 
   it("senza dati per una metrica non la mostra; senza consigli lo dice", () => {

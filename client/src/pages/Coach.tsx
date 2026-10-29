@@ -299,9 +299,11 @@ export default function Coach() {
   // The zones in effect today: null while they load (the workouts keep their stored paces).
   const currentRanges = metrics ? metrics.zones.ranges : null
   const zonesStatus = metrics ? "ready" : metricsQuery.isError ? "error" : "loading"
+  // Gemini can take seconds: its own request, so the metrics and the workouts never wait for it.
   const { data: insights } = trpc.statistics.getInsights.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   })
 
   // Read-only: fetch existing workouts (no generation)

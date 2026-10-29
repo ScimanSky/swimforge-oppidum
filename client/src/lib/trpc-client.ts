@@ -1,5 +1,5 @@
 import { CSRF_COOKIE_NAME } from "@shared/const";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCClient, httpBatchLink, httpLink, splitLink } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "../../../server/routers";
 import { apiUrl } from "./api-base";
@@ -20,23 +20,32 @@ const readCsrfCookie = (): string | null =>
  * The app's tRPC links: batch link on /api/trpc with superjson, credentials, the CSRF header
  * on the web and the bearer token + native client header on native. Shared by the React
  * client (main.tsx) and the vanilla client below.
+ *
+ * A call with `context: { skipBatch: true }` (React Query: `trpc: { context: { skipBatch: true } }`)
+ * goes alone in its own request: a slow procedure (the Coach page's Gemini insights) would
+ * otherwise hold back the answer of every query batched with it.
  */
 export function createTrpcLinks() {
+  const options = {
+    url: apiUrl("/api/trpc"),
+    transformer: superjson,
+    fetch(input: RequestInfo | URL, init?: RequestInit) {
+      const headers = buildTrpcHeaders(
+        { isNative: isNativePlatform(), csrfToken: readCsrfCookie(), nativeToken: getNativeSessionToken() },
+        init?.headers,
+      );
+      return globalThis.fetch(input, {
+        ...(init ?? {}),
+        headers,
+        credentials: "include",
+      });
+    },
+  };
   return [
-    httpBatchLink<AppRouter>({
-      url: apiUrl("/api/trpc"),
-      transformer: superjson,
-      fetch(input, init) {
-        const headers = buildTrpcHeaders(
-          { isNative: isNativePlatform(), csrfToken: readCsrfCookie(), nativeToken: getNativeSessionToken() },
-          init?.headers,
-        );
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          headers,
-          credentials: "include",
-        });
-      },
+    splitLink<AppRouter>({
+      condition: (op) => op.context.skipBatch === true,
+      true: httpLink<AppRouter>(options),
+      false: httpBatchLink<AppRouter>(options),
     }),
   ];
 }
