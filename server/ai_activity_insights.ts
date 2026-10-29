@@ -9,6 +9,7 @@ import {
 } from "../drizzle/schema";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
+import { hasHealthDataConsent } from "./consent";
 
 let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_activity_insights" });
@@ -515,6 +516,16 @@ export async function getPendingActivityInsights(userId: number, limit = 3) {
 async function generateMissingInsightsBackground(userId: number, limit: number) {
   const db = await getDb();
   if (!db) return;
+
+  // The analysis reads heart rate, zones and training effect (and the lazy lap import reaches
+  // Garmin): none of it without the health-data consent, not even for swims already imported.
+  if (!(await hasHealthDataConsent(userId))) {
+    log.debug("[AI Insights] Health-data consent missing, no analysis", {
+      event: "ai_activity_insights:health_consent_missing",
+      userId,
+    });
+    return;
+  }
 
   const activities = await db.execute(sql`
     SELECT a.*

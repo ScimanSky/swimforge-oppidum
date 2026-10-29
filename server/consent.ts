@@ -193,6 +193,19 @@ export async function hasGrantedConsent(userId: number, consentType: ConsentType
   return Boolean(row?.granted);
 }
 
+/**
+ * The «Trattamento dati salute» consent: without it no AI path reads heart rate, heart-rate
+ * zones, training effect, VO2max, recovery or stress, of new or already imported swims.
+ * False when it cannot be read (no database, query error): privacy first.
+ */
+export async function hasHealthDataConsent(userId: number): Promise<boolean> {
+  try {
+    return await hasGrantedConsent(userId, "health_data_processing");
+  } catch {
+    return false;
+  }
+}
+
 export async function ensureRequiredLegalConsents(userId: number, req?: Request): Promise<void> {
   const [hasTerms, hasPrivacy] = await Promise.all([
     hasGrantedConsent(userId, "terms_acceptance"),

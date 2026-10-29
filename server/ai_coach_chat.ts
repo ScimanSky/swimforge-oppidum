@@ -20,6 +20,7 @@ import { formatRestSeconds, parseRest } from "@shared/coachWorkout";
 import { minRestSeconds, poolHistoryOf, type SafetyContext } from "./ai_coach_safety";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
+import { hasHealthDataConsent } from "./consent";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -47,6 +48,8 @@ type CoachContext = {
   recentActivities: Awaited<ReturnType<typeof getActivities>>;
   workouts: Awaited<ReturnType<typeof getExistingWorkouts>> | null;
   latestInsights: Awaited<ReturnType<typeof listActivityInsights>>;
+  /** The health-data consent: without it the session analyses (built on heart rate) stay out. */
+  healthDataAllowed: boolean;
 };
 
 /** «m:ss/100m»; the total is rounded first, so 119.6 s is 2:00 and never 1:60. */
@@ -95,7 +98,9 @@ ULTIME ATTIVITA
 ${recentSummary.length ? recentSummary.join("\n") : "- Nessuna attività recente disponibile"}
 
 ULTIMI SESSION IQ
-${insightRows.length ? insightRows.join("\n") : "- Nessun insight sessione disponibile"}
+${!ctx.healthDataAllowed
+  ? "- Non disponibili: l'atleta non ha dato il consenso al trattamento dei dati sanitari, quindi frequenza cardiaca, zone cardio, training effect, VO2max, recupero e stress sono esclusi. Non chiederli e non usarli."
+  : insightRows.length ? insightRows.join("\n") : "- Nessun insight sessione disponibile"}
 
 WORKOUTS GENERATI
 - ${workoutsStatus}
@@ -357,13 +362,16 @@ export async function generateCoachChatReply(
   history: CoachChatMessage[],
   preferences?: CoachChatPreferences
 ): Promise<CoachChatResult> {
+  // The session analyses interpret heart rate and training effect: read only with the
+  // health-data consent.
+  const healthDataAllowed = await hasHealthDataConsent(userId);
   const [profile, swimMetrics, recentActivities, workoutsResult, insights] =
     await Promise.all([
       getSwimmerProfile(userId),
       getSwimMetrics(userId).catch(() => null),
       getActivities(userId, 10, 0),
       getExistingWorkouts(userId).catch(() => null),
-      listActivityInsights(userId, 5, 0).catch(() => []),
+      healthDataAllowed ? listActivityInsights(userId, 5, 0).catch(() => []) : Promise.resolve([]),
     ]);
 
   const context: CoachContext = {
@@ -372,6 +380,7 @@ export async function generateCoachChatReply(
     recentActivities,
     workouts: workoutsResult,
     latestInsights: insights,
+    healthDataAllowed,
   };
 
   const safeHistory = history

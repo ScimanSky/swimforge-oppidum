@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   getSwimmerProfile: vi.fn(),
   getActivities: vi.fn(),
   listActivityInsights: vi.fn(),
+  consent: vi.fn(),
 }));
 
 vi.mock("./_core/llm", () => ({ invokeLLM: h.invokeLLM }));
@@ -17,6 +18,7 @@ vi.mock("./db", () => ({ getSwimmerProfile: h.getSwimmerProfile, getActivities: 
 vi.mock("./swim_metrics", () => ({ getSwimMetrics: h.getSwimMetrics }));
 vi.mock("./ai_coach", () => ({ getExistingWorkouts: vi.fn(async () => null) }));
 vi.mock("./ai_activity_insights", () => ({ listActivityInsights: h.listActivityInsights }));
+vi.mock("./consent", () => ({ hasHealthDataConsent: h.consent }));
 
 import { generateCoachChatReply } from "./ai_coach_chat";
 
@@ -60,6 +62,7 @@ describe("coach chat prompt privacy", () => {
     h.getSwimmerProfile.mockResolvedValue(profile);
     h.getActivities.mockResolvedValue([swim]);
     h.listActivityInsights.mockResolvedValue([]);
+    h.consent.mockResolvedValue(true);
   });
 
   afterAll(() => {
@@ -87,5 +90,30 @@ describe("coach chat prompt privacy", () => {
     expect(prompt).not.toMatch(/39[.,]22|9[.,]121/);
     // The swim itself is there, as numbers.
     expect(prompt).toContain("2000m · 40 min · passo 2:00/100m · SWOLF 38");
+  });
+
+  describe("health-data consent", () => {
+    const insight = {
+      title: "Ritmo cardiaco alto nel finale",
+      summary: "La frequenza cardiaca sale a 172 bpm nelle ultime vasche, training effect 4,1.",
+    };
+    const prompt = () => h.invokeLLM.mock.calls[0][0].messages[0].content as string;
+
+    it("with the consent, the latest session analyses are in the context", async () => {
+      h.listActivityInsights.mockResolvedValue([insight]);
+      await generateCoachChatReply(7, [{ role: "user", content: "Come sto?" }]);
+      expect(h.consent).toHaveBeenCalledWith(7);
+      expect(prompt()).toContain("Ritmo cardiaco alto nel finale");
+    });
+
+    it("without it, no session analysis is read or sent, and the model is told why", async () => {
+      h.consent.mockResolvedValue(false);
+      h.listActivityInsights.mockResolvedValue([insight]);
+      await generateCoachChatReply(7, [{ role: "user", content: "Come sto?" }]);
+      expect(h.listActivityInsights).not.toHaveBeenCalled();
+      expect(prompt()).not.toContain("172 bpm");
+      expect(prompt()).not.toContain("Ritmo cardiaco alto");
+      expect(prompt()).toContain("non ha dato il consenso al trattamento dei dati sanitari");
+    });
   });
 });

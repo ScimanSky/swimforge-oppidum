@@ -32,6 +32,7 @@ vi.mock("./garmin", () => ({
 }));
 vi.mock("./personal_records", () => ({ recomputePersonalRecordsFromStoredLaps: m.recompute }));
 vi.mock("./_core/env", () => ({ ENV: { geminiTextModel: "test-model" } }));
+vi.mock("./consent", () => ({ hasHealthDataConsent: async () => true }));
 
 import { getPendingActivityInsights } from "./ai_activity_insights";
 
