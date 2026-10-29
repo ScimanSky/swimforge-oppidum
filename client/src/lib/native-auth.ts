@@ -1,6 +1,6 @@
 import { Browser } from "@capacitor/browser";
 import { toast } from "sonner";
-import { postLoginPath, syncSupabaseSession, type SyncSupabaseUser } from "./auth-sync";
+import { afterSyncPath, syncSupabaseSession, type SyncSupabaseUser } from "./auth-sync";
 import { NATIVE_AUTH_CALLBACK_URL } from "./deep-links";
 import type { NativeAuthCallback } from "./native-runtime";
 import { supabase } from "./supabase";
@@ -31,7 +31,7 @@ export async function startNativeGoogleLogin(): Promise<void> {
 
 export type CompleteNativeAuthOptions = {
   syncUser: SyncSupabaseUser;
-  /** Called with /home or the onboarding path once the backend session exists. */
+  /** Called with /home, the onboarding path, or the acceptance step when it is missing. */
   onSignedIn: (path: string) => void | Promise<void>;
 };
 
@@ -57,9 +57,10 @@ export async function completeNativeAuthCallback(
     if (exchangeError || !data.session) {
       throw exchangeError ?? new Error("Sessione OAuth non trovata");
     }
-    const { isNewUser } = await syncSupabaseSession(data.session, syncUser);
-    toast.success("Accesso effettuato con successo!");
-    await onSignedIn(postLoginPath(isNewUser));
+    const outcome = await syncSupabaseSession(data.session, syncUser);
+    // Without accepted Termini and Privacy the next path is the acceptance step.
+    if (!outcome.needsLegalAcceptance) toast.success("Accesso effettuato con successo!");
+    await onSignedIn(afterSyncPath(outcome));
     return true;
   } catch (failure) {
     console.error("[native-auth] sign-in failed", failure);

@@ -12,6 +12,7 @@ export const CONSENT_TYPES = [
   "marketing_communications",
   "cookie_analytics",
   "product_onboarding_tour",
+  "age_confirmation",
 ] as const;
 
 export type ConsentType = (typeof CONSENT_TYPES)[number];
@@ -25,7 +26,11 @@ export const CONSENT_VERSION: Record<ConsentType, string> = {
   marketing_communications: "v1.0",
   cookie_analytics: "v1.0",
   product_onboarding_tour: "v1.0",
+  age_confirmation: "v1.0",
 };
+
+/** Accepted at registration, never withdrawn from the app: Termini, Privacy and «almeno 14 anni». */
+export const REGISTRATION_CONSENTS = ["terms_acceptance", "privacy_policy", "age_confirmation"] as const;
 
 export type ConsentState = {
   id: number;
@@ -206,28 +211,30 @@ export async function hasHealthDataConsent(userId: number): Promise<boolean> {
   }
 }
 
-export async function ensureRequiredLegalConsents(userId: number, req?: Request): Promise<void> {
+/**
+ * True when the user accepted Termini and Privacy. The age confirmation is not required here:
+ * accounts created before it existed keep working without being asked again.
+ */
+export async function hasRequiredLegalConsents(userId: number): Promise<boolean> {
   const [hasTerms, hasPrivacy] = await Promise.all([
     hasGrantedConsent(userId, "terms_acceptance"),
     hasGrantedConsent(userId, "privacy_policy"),
   ]);
+  return hasTerms && hasPrivacy;
+}
 
-  const items: Array<{ consentType: ConsentType; granted: boolean; consentVersion?: string }> = [];
-  if (!hasTerms) {
-    items.push({
-      consentType: "terms_acceptance",
-      granted: true,
-      consentVersion: CONSENT_VERSION.terms_acceptance,
-    });
-  }
-  if (!hasPrivacy) {
-    items.push({
-      consentType: "privacy_policy",
-      granted: true,
-      consentVersion: CONSENT_VERSION.privacy_policy,
-    });
-  }
-
+/**
+ * Records the acceptance the user has just given (checkboxes Termini, Privacy and «Dichiaro di
+ * avere almeno 14 anni»): only the ones not recorded yet, so the first date stays. Never called
+ * without an explicit acceptance.
+ */
+export async function recordLegalAcceptance(userId: number, req?: Request): Promise<void> {
+  const granted = await Promise.all(REGISTRATION_CONSENTS.map((type) => hasGrantedConsent(userId, type)));
+  const items = REGISTRATION_CONSENTS.filter((_, index) => !granted[index]).map((consentType) => ({
+    consentType,
+    granted: true,
+    consentVersion: CONSENT_VERSION[consentType],
+  }));
   if (items.length === 0) return;
   await setManyConsents({ userId, req, items });
 }

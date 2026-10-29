@@ -10,7 +10,7 @@ import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
-import { ensureRequiredLegalConsents } from "../consent";
+import { hasRequiredLegalConsents, recordLegalAcceptance } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
@@ -44,6 +44,16 @@ const REGISTRATION_PASSWORD_SCHEMA = z
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
 
+/**
+ * The registration checkboxes, ticked by the user: Termini, Privacy and «Dichiaro di avere almeno
+ * 14 anni». Only this input records them.
+ */
+const LEGAL_ACCEPTANCE_SCHEMA = z.object({
+    terms: z.literal(true),
+    privacy: z.literal(true),
+    minimumAge: z.literal(true),
+});
+
 export const authRouter = router({
     me: publicProcedure.query(opts => toSelfUser(opts.ctx.user)),
 
@@ -53,6 +63,7 @@ export const authRouter = router({
             email: z.string().email(),
             password: REGISTRATION_PASSWORD_SCHEMA,
             name: z.string().optional(),
+            legalAcceptance: LEGAL_ACCEPTANCE_SCHEMA,
         }))
         .mutation(async ({ ctx, input }) => {
             await applyRateLimit(registrationLimiter, ctx.req, ctx.res);
@@ -76,7 +87,7 @@ export const authRouter = router({
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
 
-            await ensureRequiredLegalConsents(result.user.id, ctx.req);
+            await recordLegalAcceptance(result.user.id, ctx.req);
 
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
@@ -108,7 +119,6 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
-            await ensureRequiredLegalConsents(result.user.id, ctx.req);
 
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
@@ -146,6 +156,8 @@ export const authRouter = router({
                 email: z.string().email(),
                 name: z.string().nullable(),
             }),
+            // Sent once the user has ticked the checkboxes (registration form or /auth/consenso).
+            legalAcceptance: LEGAL_ACCEPTANCE_SCHEMA.optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             let supabaseUser;
@@ -190,6 +202,14 @@ export const authRouter = router({
             let user = await db.getUserByEmail(supabaseEmail);
             const isNewUser = !user;
 
+            // Termini, Privacy and the age are accepted with checkboxes, never recorded on their own:
+            // without them (Google sign-in of a new user, or an account that never accepted) no
+            // account and no session, the app shows the acceptance step and calls again with it.
+            const hasAccepted = user ? await hasRequiredLegalConsents(user.id) : false;
+            if (!hasAccepted && !input.legalAcceptance) {
+                return { success: false, needsLegalAcceptance: true, isNewUser } as const;
+            }
+
             if (!user) {
                 // Crea nuovo utente da OAuth
                 const result = await db.createOAuthUser({
@@ -222,7 +242,7 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
-            await ensureRequiredLegalConsents(user.id, ctx.req);
+            if (!hasAccepted) await recordLegalAcceptance(user.id, ctx.req);
             const clientHeader = ctx.req.headers[NATIVE_CLIENT_HEADER];
             const isNativeClient = (Array.isArray(clientHeader) ? clientHeader[0] : clientHeader) === NATIVE_CLIENT_VALUE;
             return {
