@@ -42,13 +42,15 @@ const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
   gradiente: ["index.css"], // skeleton shimmer animation
   // The shell header owns the page title. Public pages render outside the shell (no header), so
   // their own title is the h1: the landing (Home), StravaConnect, the sign-in, sign-up and
-  // password pages (AuthLayout) and the legal documents (LegalPage). club-print builds
-  // standalone print documents (own tab or hidden iframe).
+  // password pages (AuthLayout), the return from Google and the email link (AuthCallback) and the
+  // legal documents (LegalPage). club-print builds standalone print documents (own tab or
+  // hidden iframe).
   "titolo-pagina": [
     "components/app/ShellHeader.tsx",
     "components/auth/AuthLayout.tsx",
     "components/legal/LegalPage.tsx",
     "lib/club-print.ts",
+    "pages/AuthCallback.tsx",
     "pages/Home.tsx",
     "pages/StravaConnect.tsx",
   ],
@@ -103,9 +105,7 @@ const PENDING: Record<Rule, string[]> = {
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingWelcomeComposition.tsx",
-    "pages/AuthCallback.tsx",
     "pages/Home.tsx",
-    "pages/NotFound.tsx",
     "pages/Settings.tsx",
   ],
   sfocatura: [
@@ -115,12 +115,10 @@ const PENDING: Record<Rule, string[]> = {
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "pages/Home.tsx",
-    "pages/NotFound.tsx",
     "pages/StravaConnect.tsx",
   ],
   "titolo-pagina": [
     "components/onboarding/OnboardingWelcomeComposition.tsx",
-    "pages/NotFound.tsx",
     "pages/Settings.tsx",
   ],
   "colore-fisso": [
@@ -130,9 +128,7 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFlow.tsx",
     "components/ui/dialog.tsx",
     "components/ui/sheet.tsx",
-    "pages/AuthCallback.tsx",
     "pages/Home.tsx",
-    "pages/NotFound.tsx",
     "pages/StravaConnect.tsx",
   ],
 };
