@@ -12,6 +12,42 @@ describe("detectSets", () => {
     expect(sets).toEqual([{ distanceMeters: 100, stroke: "freestyle", repSeconds: times }]);
   });
 
+  it("a long rest splits the run: 4×100 warm-up, 3 minutes, then 6×100 are two sets", () => {
+    const warmUp = [100, 101, 100, 102];
+    const main = [92, 93, 92, 94, 95, 97];
+    const laps = lapsFrom([
+      ...withRests(warmUp.map((t) => [100, t] as LapSpec)).slice(0, -1),
+      [0, 180],
+      ...withRests(main.map((t) => [100, t] as LapSpec)),
+    ]);
+    expect(detectSets(laps)).toEqual([
+      { distanceMeters: 100, stroke: "freestyle", repSeconds: warmUp },
+      { distanceMeters: 100, stroke: "freestyle", repSeconds: main },
+    ]);
+  });
+
+  it("a rest splits only above max(60 s, 2 × the median rest so far)", () => {
+    const rep = [100, 90] as LapSpec;
+    // Rests 40, 40, 40, then 90 > max(60, 80): split.
+    const split = lapsFrom([rep, [0, 40], rep, [0, 40], rep, [0, 40], rep, [0, 90], rep, [0, 40], rep, [0, 40], rep]);
+    expect(detectSets(split).map((s) => s.repSeconds.length)).toEqual([4, 3]);
+    // Rests 50, 50, then 95 ≤ max(60, 100): same set.
+    const kept = lapsFrom([rep, [0, 50], rep, [0, 50], rep, [0, 95], rep]);
+    expect(detectSets(kept).map((s) => s.repSeconds.length)).toEqual([4]);
+    // The first gap of a run is compared with 60 s: 61 s splits.
+    const early = lapsFrom([rep, [0, 61], rep, [0, 20], rep, [0, 20], rep]);
+    expect(detectSets(early).map((s) => s.repSeconds.length)).toEqual([3]);
+    // Two rest laps in a row add up.
+    const twoRests = lapsFrom([rep, [0, 20], rep, [0, 20], rep, [0, 40], [0, 40], rep, [0, 20], rep, [0, 20], rep]);
+    expect(detectSets(twoRests).map((s) => s.repSeconds.length)).toEqual([3, 3]);
+  });
+
+  it("a slower rep never splits the set: that is the fade being measured", () => {
+    const times = [90, 90, 91, 99, 105, 112];
+    const laps = lapsFrom(withRests(times.map((t) => [100, t] as LapSpec)));
+    expect(detectSets(laps).map((s) => s.repSeconds)).toEqual([times]);
+  });
+
   it("a stroke change splits the set", () => {
     const laps = lapsFrom(
       withRests([

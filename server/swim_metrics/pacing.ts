@@ -4,7 +4,7 @@
  * fade > 5%) are our conventions.
  */
 import { addDaysToKey, dayKey } from "@shared/swimMetrics";
-import { activeLaps, type MetricLap, type NormalizedStroke } from "./laps";
+import { type MetricLap, type NormalizedStroke } from "./laps";
 import { median, weightedMean } from "./math";
 
 const MIN_REPS = 3;
@@ -12,13 +12,23 @@ const MIN_REP_DISTANCE = 50;
 
 export type RepeatSet = { distanceMeters: number; stroke: NormalizedStroke | null; repSeconds: number[] };
 
+/** A rest between two reps longer than this, or than twice the median rest so far, ends the run. */
+const MIN_SPLIT_REST_SECONDS = 60;
+
+const isRest = (lap: MetricLap) => lap.distanceMeters === 0;
+const isActive = (lap: MetricLap) => lap.distanceMeters > 0 && lap.seconds > 0;
+
 /**
- * Runs of at least 3 consecutive active laps (rests skipped) with the same distance (≥ 50 m) and
- * the same stroke. A different distance or stroke closes the run.
+ * Runs of at least 3 consecutive active laps with the same distance (≥ 50 m) and the same stroke.
+ * A different distance or stroke closes the run, and so does a rest between two reps longer than
+ * max(60 s, 2 × the median rest seen so far in the run) (e.g. a warm-up and the main set). Slower
+ * reps never close it: that is the fade being measured.
  */
 export function detectSets(laps: MetricLap[]): RepeatSet[] {
   const sets: RepeatSet[] = [];
   let run: MetricLap[] = [];
+  let runRests: number[] = [];
+  let restSinceLastRep = 0;
   const close = () => {
     if (run.length >= MIN_REPS && run[0].distanceMeters >= MIN_REP_DISTANCE) {
       sets.push({
@@ -28,11 +38,23 @@ export function detectSets(laps: MetricLap[]): RepeatSet[] {
       });
     }
     run = [];
+    runRests = [];
   };
-  for (const lap of activeLaps(laps)) {
+  for (const lap of [...laps].sort((a, b) => a.lapIndex - b.lapIndex)) {
+    if (isRest(lap)) {
+      restSinceLastRep += lap.seconds;
+      continue;
+    }
+    if (!isActive(lap)) continue;
     const previous = run[run.length - 1];
-    if (previous && (previous.distanceMeters !== lap.distanceMeters || previous.stroke !== lap.stroke)) close();
+    if (previous) {
+      const sameRep = previous.distanceMeters === lap.distanceMeters && previous.stroke === lap.stroke;
+      const restLimit = Math.max(MIN_SPLIT_REST_SECONDS, 2 * (median(runRests) ?? 0));
+      if (!sameRep || restSinceLastRep > restLimit) close();
+      else runRests.push(restSinceLastRep);
+    }
     run.push(lap);
+    restSinceLastRep = 0;
   }
   close();
   return sets;
