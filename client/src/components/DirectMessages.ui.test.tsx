@@ -1,5 +1,6 @@
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { cloneElement } from "react";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -17,6 +18,10 @@ const state = vi.hoisted(() => ({
   sends: [] as unknown[],
   sendError: null as unknown,
   marks: [] as unknown[],
+  markError: null as unknown,
+  /** Bumped by a poll: when the conversation's data was last fetched. */
+  polledAt: 1,
+  visibility: "visible" as DocumentVisibilityState,
   searches: [] as unknown[],
   profiles: {} as Record<number, any>,
   previous: null as string | null,
@@ -34,7 +39,7 @@ vi.mock("@/lib/trpc", () => {
       const value = data(input);
       if (error()) return { ...base, data: undefined, isPending: false, isError: true };
       if (value === undefined) return { ...base, data: undefined, isPending: true, isError: false };
-      return { ...base, data: value, isPending: false, isError: false };
+      return { ...base, data: value, isPending: false, isError: false, dataUpdatedAt: state.polledAt };
     },
   });
   return {
@@ -49,7 +54,22 @@ vi.mock("@/lib/trpc", () => {
           recent: query("recent", () => state.recent, () => state.recentError),
           conversation: query("conversation", (input) => state.chats[input.otherUserId] ?? [], () => state.chatError),
           markRead: {
-            useMutation: () => ({ mutate: (vars: unknown) => state.marks.push(vars), isPending: false }),
+            useMutation: (options?: { onSuccess?: () => void; onError?: (error: unknown) => void }) => ({
+              mutate: (
+                vars: unknown,
+                callOptions?: { onSuccess?: () => void; onError?: (error: unknown) => void }
+              ) => {
+                state.marks.push(vars);
+                if (state.markError) {
+                  options?.onError?.(state.markError);
+                  callOptions?.onError?.(state.markError);
+                } else {
+                  options?.onSuccess?.();
+                  callOptions?.onSuccess?.();
+                }
+              },
+              isPending: false,
+            }),
           },
           send: {
             useMutation: (options?: { onError?: (error: unknown) => void }) => ({
@@ -90,6 +110,8 @@ vi.stubGlobal(
   }
 );
 
+Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state.visibility });
+
 const msg = (id: number, senderId: number, receiverId: number, content: string, isRead = true) => ({
   message: {
     id,
@@ -113,13 +135,27 @@ const conversation = (otherId: number, name: string, content: string, unreadCoun
 
 function renderIn(ui: React.ReactElement, path = "/messages") {
   const location = memoryLocation({ path, record: true });
-  render(
+  // A new element each time, so a rerender renders the page again (as a poll does).
+  const tree = () => (
     <Router hook={location.hook} searchHook={location.searchHook}>
-      {ui}
+      {cloneElement(ui)}
     </Router>
   );
-  return location;
+  const { rerender } = render(tree());
+  // What a 5 s poll of the open chat does: the same messages, fetched again.
+  const poll = () => {
+    state.polledAt += 1;
+    rerender(tree());
+  };
+  return Object.assign(location, { poll });
 }
+
+const setVisibility = (visibility: DocumentVisibilityState) => {
+  state.visibility = visibility;
+  act(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+};
 
 const setPhone = (phone: boolean) => {
   Object.defineProperty(window, "matchMedia", {
@@ -150,6 +186,9 @@ describe("DirectMessages (Corsia)", () => {
     state.sends = [];
     state.sendError = null;
     state.marks = [];
+    state.markError = null;
+    state.polledAt = 1;
+    state.visibility = "visible";
     state.searches = [];
     state.profiles = {};
     state.previous = null;
@@ -184,6 +223,30 @@ describe("DirectMessages (Corsia)", () => {
         "Tu: Ciao Ada",
         "Ricevuto: Ci sei domani?",
       ]);
+      expect(state.marks).toEqual([{ senderId: 5 }]);
+    });
+
+    it("marks read once per new message; a failed attempt is tried again on the next poll", () => {
+      state.markError = new Error("boom");
+      const location = renderIn(<DirectMessages mode="page" />);
+      expect(state.marks).toEqual([{ senderId: 5 }]);
+
+      state.markError = null;
+      location.poll();
+      expect(state.marks).toEqual([{ senderId: 5 }, { senderId: 5 }]);
+      // Done: further polls of the same messages ask nothing.
+      location.poll();
+      expect(state.marks).toEqual([{ senderId: 5 }, { senderId: 5 }]);
+    });
+
+    it("a chat on a hidden page is not marked read until the page is visible again", () => {
+      state.visibility = "hidden";
+      const location = renderIn(<DirectMessages mode="page" />);
+      expect(screen.getByRole("log", { name: "Messaggi con Ada Rossi" })).toHaveTextContent("Ci sei domani?");
+      location.poll();
+      expect(state.marks).toEqual([]);
+
+      setVisibility("visible");
       expect(state.marks).toEqual([{ senderId: 5 }]);
     });
 

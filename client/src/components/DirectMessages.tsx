@@ -9,7 +9,16 @@
  * - a dialog with one swimmer (`recipientId`), opened from their public profile.
  */
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { ChevronLeft, MessageCircle, PenSquare, Search, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -215,13 +224,27 @@ function MessagesLink() {
   );
 }
 
-/** One chat: the messages (polled every 5 s while shown), marked read as they arrive, and sending. */
+const subscribeToVisibility = (onChange: () => void) => {
+  document.addEventListener("visibilitychange", onChange);
+  return () => document.removeEventListener("visibilitychange", onChange);
+};
+
+/** Whether the page is on screen: false in a background tab or with the app in the background. */
+function usePageVisible() {
+  return useSyncExternalStore(subscribeToVisibility, () => document.visibilityState === "visible", () => true);
+}
+
+/**
+ * One chat: the messages (polled every 5 s while shown), marked read as they arrive while the
+ * page is on screen, and sending.
+ */
 function useConversation(otherUserId: number, { active, limit }: { active: boolean; limit: number }) {
   const utils = trpc.useUtils();
   const query = trpc.community.messages.conversation.useQuery(
     { otherUserId, limit },
     { enabled: active, refetchInterval: active ? 5_000 : false }
   );
+  const pageVisible = usePageVisible();
 
   const markRead = trpc.community.messages.markRead.useMutation({
     onSuccess: () => {
@@ -236,10 +259,22 @@ function useConversation(otherUserId: number, { active, limit }: { active: boole
     );
     return unread.length ? unread[unread.length - 1].message.id : null;
   }, [query.data, otherUserId]);
-  // Once per newly arrived message (not on every poll): `markRead` is left out of the deps.
+  // The newest unread message a «read» was sent for: once per message, not on every poll. A
+  // failure forgets it, so the next poll (`dataUpdatedAt`) tries again. `markRead` is left out
+  // of the deps (a new object on every render).
+  const markedId = useRef<number | null>(null);
   useEffect(() => {
-    if (lastUnreadId !== null) markRead.mutate({ senderId: otherUserId });
-  }, [lastUnreadId, otherUserId]);
+    if (!active || !pageVisible || lastUnreadId === null || markedId.current === lastUnreadId) return;
+    markedId.current = lastUnreadId;
+    markRead.mutate(
+      { senderId: otherUserId },
+      {
+        onError: () => {
+          if (markedId.current === lastUnreadId) markedId.current = null;
+        },
+      }
+    );
+  }, [active, pageVisible, lastUnreadId, otherUserId, query.dataUpdatedAt]);
 
   const send = trpc.community.messages.send.useMutation({
     onSuccess: () => {
