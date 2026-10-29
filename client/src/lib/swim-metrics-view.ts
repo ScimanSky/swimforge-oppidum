@@ -243,13 +243,13 @@ function intensityHeader(m: SwimMetrics): MetricHeader {
   if (!last28) return { value: null, reading: null, basis: null, missing: m.intensity.missing }
   const counted = m.sessions.filter(session => session.zoneMeters && inLast28(m)(session)).length
   const total = zoneSum(last28.zoneMeters, 0, 6)
+  // «64% in zona A · 16% B · 20% C»: the zone letters, never the level words.
+  const shares = `${formatInteger(last28.mediumPct)}% B · ${formatInteger(last28.hardPct)}% C`
   return {
     value: `${formatInteger(last28.easyPct)}%`,
-    unit: "facile",
+    unit: "in zona A",
     reading:
-      last28.mediumPct > SWIM_METRIC_THRESHOLDS.mediumZonePct
-        ? "molto lavoro in zona media"
-        : `${formatInteger(last28.mediumPct)}% medio, ${formatInteger(last28.hardPct)}% intenso`,
+      last28.mediumPct > SWIM_METRIC_THRESHOLDS.mediumZonePct ? `${shares}: molto lavoro in zona B` : shares,
     basis: `Su ${formatSwims(counted)} in vasca con i giri degli ultimi 28 giorni: ${kmOf(total)} a stile libero nelle zone.`,
     missing: m.intensity.missing,
   }
@@ -398,9 +398,9 @@ export function intensityChartSummary(weeksData: SwimMetrics["intensity"]["weeks
           .join(", ")}`
       : `Ultime 8 settimane: ${kmOf(zoneSum(total, 0, 6))} a stile libero nelle zone, ${formatKm(
           zoneSum(total, 0, 1)
-        )} in A1–A2 (facile), ${formatKm(zoneSum(total, 2, 3))} in B1–B2 (medio), ${formatKm(
+        )} in zona A (A1–A2), ${formatKm(zoneSum(total, 2, 3))} in zona B (B1–B2), ${formatKm(
           zoneSum(total, 4, 6)
-        )} in C1–C3 (intenso)`
+        )} in zona C (C1–C3)`
   return unclassified > 0
     ? `${zoned}; ${kmOf(unclassified)} di altri stili, tecnica o gambe non classificati.`
     : `${zoned}.`

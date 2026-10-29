@@ -34,8 +34,8 @@ export function addZones(a: Zones7, b: Zones7): Zones7 {
 }
 
 /**
- * Facile (A1+A2), medio (B1+B2) and intenso (C1+C2+C3) shares in whole percent summing to 100
- * (largest remainder); null without distance.
+ * Shares of zone A (A1+A2), B (B1+B2) and C (C1+C2+C3) in whole percent summing to 100 (largest
+ * remainder); null without distance.
  */
 export function intensitySplit(z: Zones7): { easyPct: number; mediumPct: number; hardPct: number } | null {
   const total = z.reduce((sum, metres) => sum + metres, 0);

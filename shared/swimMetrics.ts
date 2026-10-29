@@ -4,7 +4,7 @@
  * in the Rome time zone). Design: docs/plans/2026-10-29-swim-metrics-design.md.
  */
 
-import type { PaceZoneBounds, PaceZoneRange, Zones7 } from "./paceZones";
+import { WORKOUT_SAFETY_TEXT, ZONE_GROUPS_TEXT, type PaceZoneBounds, type PaceZoneRange, type Zones7 } from "./paceZones";
 
 export * from "./paceZones";
 
@@ -86,7 +86,10 @@ export type SwimMetrics = {
   };
   intensity: {
     last28: {
-      /** Metres per zone A1..C3; facile = A1+A2, medio = B1+B2, intenso = C1+C2+C3. */
+      /**
+       * Metres per zone A1..C3, and the shares of zone A (A1+A2: easyPct), B (B1+B2: mediumPct)
+       * and C (C1+C2+C3: hardPct); the field names are historical.
+       */
       zoneMeters: Zones7; easyPct: number; mediumPct: number; hardPct: number;
       /** Active metres not zoned (other strokes, drill, kick) in the 28 days. */
       unclassifiedMeters?: number;
@@ -186,20 +189,22 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
   intensity: {
     name: "Intensità",
     measures:
-      "Come si divide il tuo volume tra le zone di passo A1–C3, dalla più lenta alla più esplosiva, e quindi tra lavoro facile, medio e intenso.",
+      "Come si divide il tuo volume tra le zone di passo A1–C3, dalla più lenta alla più esplosiva, e quindi tra zona A (aerobica), zona B (mista) e zona C (anaerobica).",
     formula:
-      "Ogni giro attivo a stile libero va in una zona secondo il suo passo rispetto al passo soglia, in % della velocità soglia: A1 sotto 85%, A2 85–90%, B1 90–95%, B2 95–100%, C1 100–104%, C2 sopra 104% (in passo: passo soglia / percentuale; un passo uguale a un confine va nella zona più veloce). C3: un tratto di al massimo 25 m (o una vasca) più veloce del confine C1/C2; più lungo è C2. Con «Le tue zone» valgono i tuoi confini. Si somma la distanza per zona; facile = A1 + A2, medio = B1 + B2, intenso = C1 + C2 + C3. Gli altri stili, la tecnica e le gambe restano non classificati; la copertura è la quota dei metri delle ultime 4 settimane che sta nelle zone.",
+      "Ogni giro attivo a stile libero va in una zona secondo il suo passo rispetto al passo soglia, in % della velocità soglia: A1 sotto 85%, A2 85–90%, B1 90–95%, B2 95–100%, C1 100–104%, C2 sopra 104% (in passo: passo soglia / percentuale; un passo uguale a un confine va nella zona più veloce). C3: un tratto di al massimo 25 m (o una vasca) più veloce del confine C1/C2; più lungo è C2. Con «Le tue zone» valgono i tuoi confini. Si somma la distanza per zona; zona A = A1 + A2, zona B = B1 + B2, zona C = C1 + C2 + C3. Gli altri stili, la tecnica e le gambe restano non classificati; la copertura è la quota dei metri delle ultime 4 settimane che sta nelle zone.",
     source:
       "Zone di passo A1–C3 della scuola di allenamento italiana, legate al passo soglia (Swim Smooth, TrainingPeaks); distribuzione dell'intensità polarizzata o piramidale (Seiler, 2010; Stöggl e Sperlich, 2014).",
     howToRead:
-      "Gli studi sugli sport di resistenza indicano che la maggior parte del volume facile e una piccola parte intensa funzionano meglio di tanto lavoro medio. Più alta è la zona, più è intensa e più corte sono le ripetute.",
+      "Gli studi sugli sport di resistenza indicano che la maggior parte del volume in zona A e una piccola parte in zona C funzionano meglio di tanto lavoro in zona B. Più alta è la zona, più è intensa e più corte sono le ripetute.",
     conventions: [
       "I confini delle zone sono una convenzione di SwimForge, approvata dal suo ideatore: il passo soglia è il confine tra B2 e C1. Se il tuo allenatore usa altri valori, inseriscili in «Le tue zone».",
       "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, il coach e gli allenamenti.",
       "Ripetuta massima: C1 200 m, C2 150 m, C3 25 m.",
       "I cinque livelli sono allineati alle zone: Facile = A1, Aerobico = A2, Medio = B1, Soglia = B2 + C1, Sopra soglia = C2 + C3.",
       "Le zone valgono solo per lo stile libero, perché il passo soglia è a stile libero: gli altri stili non sono classificati.",
-      "Se la zona media (B1–B2) supera circa il 35% del volume: molto lavoro in zona media. È un'indicazione basata sugli studi, non una regola.",
+      ZONE_GROUPS_TEXT,
+      "Se la zona B (B1–B2) supera circa il 35% del volume: molto lavoro in zona B. È un'indicazione basata sugli studi, non una regola.",
+      WORKOUT_SAFETY_TEXT,
     ],
   },
   efficiency: {
@@ -278,7 +283,7 @@ export function tsbReadingOf(tsb: number): TsbReading {
 }
 
 export const SWIM_METRIC_THRESHOLDS = {
-  /** Above this share of B1 + B2: «molto lavoro in zona media». */
+  /** Above this share of zone B (B1 + B2): «molto lavoro in zona B». */
   mediumZonePct: 35,
   /** CTL growth above this many points a week: «crescita molto rapida». */
   rampPerWeek: 8,

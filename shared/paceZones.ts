@@ -209,12 +209,19 @@ export const LEVEL_ZONES: Record<IntensityLevel, PaceZoneCode[]> = {
   "Sopra soglia": ["C2", "C3"],
 };
 
-/** The polarized split of the intensity summary. */
+/**
+ * The split of the intensity summary by zone letter (polarized or pyramidal distribution): zone A
+ * aerobic, B mixed, C anaerobic. The level words (Facile, Medio, …) stay for the five levels.
+ */
 export const INTENSITY_SPLIT = {
-  facile: ["A1", "A2"],
-  medio: ["B1", "B2"],
-  intenso: ["C1", "C2", "C3"],
+  A: ["A1", "A2"],
+  B: ["B1", "B2"],
+  C: ["C1", "C2", "C3"],
 } as const satisfies Record<string, readonly PaceZoneCode[]>;
+
+/** The three letters in plain words, for the glossary and the definitions. */
+export const ZONE_GROUPS_TEXT =
+  "Le zone A sono aerobiche (lavoro facile e di base, potresti parlare), le B miste (aerobico sostenuto fino a ridosso della soglia, frasi brevi), le C anaerobiche (dalla soglia in su: ripetute brevi e recuperi lunghi).";
 
 const zoneIndex = (code: PaceZoneCode) => PACE_ZONE_CODES.indexOf(code);
 

@@ -6,12 +6,20 @@ import {
   intensityChartSummary,
   intensityCoverageText,
   loadEstimatedText,
+  metricHeaders,
   zoneShareItems,
   zonesSourceText,
   zoneTableRows,
 } from "./swim-metrics-view";
 
 describe("metriche: testi del riquadro", () => {
+  it("intensità: la quota per lettera di zona, mai con le parole dei livelli", () => {
+    const metrics = swimMetricsFixture();
+    expect(metricHeaders(metrics).intensity).toMatchObject({ value: "64%", unit: "in zona A", reading: "16% B · 20% C" });
+    metrics.intensity.last28 = { ...metrics.intensity.last28!, easyPct: 40, mediumPct: 45, hardPct: 15 };
+    expect(metricHeaders(metrics).intensity.reading).toBe("45% B · 15% C: molto lavoro in zona B");
+  });
+
   it("le sette zone del proprietario dal passo soglia 1:48,5: codice, nome, livello, passo e ripetuta massima", () => {
     const rows = zoneTableRows(swimMetricsFixture().zones, "zone");
     expect(rows.map((row) => [row.label, row.detail, row.pace, row.maxRep])).toEqual([
@@ -57,7 +65,7 @@ describe("metriche: testi del riquadro", () => {
   it("sintesi del grafico settimanale nelle due viste", () => {
     const weeks = swimMetricsFixture().intensity.weeks;
     expect(intensityChartSummary(weeks, "zone")).toBe(
-      "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in A1–A2 (facile), 2,4 in B1–B2 (medio), 2,6 in C1–C3 (intenso); 1,8 km di altri stili, tecnica o gambe non classificati."
+      "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in zona A (A1–A2), 2,4 in zona B (B1–B2), 2,6 in zona C (C1–C3); 1,8 km di altri stili, tecnica o gambe non classificati."
     );
     expect(intensityChartSummary(weeks, "livelli")).toBe(
       "Ultime 8 settimane: 13,6 km a stile libero nelle zone: Facile 4, Aerobico 4,6, Medio 1,7, Soglia 2,5, Sopra soglia 0,9; 1,8 km di altri stili, tecnica o gambe non classificati."

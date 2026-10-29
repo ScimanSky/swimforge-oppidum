@@ -19,7 +19,8 @@ describe("swimMetricsForCoach", () => {
     expect(text).toContain("scartato 300 m in 5:00 il 10/10 (più lento del tuo 400 m)");
     expect(text).toContain("equilibrio −7,8 (neutro), cioè forma − fatica a fine di ieri");
     expect(text).toContain("forma +2,1 punti in 7 giorni");
-    expect(text).toContain("facile (A1–A2) 72% · medio (B1–B2) 18% · intenso (C1–C3) 10%");
+    expect(text).toContain("zona A (A1–A2) 72% · zona B (B1–B2) 18% · zona C (C1–C3) 10%");
+    expect(text).not.toMatch(/facile \(A1|medio \(B1|intenso \(C1/);
     expect(text).toContain("per zona A1 30%, A2 42%, B1 10%, B2 8%, C1 6%, C2 3%, C3 1%");
     expect(text).toContain("Stroke Index, vasca 25 m");
     expect(text).toContain("base 2,02 su 9 nuotate (+4,0%)");
@@ -157,7 +158,8 @@ describe("swimMetricsGlossary", () => {
     expect(glossary).toContain("Craig e Pendergast");
     expect(glossary).not.toMatch(/85%|90%|95%|104%/);
     expect(glossary).toContain("zone A1–C3");
-    expect(glossary).toContain("facile = A1–A2, medio = B1–B2, intenso = C1–C3");
+    expect(glossary).toContain("zona A = A1–A2 (aerobica), zona B = B1–B2 (mista), zona C = C1–C3 (anaerobica)");
+    expect(glossary).toContain("molto lavoro in zona B");
     for (const name of OLD_NAMES) expect(glossary).not.toMatch(name);
   });
 });

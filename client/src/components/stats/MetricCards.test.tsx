@@ -58,7 +58,7 @@ describe("Metriche: riquadri", () => {
     expect(card("Passo soglia")).toHaveTextContent("Passo soglia 1:49 /100 m stima, affidabilità media");
     // −7,3 is in the neutral band (−10 to +5) of TrainingPeaks.
     expect(card("Forma e fatica")).toHaveTextContent("Forma e fatica −7 neutro");
-    expect(card("Intensità")).toHaveTextContent("Intensità 64% facile 16% medio, 20% intenso");
+    expect(card("Intensità")).toHaveTextContent("Intensità 64% in zona A 16% B · 20% C");
     expect(card("Efficienza della bracciata")).toHaveTextContent("1,52 +7% sulla tua base");
     expect(card("Regolarità e tenuta nelle ripetute")).toHaveTextContent(
       "Regolarità e tenuta nelle ripetute 2,6% variabilità regolare"
@@ -73,7 +73,7 @@ describe("Metriche: riquadri", () => {
     const region = screen.getByRole("region", { name: /^Intensità/ });
     expect(
       within(region).getByRole("img", {
-        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in A1–A2 (facile), 2,4 in B1–B2 (medio), 2,6 in C1–C3 (intenso); 1,8 km di altri stili, tecnica o gambe non classificati.",
+        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in zona A (A1–A2), 2,4 in zona B (B1–B2), 2,6 in zona C (C1–C3); 1,8 km di altri stili, tecnica o gambe non classificati.",
       })
     ).toBeTruthy();
     expect(region).toHaveTextContent("Come si legge: Gli studi sugli sport di resistenza");
@@ -162,8 +162,8 @@ describe("Metriche: riquadri", () => {
         name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone: Facile 4, Aerobico 4,6, Medio 1,7, Soglia 2,5, Sopra soglia 0,9; 1,8 km di altri stili, tecnica o gambe non classificati.",
       })
     ).toBeTruthy();
-    // The header split stays facile / medio / intenso.
-    expect(card("Intensità")).toHaveTextContent("Intensità 64% facile 16% medio, 20% intenso");
+    // The header split stays by zone letter: the level words are for the levels only.
+    expect(card("Intensità")).toHaveTextContent("Intensità 64% in zona A 16% B · 20% C");
   });
 
   it("forma e fatica: senza passo soglia la soglia del carico viene dalle tue zone, e lo dice", async () => {
@@ -217,7 +217,7 @@ describe("Metriche: riquadri", () => {
     expect(region).not.toHaveTextContent("Non classificati");
     expect(
       within(region).getByRole("img", {
-        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in A1–A2 (facile), 2,4 in B1–B2 (medio), 2,6 in C1–C3 (intenso).",
+        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in zona A (A1–A2), 2,4 in zona B (B1–B2), 2,6 in zona C (C1–C3).",
       })
     ).toBeTruthy();
   });

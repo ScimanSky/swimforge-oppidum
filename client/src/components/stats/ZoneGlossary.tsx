@@ -5,7 +5,7 @@
  * that was tapped.
  */
 import { useState } from "react";
-import { PACE_ZONES, zoneRpeLabel, type PaceZoneCode, type PaceZoneRange } from "@shared/swimMetrics";
+import { PACE_ZONES, ZONE_GROUPS_TEXT, zoneRpeLabel, type PaceZoneCode, type PaceZoneRange } from "@shared/swimMetrics";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatZonePace, PACE_ZONE_COLOR } from "@/lib/swim-metrics-view";
@@ -44,8 +44,8 @@ export function ZoneGlossary({
           <DialogTitle>{TITLE}</DialogTitle>
           <DialogDescription>
             Sette zone, dalla più lenta alla più esplosiva: più alta è la zona, più è intensa e più corte sono le
-            ripetute. Accanto al codice c'è il livello (Facile, Aerobico, Medio, Soglia, Sopra soglia), così
-            l'allenamento si segue anche senza conoscere le zone. I passi valgono per lo stile libero.
+            ripetute. {ZONE_GROUPS_TEXT} Accanto al codice c'è il livello (Facile, Aerobico, Medio, Soglia, Sopra
+            soglia), così l'allenamento si segue anche senza conoscere le zone. I passi valgono per lo stile libero.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

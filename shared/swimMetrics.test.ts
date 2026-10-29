@@ -132,15 +132,19 @@ describe("SWIM_METRIC_DEFINITIONS", () => {
       "A1 sotto 85%, A2 85–90%, B1 90–95%, B2 95–100%, C1 100–104%, C2 sopra 104%",
     );
     expect(intensity.formula).toContain("C3: un tratto di al massimo 25 m (o una vasca) più veloce del confine C1/C2");
-    expect(intensity.formula).toContain("facile = A1 + A2, medio = B1 + B2, intenso = C1 + C2 + C3");
+    expect(intensity.formula).toContain("zona A = A1 + A2, zona B = B1 + B2, zona C = C1 + C2 + C3");
     expect(intensity.conventions).toEqual(
       expect.arrayContaining([
         "I confini delle zone sono una convenzione di SwimForge, approvata dal suo ideatore: il passo soglia è il confine tra B2 e C1. Se il tuo allenatore usa altri valori, inseriscili in «Le tue zone».",
         "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, il coach e gli allenamenti.",
         "I cinque livelli sono allineati alle zone: Facile = A1, Aerobico = A2, Medio = B1, Soglia = B2 + C1, Sopra soglia = C2 + C3.",
-        "Se la zona media (B1–B2) supera circa il 35% del volume: molto lavoro in zona media. È un'indicazione basata sugli studi, non una regola.",
+        "Se la zona B (B1–B2) supera circa il 35% del volume: molto lavoro in zona B. È un'indicazione basata sugli studi, non una regola.",
+        "Le zone A sono aerobiche (lavoro facile e di base, potresti parlare), le B miste (aerobico sostenuto fino a ridosso della soglia, frasi brevi), le C anaerobiche (dalla soglia in su: ripetute brevi e recuperi lunghi).",
+        "Limiti di sicurezza degli allenamenti del coach (convenzione nostra): in un allenamento al massimo 1600 m in C1, 600 m in C2 e 300 m in C3; in C2 il recupero è almeno lungo quanto la ripetuta, in C3 almeno 3 volte; si comincia sempre con almeno 200 m facili in A1; il totale non supera 1,5 volte la mediana delle tue ultime 6 nuotate in vasca.",
       ]),
     );
+    expect(intensity.measures).toContain("zona A (aerobica), zona B (mista) e zona C (anaerobica)");
+    expect(JSON.stringify(intensity)).not.toMatch(/zona media|lavoro medio/);
     expect(JSON.stringify(intensity)).not.toMatch(/\bZ[1-5]\b/);
   });
 

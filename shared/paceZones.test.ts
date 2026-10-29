@@ -82,7 +82,7 @@ describe("the seven zones A1–C3", () => {
     expect(zoneOneLine("C3")).toBe("C3 · Sopra soglia: sprint a tutta, non si respira quasi; velocità pura, max 25 m");
   });
 
-  it("five levels aligned to the zones, and the facile/medio/intenso split", () => {
+  it("five levels aligned to the zones, and the split by zone letter A/B/C", () => {
     expect(INTENSITY_LEVELS).toEqual(["Facile", "Aerobico", "Medio", "Soglia", "Sopra soglia"]);
     expect(LEVEL_ZONES).toEqual({
       Facile: ["A1"],
@@ -91,7 +91,7 @@ describe("the seven zones A1–C3", () => {
       Soglia: ["B2", "C1"],
       "Sopra soglia": ["C2", "C3"],
     });
-    expect(INTENSITY_SPLIT).toEqual({ facile: ["A1", "A2"], medio: ["B1", "B2"], intenso: ["C1", "C2", "C3"] });
+    expect(INTENSITY_SPLIT).toEqual({ A: ["A1", "A2"], B: ["B1", "B2"], C: ["C1", "C2", "C3"] });
     expect(levelMeters([100, 200, 300, 400, 500, 600, 700])).toEqual([100, 200, 300, 900, 1300]);
   });
 

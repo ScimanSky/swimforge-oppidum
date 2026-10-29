@@ -142,8 +142,8 @@ function loadLine(m: SwimMetrics): string {
 function intensityLine(m: SwimMetrics): string {
   const last28 = m.intensity.last28;
   if (!last28) return `- Intensità: non disponibile. ${m.intensity.missing ?? ""}`.trimEnd();
-  let line = `- Intensità (ultimi 28 giorni, zone A1–C3, solo stile libero): facile (A1–A2) ${last28.easyPct}% · medio (B1–B2) ${last28.mediumPct}% · intenso (C1–C3) ${last28.hardPct}%`;
-  if (last28.mediumPct > SWIM_METRIC_THRESHOLDS.mediumZonePct) line += " (molto lavoro in zona media)";
+  let line = `- Intensità (ultimi 28 giorni, zone A1–C3, solo stile libero): zona A (A1–A2) ${last28.easyPct}% · zona B (B1–B2) ${last28.mediumPct}% · zona C (C1–C3) ${last28.hardPct}%`;
+  if (last28.mediumPct > SWIM_METRIC_THRESHOLDS.mediumZonePct) line += " (molto lavoro in zona B)";
   const shares = zoneShares(last28.zoneMeters);
   if (shares) line += ` · per zona ${shares}`;
   if (last28.coveragePct !== undefined) {
@@ -262,7 +262,7 @@ export function swimMetricsGlossary(): string {
   const lines = [
     `- ${d.css.name}: passo/100 m sostenibile a lungo; velocità critica (Wakayoshi 1992) dai migliori tratti continui a stile libero, o test 400/200 (Ginn 1993); le stime sono di solito un po' più lente del vero.`,
     `- ${d.load.name}: carico (sTSS, TrainingPeaks) = IF³ × ore × 100 sui giri nuotati; giri non a stile libero IF 0,80 (convenzione nostra); forma 42 giorni, fatica 7, equilibrio = forma − fatica a fine di ieri: sopra +${b.veryRestedAbove} molto riposato, da +${b.freshAbove} a +${b.veryRestedAbove} fresco, da ${signed(b.neutralFrom, 0)} a +${b.freshAbove} neutro, da ${signed(b.buildingFrom, 0)} a ${signed(b.neutralFrom, 0)} in costruzione, sotto ${signed(b.buildingFrom, 0)} carico alto.`,
-    `- ${d.intensity.name}: zone A1–C3 (passi e sensazioni nel blocco ZONE), solo stile libero; facile = A1–A2, medio = B1–B2, intenso = C1–C3; medio oltre il ${t.mediumZonePct}% = molto lavoro medio (Seiler).`,
+    `- ${d.intensity.name}: zone A1–C3 (passi e sensazioni nel blocco ZONE), solo stile libero; zona A = A1–A2 (aerobica), zona B = B1–B2 (mista), zona C = C1–C3 (anaerobica); zona B oltre il ${t.mediumZonePct}% = molto lavoro in zona B (Seiler). I livelli (Facile…Sopra soglia) sono un'altra scala.`,
     `- ${d.efficiency.name}: Stroke Index = velocità × distanza per bracciata (Costill 1985), contro la tua base nella stessa vasca; se sale ma la distanza per bracciata no, vai solo più veloce.`,
     `- ${d.pacing.name}: variabilità sotto 2% molto regolare, 2–4% regolare, oltre irregolare; calo nel finale oltre ${t.pacingFadePct}%; distanza per bracciata che cala oltre ${t.dpsDropPct}% = la bracciata si accorcia con la fatica (Craig e Pendergast 1979).`,
     `- ${d.volume.name}: km e nuotate a settimana; serie = settimane di fila con almeno 2 nuotate.`,

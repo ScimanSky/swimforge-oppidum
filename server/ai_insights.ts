@@ -292,7 +292,7 @@ ${SWIM_METRICS_COACH_RULES}
 2. ✅ INTERPRETA E COLLEGA I DATI
    - Confronta con la base personale e con le settimane precedenti, mai con altri nuotatori
    - Collega le metriche tra loro (es. equilibrio negativo e volume in crescita; quota media alta e regolarità nelle ripetute)
-   - Spiega cosa significa una lettura (es. "in costruzione", "molto lavoro in zona media")
+   - Spiega cosa significa una lettura (es. "in costruzione", "molto lavoro in zona B")
 
 3. ✅ DAI INDICAZIONI GENERALI (NON ALLENAMENTI SPECIFICI)
    - Identifica aree da migliorare e suggerisci direzioni generali
@@ -317,7 +317,7 @@ ${SWIM_METRICS_COACH_RULES}
 
 ESEMPI DI INSIGHTS BUONI:
 ✅ "🔄 Recupero: il tuo equilibrio è in costruzione da due settimane mentre la forma sale: stai caricando bene, ma una settimana più leggera ogni 3-4 ti aiuterà ad assorbire il lavoro."
-✅ "💪 Intensità: quasi metà del volume cade in zona media; gli studi indicano che spostarne una parte sul facile, tenendo pochi tratti intensi, rende di più."
+✅ "💪 Intensità: quasi metà del volume cade in zona B; gli studi indicano che spostarne una parte in zona A, tenendo pochi tratti in zona C, rende di più."
 ✅ "🏊 Tecnica: lo Stroke Index è sopra la tua base nella vasca da 25 m e anche la distanza per bracciata è salita: fai più strada per bracciata, non vai solo più veloce." (dillo solo se sale la distanza per bracciata; se sale solo il passo, il merito è della velocità)
 ✅ "⚡ Efficienza: nelle ripetute la distanza per bracciata cala nel finale: la fatica ti accorcia la bracciata, e lì c'è margine con un lavoro di resistenza graduale."
 ✅ "🎯 Obiettivi: la stima del passo soglia ha affidabilità media; una nuotata con un tratto continuo lungo (800 m o più) la renderebbe più solida."

@@ -15,6 +15,9 @@ describe("Le zone A1–C3", () => {
     expect(dialog).toHaveTextContent(
       "Sette zone, dalla più lenta alla più esplosiva: più alta è la zona, più è intensa e più corte sono le ripetute."
     );
+    expect(dialog).toHaveTextContent(
+      "Le zone A sono aerobiche (lavoro facile e di base, potresti parlare), le B miste (aerobico sostenuto fino a ridosso della soglia, frasi brevi), le C anaerobiche (dalla soglia in su: ripetute brevi e recuperi lunghi)."
+    );
     expect(within(dialog).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
       "A1 Recupero attivo · Facile",
       "A2 Fondo lento · Aerobico",

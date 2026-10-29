@@ -44,7 +44,7 @@ describe("addZones", () => {
 });
 
 describe("intensitySplit", () => {
-  it("facile = A1+A2, medio = B1+B2, intenso = C1+C2+C3, summing to 100", () => {
+  it("zone A = A1+A2, B = B1+B2, C = C1+C2+C3, summing to 100", () => {
     expect(intensitySplit([300, 300, 100, 100, 100, 50, 50])).toEqual({ easyPct: 60, mediumPct: 20, hardPct: 20 });
   });
 

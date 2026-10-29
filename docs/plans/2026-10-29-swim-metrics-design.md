@@ -132,9 +132,12 @@ coach e allenamenti le parlino (sostituiscono le cinque zone Z1–Z5 della prima
   il client non ricalcola mai i confini; `load.threshold = { paceSecondsPer100, source }` con
   `source` «stima», «test» o «zone manuali». `zoneCssOffsetSeconds(code, bounds)` dà il centro
   della zona rispetto al CSS per i futuri obiettivi Garmin.
-- **Mostrato:** quota facile (A1–A2), medio (B1–B2) e intenso (C1–C3) degli ultimi 28 giorni.
-  Lettura: se il medio supera ~35% del volume, «molto lavoro in zona media»; è un'indicazione
-  basata sugli studi, non una regola. Nel riquadro: interruttore «7 zone» / «5 livelli» per
+- **Mostrato:** quota in zona A (A1–A2), B (B1–B2) e C (C1–C3) degli ultimi 28 giorni,
+  nell'intestazione «64% in zona A · 16% B · 20% C». Le zone A sono aerobiche (lavoro facile e di
+  base), le B miste (aerobico sostenuto fino a ridosso della soglia), le C anaerobiche (dalla
+  soglia in su); le parole dei livelli (Facile, Medio, …) restano solo per i livelli. Lettura: se
+  la zona B supera ~35% del volume, «molto lavoro in zona B»; è un'indicazione basata sugli studi,
+  non una regola. Nel riquadro: interruttore «7 zone» / «5 livelli» per
   barra, tabella dei passi e barre settimanali impilate (8 settimane) con i colori `--pace-a1..c3`
   (dal freddo al caldo; le zone cardio restano `--zone-1..5`); «Le tue zone» (editor) e «Le zone
   A1–C3» (glossario).
