@@ -111,13 +111,17 @@ export class RedisRateLimitStore implements Store {
 
       // Use individual commands instead of multi() — pTTL is not available in multi
       const totalHits = await withRedisTimeout(() => redis.incr(redisKey), 'rate-limit INCR');
-      
-      // Only set expiry on first increment (when totalHits is 1)
-      if (totalHits === 1) {
+      let ttl = await withRedisTimeout(() => redis.pTTL(redisKey), 'rate-limit PTTL');
+
+      // Set the window on the first hit, and also whenever the key has no TTL
+      // (-1): if an earlier PEXPIRE failed or timed out after INCR created the
+      // key, it would otherwise never expire and the client would stay limited
+      // forever.
+      if (totalHits === 1 || ttl === -1) {
         await withRedisTimeout(() => redis.pExpire(redisKey, this.windowMs), 'rate-limit PEXPIRE');
+        ttl = this.windowMs;
       }
-      
-      const ttl = await withRedisTimeout(() => redis.pTTL(redisKey), 'rate-limit PTTL');
+
       const resetTime = ttl > 0 ? new Date(Date.now() + ttl) : undefined;
 
       return { totalHits, resetTime };

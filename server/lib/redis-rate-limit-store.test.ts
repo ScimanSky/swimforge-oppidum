@@ -84,14 +84,49 @@ describe("RedisRateLimitStore", () => {
       expect(result.resetTime).toBeInstanceOf(Date);
     });
 
-    it("should return resetTime as undefined when ttl is negative", async () => {
+    it("repairs a key left without TTL (orphan) by setting the expiry again", async () => {
       mockRedis.incr.mockResolvedValue(3);
-      mockRedis.pTTL.mockResolvedValue(-1); // No expiry
+      mockRedis.pTTL.mockResolvedValue(-1); // No expiry: an earlier PEXPIRE was lost
+      mockRedis.pExpire.mockResolvedValue(true);
 
       const result = await store.increment("test-key");
 
+      expect(mockRedis.pExpire).toHaveBeenCalledWith("test:test-key", 60000);
       expect(result.totalHits).toBe(3);
-      expect(result.resetTime).toBeUndefined();
+      expect(result.resetTime).toBeInstanceOf(Date);
+    });
+
+    it("a PEXPIRE lost on the first hit is repaired on the next hit (IP not limited forever)", async () => {
+      vi.useFakeTimers();
+      try {
+        // First hit: INCR creates the key, PEXPIRE never answers.
+        mockRedis.incr.mockResolvedValueOnce(1);
+        mockRedis.pTTL.mockResolvedValueOnce(-1);
+        mockRedis.pExpire.mockImplementationOnce(() => new Promise<never>(() => {}));
+        const first = store.increment("orphan");
+        await vi.advanceTimersByTimeAsync(REDIS_COMMAND_TIMEOUT_MS + 10);
+        await expect(first).resolves.toMatchObject({ totalHits: 1 }); // memory fallback, request allowed
+
+        // Next hit: the key still has no TTL, so the expiry is set now.
+        mockRedis.incr.mockResolvedValueOnce(2);
+        mockRedis.pTTL.mockResolvedValueOnce(-1);
+        mockRedis.pExpire.mockResolvedValueOnce(true);
+        const second = await store.increment("orphan");
+        expect(mockRedis.pExpire).toHaveBeenLastCalledWith("test:orphan", 60000);
+        expect(second.totalHits).toBe(2);
+        expect(second.resetTime).toBeInstanceOf(Date);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not touch the expiry of a key that already has one", async () => {
+      mockRedis.incr.mockResolvedValue(7);
+      mockRedis.pTTL.mockResolvedValue(12_000);
+
+      await store.increment("test-key");
+
+      expect(mockRedis.pExpire).not.toHaveBeenCalled();
     });
 
     it("should use in-memory fallback when Redis is not connected", async () => {
