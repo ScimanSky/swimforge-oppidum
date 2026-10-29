@@ -98,8 +98,7 @@ const PENDING: Record<Rule, string[]> = {
     "pages/Settings.tsx",
   ],
   "testo-primario": [],
-  "accento-lime": [
-  ],
+  "accento-lime": [],
   gradiente: [
     "components/ActivityInsightNotification.tsx",
     "components/BadgeUnlockNotification.tsx",
