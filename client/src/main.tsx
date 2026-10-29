@@ -9,6 +9,7 @@ import { endExpiredSession } from "@/lib/session-expired";
 import { loadNativeSessionToken } from "@/lib/session-token";
 import { createTrpcLinks } from "@/lib/trpc-client";
 import { installInAppHistory } from "@/lib/in-app-history";
+import { shouldRetryQuery } from "@/lib/query-retry";
 import "@fontsource/manrope/latin-400.css";
 import "@fontsource/manrope/latin-500.css";
 import "@fontsource/manrope/latin-600.css";
@@ -20,7 +21,9 @@ import "./index.css";
 // Before any navigation: «Indietro» and the Android back button only go back inside the app.
 installInAppHistory();
 
-const queryClient = new QueryClient();
+// NOT_FOUND, FORBIDDEN, UNAUTHORIZED and BAD_REQUEST are final: no retries (a missing club
+// said so after about 7 s); the rest keeps the default three.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: shouldRetryQuery } } });
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;

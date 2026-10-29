@@ -4,11 +4,15 @@ import { cn } from "@/lib/utils";
 
 /**
  * Brings the top of the paged list back into view when it scrolled above the viewport (or under
- * the fixed header, via the list's `scroll-margin-top`); a list already in view does not move.
+ * the fixed header, via the list's `scroll-margin-top` plus the page's `scroll-padding-top`, the
+ * status bar of the native app); a list already in view does not move.
  */
 function revealListTop(list: HTMLElement | null | undefined) {
   if (!list) return;
-  const margin = Number.parseFloat(window.getComputedStyle(list).scrollMarginTop) || 0;
+  const px = (value: string) => Number.parseFloat(value) || 0;
+  const margin =
+    px(window.getComputedStyle(list).scrollMarginTop) +
+    px(window.getComputedStyle(document.documentElement).scrollPaddingTop);
   if (list.getBoundingClientRect().top >= margin) return;
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   list.scrollIntoView?.({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });

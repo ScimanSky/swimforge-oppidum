@@ -1,10 +1,17 @@
-import { Link, useRoute } from "wouter";
-import AppLayout from "@/components/AppLayout";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText } from "lucide-react";
-import { trpc } from "@/lib/trpc";
+/**
+ * The club's shared PDFs (members only; the shell header carries the «Documenti» title and the
+ * back button to the club).
+ */
+
+import { useRoute } from "wouter";
+import { AppLayout } from "@/components/AppLayout";
 import ClubDocumentsPanel from "@/components/club/ClubDocumentsPanel";
+import { ClubAccessState } from "@/components/club/ClubPageState";
+import { clubAccess } from "@/lib/club-access";
+import { trpc } from "@/lib/trpc";
+
+/** Roles that may upload a PDF (the server checks the same list). */
+const UPLOAD_ROLES = ["owner", "admin", "moderator", "coach"];
 
 export default function ClubDocumentsPage() {
   const [match, params] = useRoute("/community/club/:clubId/documents");
@@ -17,60 +24,27 @@ export default function ClubDocumentsPage() {
 
   if (!match || !Number.isFinite(clubId)) return null;
 
-  if (clubQuery.isLoading) {
+  const access = clubAccess(clubQuery);
+  if (access !== "member") {
     return (
       <AppLayout>
-        <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento documenti...</div>
-        </div>
+        <ClubAccessState
+          access={access}
+          clubId={clubId}
+          loadingLabel="Caricamento dei documenti…"
+          notMemberText="Iscriviti al club per vedere i documenti."
+          onRetry={() => void clubQuery.refetch()}
+        />
       </AppLayout>
     );
   }
 
-  const club = clubQuery.data as any | undefined;
-  if (!club || !club.is_member) {
-    return (
-      <AppLayout>
-        <div className="container py-6 space-y-4">
-          <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Torna al club
-          </Link>
-          <div className="surface-panel p-6 text-center text-muted-foreground">
-            Devi essere iscritto al club per vedere i documenti.
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  const role = String(club.member_role ?? "");
-  const canUpload = ["owner", "admin", "moderator", "coach"].includes(role);
+  const club = clubQuery.data as any;
+  const canUpload = UPLOAD_ROLES.includes(String(club.member_role ?? ""));
 
   return (
     <AppLayout>
-      <div className="container py-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Torna al club
-            </Link>
-            <h1 className="mt-1 inline-flex items-center gap-2 text-2xl font-display font-bold">
-              <FileText className="h-5 w-5 text-action-text" />
-              Documenti Club • {club.name}
-            </h1>
-          </div>
-          <Badge variant="outline">{role || "member"}</Badge>
-        </div>
-
-        <ClubDocumentsPanel clubId={clubId} isMember={true} canUpload={canUpload} />
-
-        <div className="flex justify-end">
-          <Link href={`/community/club/${clubId}`}>
-            <Button variant="outline-neon" size="sm">Torna al feed club</Button>
-          </Link>
-        </div>
-      </div>
+      <ClubDocumentsPanel clubId={clubId} isMember canUpload={canUpload} clubName={club.name} />
     </AppLayout>
   );
 }
-

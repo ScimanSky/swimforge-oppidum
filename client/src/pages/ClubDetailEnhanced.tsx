@@ -5,7 +5,7 @@
 
 import { useId, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { Pin, ArrowLeft, Copy, Check, Upload, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
+import { Pin, ArrowLeft, Upload, X as XIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,24 +14,24 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChoiceGroup, type ChoiceOption } from "@/components/corsia/ChoiceGroup";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { toast } from "sonner";
 
 import ClubHero from "@/components/club/ClubHero";
 import ClubEventsPanel, { type ClubAgendaItem } from "@/components/club/ClubEventsPanel";
 import PulseBar, { type ClubWeeklyStats } from "@/components/club/PulseBar";
-import QuickActionsFAB from "@/components/club/QuickActionsFAB";
+import ClubCreateMenu from "@/components/club/ClubCreateMenu";
+import { ClubInviteRow } from "@/components/club/ClubInviteRow";
+import { DateTimePickerField, parseDateTimeLocal } from "@/components/club/DateTimePickerField";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
 import { pointsToRouteGeojson, routeDistanceMeters, type RoutePoint } from "@/lib/club-event-map";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
-import { publicSiteUrl } from "@/lib/public-url";
 
 async function geocodeLocation(query: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const q = query.trim();
@@ -59,124 +59,11 @@ async function geocodeLocation(query: string): Promise<{ lat: number; lng: numbe
   };
 }
 
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function toDateTimeLocalString(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
-function parseDateTimeLocal(value: string) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
-function DateTimePickerField({
-  label,
-  value,
-  onChange,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-  required?: boolean;
-}) {
-  const selected = parseDateTimeLocal(value);
-  const [open, setOpen] = useState(false);
-  const timeInputId = `event-time-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-
-  const applyDate = (nextDate: Date | undefined) => {
-    if (!nextDate) return;
-    const base = selected ?? new Date();
-    const merged = new Date(nextDate);
-    merged.setHours(base.getHours(), base.getMinutes(), 0, 0);
-    onChange(toDateTimeLocalString(merged));
-  };
-
-  const applyTime = (time: string) => {
-    const [hh, mm] = time.split(":").map((part) => Number(part));
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
-    const base = selected ?? new Date();
-    const next = new Date(base);
-    next.setHours(hh, mm, 0, 0);
-    onChange(toDateTimeLocalString(next));
-  };
-
-  const formattedLabel = selected
-    ? selected.toLocaleString("it-IT", {
-        weekday: "short",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Seleziona data e ora";
-
-  return (
-    <div className="space-y-1">
-      <Label>
-        {label}
-        {required ? " *" : ""}
-      </Label>
-      <div className="flex items-center gap-2">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="w-full justify-start font-normal">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              <span className="truncate">{formattedLabel}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-3" align="start">
-            <div className="space-y-3">
-              <Calendar
-                mode="single"
-                selected={selected ?? undefined}
-                onSelect={applyDate}
-                initialFocus
-              />
-              <div className="space-y-1">
-                <Label htmlFor={timeInputId}>Ora</Label>
-                <Input
-                  id={timeInputId}
-                  type="time"
-                  value={selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "09:00"}
-                  onChange={(e) => applyTime(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-between gap-2">
-                {!required ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onChange("")}
-                  >
-                    Rimuovi
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                <Button type="button" size="sm" onClick={() => setOpen(false)}>
-                  Conferma
-                </Button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </div>
-  );
-}
-
 export default function ClubDetailEnhanced() {
   const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
   const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
   const [match, params] = useRoute("/community/club/:id");
+  const [, navigate] = useLocation();
   const clubId = Number(params?.id);
   const [eventsFromDateIso] = useState(() => new Date().toISOString());
 
@@ -258,7 +145,7 @@ export default function ClubDetailEnhanced() {
       utils.community.clubs.get.invalidate({ clubId });
     },
     onError: (error) => {
-      toast.error(error.message || "Impossibile iscriversi al club.");
+      toast.error(errorToastMessage(error, "Impossibile iscriversi al club."));
     },
   });
   const leaveMutation = trpc.community.clubs.leave.useMutation({
@@ -287,14 +174,14 @@ export default function ClubDetailEnhanced() {
       // Not refetch(): that would run even while the query is disabled.
       utils.community.clubs.weeklyStats.invalidate({ clubId });
     },
-    onError: (e) => toast.error(e.message || "Errore nella creazione"),
+    onError: (e) => toast.error(errorToastMessage(e, "Errore nella creazione")),
   });
   const createInviteMutation = trpc.community.clubs.createInvite.useMutation({
     onSuccess: () => {
       toast.success("Invito creato!");
       invitesQuery.refetch();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(errorToastMessage(e, "Invito non creato")),
   });
   const invitesQuery = trpc.community.clubs.invites.useQuery(
     { clubId },
@@ -315,11 +202,11 @@ export default function ClubDetailEnhanced() {
       utils.community.clubs.meets.list.invalidate({ clubId });
       const meetId = Number(payload?.meet?.id);
       if (Number.isFinite(meetId)) {
-        window.location.href = `/community/club/${clubId}/meet/${meetId}`;
+        navigate(`/community/club/${clubId}/meet/${meetId}`);
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Errore durante creazione convocazione");
+      toast.error(errorToastMessage(error, "Errore durante creazione convocazione"));
     },
   });
 
@@ -436,6 +323,13 @@ export default function ClubDetailEnhanced() {
     return status === "published" || status === "open";
   });
 
+  // «Nuovo post»: to the feed, in the composer.
+  const startNewPost = () => {
+    const feed = document.getElementById(feedId);
+    feed?.scrollIntoView({ behavior: "smooth", block: "start" });
+    feed?.querySelector<HTMLTextAreaElement>("textarea")?.focus({ preventScroll: true });
+  };
+
   const handleJoinClub = () => {
     if (!hasClubRules) {
       joinMutation.mutate({ clubId });
@@ -495,6 +389,19 @@ export default function ClubDetailEnhanced() {
             pbLeaderboardHref={pbLeaderboardHref}
             coachPageHref={coachAreaHref}
             hasActiveMeet={hasActiveMeet}
+            createMenu={
+              isMember ? (
+                <ClubCreateMenu
+                  role={memberRole}
+                  meetsEnabled={clubMeetsV1Enabled}
+                  onPost={startNewPost}
+                  onCreateEvent={() => setCreateEventOpen(true)}
+                  // Meet calls and invites live in the coach area.
+                  onCreateMeet={() => navigate(coachAreaHref)}
+                  onInvite={() => navigate(coachAreaHref)}
+                />
+              ) : null
+            }
           />
 
           {pinnedAnnouncements.length > 0 && (
@@ -544,16 +451,6 @@ export default function ClubDetailEnhanced() {
           </div>
         ) : null}
       </div>
-
-        {/* Quick Actions FAB */}
-        <QuickActionsFAB
-          isMember={isMember}
-          isStaff={isStaff}
-          onPost={() => document.getElementById(feedId)?.scrollIntoView({ behavior: "smooth" })}
-          onCreateEvent={() => setCreateEventOpen(true)}
-          onCreateMeet={clubMeetsV1Enabled && isStaff ? () => { window.location.href = coachAreaHref; } : undefined}
-          onInvite={isStaff ? () => { window.location.href = coachAreaHref; } : () => {}}
-        />
 
         {/* Members Sheet */}
         <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
@@ -617,7 +514,7 @@ export default function ClubDetailEnhanced() {
                 disabled={!joinRulesAccepted || joinMutation.isPending}
                 onClick={() => joinMutation.mutate({ clubId, acceptRules: true })}
               >
-                {joinMutation.isPending ? "Iscrizione..." : "Accetta e iscriviti"}
+                {joinMutation.isPending ? "Iscrizione…" : "Accetta e iscriviti"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -625,7 +522,7 @@ export default function ClubDetailEnhanced() {
 
         {/* Create Meet Dialog */}
         <Dialog open={clubMeetsV1Enabled ? createMeetOpen : false} onOpenChange={setCreateMeetOpen}>
-          <DialogContent className={isMobile ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4 pb-24" : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"}>
+          <DialogContent className={isMobile ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4" : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"}>
             <DialogHeader>
               <DialogTitle>Nuova convocazione gara</DialogTitle>
               <DialogDescription>
@@ -675,7 +572,7 @@ export default function ClubDetailEnhanced() {
                   rows={3}
                   value={newMeet.notes}
                   onChange={(e) => setNewMeet((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Dettagli tecnici, logistica, convocazione..."
+                  placeholder="Dettagli tecnici, logistica, convocazione…"
                 />
               </div>
             </div>
@@ -717,7 +614,7 @@ export default function ClubDetailEnhanced() {
                 }}
                 disabled={createMeetMutation.isPending}
               >
-                {createMeetMutation.isPending ? "Creazione..." : "Crea convocazione"}
+                {createMeetMutation.isPending ? "Creazione…" : "Crea convocazione"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -728,7 +625,7 @@ export default function ClubDetailEnhanced() {
           <DialogContent
             className={
               isMobile
-                ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4 pb-24"
+                ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4"
                 : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"
             }
           >
@@ -773,7 +670,7 @@ export default function ClubDetailEnhanced() {
                     onClick={handleFindLocationOnMap}
                     disabled={isGeocodingLocation || !newEvent.location.trim()}
                   >
-                    {isGeocodingLocation ? "Cerco..." : "Trova su mappa"}
+                    {isGeocodingLocation ? "Cerco…" : "Trova su mappa"}
                   </Button>
                   {newEvent.locationLat !== null && newEvent.locationLng !== null && (
                     <span className="text-xs text-muted-foreground">
@@ -882,7 +779,7 @@ export default function ClubDetailEnhanced() {
                   });
                 }}
               >
-                {createEventMutation.isPending ? "Creazione..." : "Crea evento"}
+                {createEventMutation.isPending ? "Creazione…" : "Crea evento"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -901,13 +798,13 @@ export default function ClubDetailEnhanced() {
                 disabled={createInviteMutation.isPending}
                 onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
               >
-                {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
+                {createInviteMutation.isPending ? "Generazione…" : "Genera nuovo invito"}
               </Button>
               {(invitesQuery.data as any[])?.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Inviti attivi</p>
                   {(invitesQuery.data as any[]).map((inv: any) => (
-                    <InviteRow key={inv.id} invite={inv} />
+                    <ClubInviteRow key={inv.id} invite={inv} />
                   ))}
                 </div>
               )}
@@ -1009,18 +906,18 @@ function ClubSettingsForm({
 
   const imageKitAuth = trpc.community.clubs.media.imageKitAuth.useMutation();
   const generateBrandAssetMutation = trpc.community.clubs.media.generateBrandAsset.useMutation({
-    onError: (e) => toast.error(e.message || "Generazione AI non riuscita"),
+    onError: (e) => toast.error(errorToastMessage(e, "Generazione AI non riuscita")),
   });
+  // No onError toast: handleSave's catch shows one for this and for the image uploads.
   const updateMutation = trpc.community.clubs.update.useMutation({
     onSuccess: () => { toast.success("Club aggiornato!"); onSaved(); },
-    onError: (e) => toast.error(e.message),
   });
   const deleteMutation = trpc.community.clubs.delete.useMutation({
     onSuccess: () => {
       toast.success("Club eliminato");
       setLocation("/home/community");
     },
-    onError: (e) => toast.error(e.message || "Impossibile eliminare il club"),
+    onError: (e) => toast.error(errorToastMessage(e, "Impossibile eliminare il club")),
   });
 
   const handleFilePick = (file: File, target: "logo" | "cover") => {
@@ -1115,8 +1012,7 @@ function ClubSettingsForm({
         ...(coverImageUrl !== undefined ? { coverImageUrl } : {}),
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Errore nel salvataggio";
-      toast.error(msg);
+      toast.error(errorToastMessage(e, "Errore nel salvataggio"));
     } finally {
       setSaving(false);
     }
@@ -1171,7 +1067,7 @@ function ClubSettingsForm({
             disabled={generatingAssetKind !== null || saving || !isOwner}
             onClick={() => void handleGenerateAsset("logo")}
           >
-            {generatingAssetKind === "logo" ? "Genero logo..." : "Genera logo AI"}
+            {generatingAssetKind === "logo" ? "Genero logo…" : "Genera logo AI"}
           </Button>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -1225,7 +1121,7 @@ function ClubSettingsForm({
             disabled={generatingAssetKind !== null || saving || !isOwner}
             onClick={() => void handleGenerateAsset("cover")}
           >
-            {generatingAssetKind === "cover" ? "Genero copertina..." : "Genera copertina AI"}
+            {generatingAssetKind === "cover" ? "Genero copertina…" : "Genera copertina AI"}
           </Button>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -1247,7 +1143,7 @@ function ClubSettingsForm({
       {/* Tagline */}
       <div>
         <label className="text-sm font-medium">Tagline</label>
-        <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={200} placeholder="Motto del club..." />
+        <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={200} placeholder="Motto del club…" />
       </div>
 
       {/* Website URL */}
@@ -1270,7 +1166,7 @@ function ClubSettingsForm({
       {/* Rules */}
       <div>
         <label className="text-sm font-medium">Regolamento</label>
-        <Textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={2} placeholder="Regole del club..." />
+        <Textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={2} placeholder="Regole del club…" />
       </div>
 
       {/* Theme colour: only the AI logo and cover use it. */}
@@ -1306,7 +1202,7 @@ function ClubSettingsForm({
         disabled={saving}
         onClick={handleSave}
       >
-        {saving ? "Caricamento..." : "Salva modifiche"}
+        {saving ? "Caricamento…" : "Salva modifiche"}
       </Button>
 
       {isStaff ? (
@@ -1334,37 +1230,10 @@ function ClubSettingsForm({
               deleteMutation.mutate({ clubId });
             }}
           >
-            {deleteMutation.isPending ? "Eliminazione..." : "Elimina club"}
+            {deleteMutation.isPending ? "Eliminazione…" : "Elimina club"}
           </Button>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-/* ---- Invite Row ---- */
-
-function InviteRow({ invite }: { invite: any }) {
-  const [copied, setCopied] = useState(false);
-  const link = publicSiteUrl(`/community/invite/${invite.code}`);
-
-  return (
-    <div className="flex items-center gap-2 rounded-xl bg-raised py-1 pl-3 pr-1 text-sm">
-      <code className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{link}</code>
-      <span className="text-xs text-muted-foreground tabular-nums">{invite.usedCount}/{invite.maxUses}</span>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={copied ? "Link copiato" : "Copia link"}
-        className="shrink-0"
-        onClick={() => {
-          navigator.clipboard.writeText(link);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }}
-      >
-        {copied ? <Check className="size-4 text-success" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-      </Button>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -9,6 +7,10 @@ type ThemeToggleButtonProps = {
   className?: string;
 };
 
+/**
+ * Theme switch of the public pages (sign-in, sign-up, password): signed-in users pick the theme
+ * in Profilo › Aspetto. The name says what a press does.
+ */
 export function ThemeToggleButton({ className }: ThemeToggleButtonProps) {
   const { theme, toggleTheme, switchable } = useTheme();
 
@@ -20,10 +22,10 @@ export function ThemeToggleButton({ className }: ThemeToggleButtonProps) {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
-      aria-label="Cambia tema"
+      aria-label={theme === "dark" ? "Passa al tema chiaro" : "Passa al tema scuro"}
       className={cn("text-muted-foreground hover:text-foreground", className)}
     >
-      {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      {theme === "dark" ? <Sun className="size-5" aria-hidden /> : <Moon className="size-5" aria-hidden />}
     </Button>
   );
 }

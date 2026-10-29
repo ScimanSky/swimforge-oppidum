@@ -169,7 +169,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         isGarminSyncing={garminSync.isPending}
       />
 
-      <main className="min-h-[100dvh] pb-24 pt-20 lg:pb-8 lg:pl-[232px]">
+      {/* Clear of the fixed header and bottom bar, which grow by the system bar insets in the app. */}
+      <main className="min-h-[100dvh] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] lg:pb-[calc(2rem+env(safe-area-inset-bottom))] lg:pl-[232px]">
         <div className="mx-auto max-w-[1100px] px-4 md:px-6">
           {hub ? (
             <SectionTabs

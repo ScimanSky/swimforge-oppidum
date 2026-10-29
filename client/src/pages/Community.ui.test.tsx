@@ -158,6 +158,16 @@ describe("Community · Club (Corsia)", () => {
     expect(state.followCalls).toEqual([{ userId: 5 }]);
   });
 
+  // The server searches people by name and username only (never by email).
+  it("la ricerca dei nuotatori chiede nome o username, non l'email", () => {
+    renderCommunity();
+    const people = screen.getByRole("region", { name: "Trova nuotatori" });
+    expect(within(people).getByRole("searchbox", { name: "Cerca persone" })).toHaveAttribute(
+      "placeholder",
+      "Nome o username",
+    );
+  });
+
   it("crea un club dal dialogo", async () => {
     renderCommunity();
     await userEvent.click(screen.getByRole("button", { name: "Crea club" }));

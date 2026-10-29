@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Chip } from "@/components/corsia/Chip";
 import { LevelCard } from "@/components/corsia/LevelCard";
+import { LoadError } from "@/components/corsia/LoadState";
 import { Metric, type MetricProps } from "@/components/corsia/Metric";
 import {
   ChoiceGroup,
@@ -165,7 +166,8 @@ function ProfileSkeleton() {
 }
 
 export default function Profile() {
-  const { data: me } = trpc.auth.me.useQuery();
+  const meQuery = trpc.auth.me.useQuery();
+  const me = meQuery.data;
   const profileQuery = trpc.profile.get.useQuery();
   const profile = profileQuery.data;
   const { data: activitiesData } = trpc.activities.list.useQuery({
@@ -541,7 +543,12 @@ export default function Profile() {
           ) : null}
         </Section>
 
-        <PersonalRecordsBoard userId={Number(me?.id ?? 0)} />
+        {/* Asked for once auth.me is known (loading meanwhile); a failed auth.me can be retried. */}
+        {meQuery.isError && !me ? (
+          <LoadError onRetry={() => void meQuery.refetch()} />
+        ) : (
+          <PersonalRecordsBoard userId={Number(me?.id ?? 0)} enabled={Boolean(me)} persist />
+        )}
 
         <nav aria-label="Altro">
           <ul className="surface-panel divide-y divide-border overflow-hidden">

@@ -367,7 +367,12 @@ function pushDirectMessage(params: {
     const senderName = (sender?.rows[0] as { name?: string | null } | undefined)?.name ?? null
     await sendPushToUser(
       params.receiverId,
-      buildDirectMessagePush({ senderName, content: params.content, messageType: params.messageType })
+      buildDirectMessagePush({
+        senderId: params.senderId,
+        senderName,
+        content: params.content,
+        messageType: params.messageType,
+      })
     )
   })().catch(() => {
     // Push is best-effort.

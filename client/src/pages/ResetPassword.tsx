@@ -1,30 +1,36 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  Surface,
-  SurfaceContent,
-  SurfaceDescription,
-  SurfaceHeader,
-  SurfaceTitle,
-} from "@/components/ui/surface";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Waves, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useId, useState, type FormEvent } from "react";
+import { Link } from "wouter";
+import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { AuthLayout } from "@/components/auth/AuthLayout";
+import {
+  FieldError,
+  FormError,
+  PasswordInput,
+  fieldAria,
+  useFieldErrors,
+} from "@/components/auth/form-fields";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { authErrorMessage, MIN_PASSWORD_LENGTH } from "@/lib/auth-errors";
+import { supabase } from "@/lib/supabase";
+
+const ASIDE = {
+  headline: "Imposta una nuova password",
+  body: "Scegli una password sicura per il tuo account.",
+};
 
 export default function ResetPassword() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { errors, show, clear } = useFieldErrors<"password" | "confirm">();
+  const passwordId = useId();
+  const passwordHintId = useId();
+  const confirmId = useId();
 
   useEffect(() => {
     let mounted = true;
@@ -52,21 +58,33 @@ export default function ResetPassword() {
     };
   }, []);
 
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password || password.length < 8) {
-      toast.error("La password deve avere almeno 8 caratteri");
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast.error("Le password non coincidono");
-      return;
-    }
+  const handleReset = async (event: FormEvent) => {
+    event.preventDefault();
+    if (isLoading) return;
+    setFormError(null);
+    const valid = show(
+      {
+        password:
+          password.length < MIN_PASSWORD_LENGTH
+            ? `La password deve avere almeno ${MIN_PASSWORD_LENGTH} caratteri.`
+            : undefined,
+        confirm: !confirmPassword
+          ? "Ripeti la password."
+          : password !== confirmPassword
+            ? "Le password non coincidono."
+            : undefined,
+      },
+      [
+        ["password", passwordId],
+        ["confirm", confirmId],
+      ]
+    );
+    if (!valid) return;
 
     setIsLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
-      toast.error(error.message || "Errore durante l'aggiornamento");
+      setFormError(authErrorMessage(error, "Aggiornamento non riuscito. Riprova."));
       setIsLoading(false);
       return;
     }
@@ -78,133 +96,80 @@ export default function ResetPassword() {
     }, 300);
   };
 
+  if (!isReady) {
+    return (
+      <AuthLayout title="Nuova password" aside={ASIDE}>
+        <p role="status" className="text-center text-sm text-muted-foreground">
+          Verifica del link in corso…
+        </p>
+      </AuthLayout>
+    );
+  }
+
+  if (!hasSession) {
+    return (
+      <AuthLayout title="Link non valido" aside={ASIDE}>
+        <p className="text-center text-[15px]">Il link non è valido o è scaduto.</p>
+        <Button asChild variant="outline" className="mt-5 w-full">
+          <Link href="/forgot-password">Richiedi un nuovo link</Link>
+        </Button>
+      </AuthLayout>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)]">
-      <ThemeToggleButton className="absolute right-4 top-4 z-20" />
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-r border-border/50 bg-[linear-gradient(146deg,#0e1722_0%,#152839_46%,#0f1b27_100%)]">
-        <div className="absolute inset-0 bg-[radial-gradient(72%_84%_at_12%_0%,rgba(14,165,233,0.26),transparent_70%),radial-gradient(58%_72%_at_84%_18%,rgba(34,211,238,0.2),transparent_72%)]" />
-        <div className="absolute -left-20 bottom-[-2rem] size-80 rounded-full bg-[rgba(6,182,212,0.22)] blur-3xl" />
-        <div className="absolute right-[-4rem] top-[24%] size-72 rounded-full bg-[rgba(59,130,246,0.16)] blur-3xl" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/16 via-background/28 to-background/72" />
-        <div className="absolute bottom-12 left-12 max-w-md">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Waves className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-display text-2xl font-bold text-foreground">
-              SwimForge
-            </span>
-          </div>
-          <h2 className="text-3xl font-display font-bold text-foreground mb-2">
-            Imposta una nuova password
-          </h2>
-          <p className="text-muted-foreground">
-            Scegli una password sicura per il tuo account.
+    <AuthLayout
+      title="Nuova password"
+      description="Inserisci e conferma la nuova password."
+      aside={ASIDE}
+      footer={
+        <Link href="/login" className="font-semibold text-action-text hover:underline">
+          Torna al login
+        </Link>
+      }
+    >
+      <form onSubmit={handleReset} noValidate aria-label="Imposta la nuova password" className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor={passwordId}>Nuova password</Label>
+          <PasswordInput
+            id={passwordId}
+            autoComplete="new-password"
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              clear("password");
+            }}
+            {...fieldAria(passwordId, errors.password, passwordHintId)}
+          />
+          <FieldError fieldId={passwordId} error={errors.password} />
+          <p id={passwordHintId} className="text-xs text-muted-foreground">
+            Almeno {MIN_PASSWORD_LENGTH} caratteri.
           </p>
         </div>
-      </div>
 
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Waves className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-display text-2xl font-bold text-foreground">
-              SwimForge
-            </span>
-          </div>
-
-          <Surface className="bg-card border-border">
-            <SurfaceHeader className="text-center">
-              <SurfaceTitle className="text-2xl font-display">Nuova password</SurfaceTitle>
-              <SurfaceDescription>
-                Inserisci e conferma la nuova password
-              </SurfaceDescription>
-            </SurfaceHeader>
-            <SurfaceContent className="space-y-4">
-              {!isReady ? (
-                <div className="text-center text-sm text-muted-foreground">
-                  Verifica del link in corso...
-                </div>
-              ) : hasSession ? (
-                <form onSubmit={handleReset} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Nuova password</Label>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Minimo 8 caratteri"
-                        className="bg-background/60 pr-10"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost-neon"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        disabled={isLoading}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Conferma password</Label>
-                    <div className="relative">
-                      <Input
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Ripeti la password"
-                        className="bg-background/60 pr-10"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost-neon"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full"
-                        onClick={() => setShowConfirmPassword((prev) => !prev)}
-                        disabled={isLoading}
-                      >
-                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Button variant="neon" type="submit" className="w-full gap-2" disabled={isLoading}>
-                    {isLoading ? "Aggiornamento..." : "Aggiorna password"}
-                    {!isLoading && <ArrowRight className="w-4 h-4" />}
-                  </Button>
-                </form>
-              ) : (
-                <div className="space-y-3 text-center text-sm text-muted-foreground">
-                  Il link non e valido o e scaduto.
-                  <Link href="/forgot-password" className="inline-flex w-full">
-                    <Button variant="outline-neon" className="w-full">
-                      Richiedi nuovo link
-                    </Button>
-                  </Link>
-                </div>
-              )}
-
-              {hasSession && (
-                <p className="text-center text-sm text-muted-foreground mt-6">
-                  Torna al{" "}
-                  <Link href="/login" className="text-action-text hover:underline">
-                    login
-                  </Link>
-                </p>
-              )}
-            </SurfaceContent>
-          </Surface>
+        <div className="space-y-2">
+          <Label htmlFor={confirmId}>Conferma password</Label>
+          <PasswordInput
+            id={confirmId}
+            autoComplete="new-password"
+            showLabel="Mostra la conferma della password"
+            value={confirmPassword}
+            onChange={(event) => {
+              setConfirmPassword(event.target.value);
+              clear("confirm");
+            }}
+            {...fieldAria(confirmId, errors.confirm)}
+          />
+          <FieldError fieldId={confirmId} error={errors.confirm} />
         </div>
-      </div>
-    </div>
+
+        <FormError error={formError} />
+
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading ? "Aggiornamento…" : "Aggiorna password"}
+          {!isLoading && <ArrowRight aria-hidden />}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

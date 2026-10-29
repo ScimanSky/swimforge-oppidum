@@ -13,6 +13,11 @@ const state = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
+  status: { data: { connected: true, email: "a@b.it" } } as Record<string, unknown>,
+  refetchStatus: vi.fn(),
+  disconnectCalls: 0,
+  disconnectOptions: null as any,
+  connectCalls: [] as unknown[],
 }));
 
 vi.mock("sonner", () => ({
@@ -37,10 +42,17 @@ vi.mock("@/lib/trpc", () => {
         profile: { get: { invalidate: state.invalidateProfile } },
       }),
       garmin: {
-        status: { useQuery: () => ({ data: { connected: true, email: "a@b.it" } }) },
-        connect: { useMutation: idleMutation },
+        status: { useQuery: () => ({ ...state.status, refetch: state.refetchStatus }) },
+        connect: {
+          useMutation: () => ({ mutate: (vars: unknown) => state.connectCalls.push(vars), isPending: false }),
+        },
         completeMfa: { useMutation: idleMutation },
-        disconnect: { useMutation: idleMutation },
+        disconnect: {
+          useMutation: (options: any) => {
+            state.disconnectOptions = options;
+            return { mutate: () => (state.disconnectCalls += 1), isPending: false };
+          },
+        },
         sync: {
           useMutation: (options: any) => {
             state.syncOptions = options;
@@ -59,6 +71,9 @@ describe("GarminSection sync count", () => {
   beforeEach(() => {
     state.syncCalls = [];
     state.syncPending = false;
+    state.status = { data: { connected: true, email: "a@b.it" } };
+    state.disconnectCalls = 0;
+    state.connectCalls = [];
     vi.clearAllMocks();
   });
 
@@ -136,5 +151,63 @@ describe("GarminSection sync count", () => {
     render(<GarminSection garminConnected />);
 
     expect(screen.getByRole("button", { name: /Sincronizzazione/ })).toBeDisabled();
+  });
+});
+
+describe("GarminSection (Corsia)", () => {
+  beforeEach(() => {
+    state.status = { data: { connected: true, email: "a@b.it", lastSync: "2026-10-27T09:47:00" } };
+    state.disconnectCalls = 0;
+    state.connectCalls = [];
+    vi.clearAllMocks();
+  });
+  afterEach(cleanup);
+
+  it("collegato: titolo, account, ultima sincronizzazione e «Scollega» con il suo nome", async () => {
+    const user = userEvent.setup();
+    render(<GarminSection garminConnected />);
+    expect(screen.getByRole("region", { name: "Garmin Connect" })).toBeInTheDocument();
+    expect(screen.getByText("Collegato come a@b.it")).toBeInTheDocument();
+    expect(screen.getByText("Ultima sincronizzazione: mar 27 ott · 09:47")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Scollega" }));
+    expect(state.disconnectCalls).toBe(1);
+  });
+
+  it("errore nello scollegamento: il messaggio del server, se in italiano", () => {
+    render(<GarminSection garminConnected />);
+    state.disconnectOptions.onError(Object.assign(new Error("Garmin non risponde"), { data: { code: "BAD_GATEWAY" } }));
+    expect(state.toastError).toHaveBeenCalledWith("Garmin non risponde");
+  });
+
+  it("non collegato: «Collega» apre il modulo con campi etichettati", async () => {
+    state.status = { data: { connected: false } };
+    const user = userEvent.setup();
+    render(<GarminSection garminConnected={false} />);
+    expect(screen.getByText("Non collegato")).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Collega" }));
+    expect(screen.getByRole("dialog", { name: "Collega Garmin Connect" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Email Garmin"), "me@garmin.it");
+    await user.type(screen.getByLabelText("Password Garmin"), "segreta");
+    await user.click(screen.getByRole("button", { name: "Collega account" }));
+    expect(state.connectCalls).toEqual([{ email: "me@garmin.it", password: "segreta" }]);
+  });
+
+  it("stato in caricamento: niente «Collega» finché non si sa", () => {
+    state.status = { data: undefined, isLoading: true };
+    render(<GarminSection garminConnected={false} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Caricamento dello stato di Garmin…");
+    expect(screen.queryByRole("button", { name: "Collega" })).toBeNull();
+  });
+
+  it("stato non caricato: errore con «Riprova», niente «Collega»", async () => {
+    state.status = { data: undefined, isError: true };
+    const user = userEvent.setup();
+    render(<GarminSection garminConnected={false} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Non riesco a caricare i dati");
+    expect(screen.queryByRole("button", { name: "Collega" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.refetchStatus).toHaveBeenCalled();
   });
 });

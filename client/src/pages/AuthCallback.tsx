@@ -1,18 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { CheckCircle2, Loader2, MailCheck, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
+import { AppLayout } from "@/components/AppLayout";
+import { Wordmark } from "@/components/corsia/Wordmark";
+import { Button } from "@/components/ui/button";
+import { authErrorMessage } from "@/lib/auth-errors";
+import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
-import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
-import { toast } from "sonner";
-import { Waves, Loader2 } from "lucide-react";
-import { AppLayout } from "@/components/AppLayout";
 
 const PKCE_VERIFIER_MISSING_RE = /pkce code verifier not found|code verifier/i;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const SIGN_IN_FAILED = "Accesso non riuscito. Riprova.";
+const SESSION_EXPIRED = "Sessione di accesso scaduta o non valida. Riprova ad accedere.";
+const NO_SESSION = "Sessione di accesso non trovata. Riprova ad accedere.";
+
+type Status = "loading" | "success" | "error" | "confirmed";
+
+/**
+ * `/auth/callback` on the web: return from Google (PKCE code or implicit tokens) and the link of
+ * the sign-up confirmation email. A public page: its state is the page's h1.
+ */
 export default function AuthCallback() {
   const [, navigate] = useLocation();
-  const [status, setStatus] = useState<"loading" | "success" | "error" | "confirmed">("loading");
+  const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState("");
 
   const utils = trpc.useUtils();
@@ -31,10 +44,10 @@ export default function AuthCallback() {
         window.location.href = target;
       }, 1000);
     } catch (error) {
+      // The server's messages for this step are English: the Italian fallback instead.
       console.error('[AuthCallback] syncSupabaseUser ERROR:', error);
       setStatus("error");
-      setErrorMessage((error as Error)?.message || "Errore durante la sincronizzazione");
-      toast.error("Errore durante l'accesso");
+      setErrorMessage(SIGN_IN_FAILED);
     }
   };
 
@@ -51,7 +64,6 @@ export default function AuthCallback() {
     const handleAuthCallback = async () => {
       try {
         console.log('[AuthCallback] Starting auth callback...');
-        console.log('[AuthCallback] Full URL:', window.location.href);
 
         let session = null;
         let error = null;
@@ -116,7 +128,7 @@ export default function AuthCallback() {
 
         if (!session) {
           console.error('[AuthCallback] No session found!');
-          throw new Error("Sessione OAuth non trovata. Riprova il login con Google.");
+          throw new Error(NO_SESSION);
         }
 
         // Prevent accidental re-processing of auth params on refresh/back.
@@ -124,26 +136,20 @@ export default function AuthCallback() {
           window.history.replaceState({}, document.title, "/auth/callback");
         }
 
-        // Sincronizza l'utente con il backend
-        console.log('[AuthCallback] Syncing user with backend:', {
-          userId: session.user.id,
-          email: session.user.email,
-          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name
-        });
-        
         console.log('[AuthCallback] Calling syncSupabaseUser mutation...');
         await syncWithBackend(session);
       } catch (error: any) {
         setStatus("error");
-        const rawMessage = error?.message || "Errore durante l'autenticazione";
-        if (PKCE_VERIFIER_MISSING_RE.test(rawMessage)) {
-          setErrorMessage("Sessione OAuth scaduta o non valida. Riprova ad accedere con Google.");
+        const rawMessage = error?.message || "";
+        if (rawMessage === NO_SESSION) {
+          setErrorMessage(NO_SESSION);
+        } else if (PKCE_VERIFIER_MISSING_RE.test(rawMessage)) {
+          setErrorMessage(SESSION_EXPIRED);
         } else {
-          setErrorMessage(rawMessage);
+          setErrorMessage(authErrorMessage(error, SIGN_IN_FAILED));
         }
-        toast.error("Errore durante l'accesso con Google");
         console.error(error);
-        
+
         // Redirect alla pagina di login dopo 3 secondi
         setTimeout(() => {
           navigate("/login");
@@ -155,54 +161,53 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
-      <div className="relative w-full max-w-md">
-        {/* Local glow accents */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-10 -left-10 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
-          <div className="absolute -bottom-12 -right-12 w-52 h-52 bg-cyan-500/10 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative z-10 text-center space-y-6">
-          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full flex items-center justify-center">
-            <Waves className="w-10 h-10 text-white" />
-          </div>
-
-        {status === "loading" && (
-          <>
-            <div className="flex items-center justify-center gap-3">
-              <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-              <h2 className="text-2xl font-bold text-white">Accesso in corso...</h2>
+    <AppLayout className="flex items-center justify-center p-4" withShell={false}>
+      <main className="w-full max-w-md text-center">
+        <Wordmark />
+        <div className="surface-panel mt-6 space-y-3 p-6">
+          {status === "loading" && (
+            <div role="status" className="space-y-3">
+              <Loader2 className="mx-auto size-8 animate-spin text-action-text" aria-hidden />
+              <h1 className="font-display text-[30px] font-bold leading-tight">Accesso in corso…</h1>
+              <p className="text-[15px] text-muted-foreground">Stiamo completando l&apos;accesso.</p>
             </div>
-            <p className="text-slate-400">Stiamo completando l'autenticazione con Google</p>
-          </>
-        )}
+          )}
 
-        {status === "success" && (
-          <>
-            <h2 className="text-2xl font-bold text-green-400">✓ Accesso completato!</h2>
-            <p className="text-slate-400">Reindirizzamento alla dashboard...</p>
-          </>
-        )}
+          {status === "success" && (
+            <div role="status" className="space-y-3">
+              <CheckCircle2 className="mx-auto size-8 text-success" aria-hidden />
+              <h1 className="font-display text-[30px] font-bold leading-tight">Accesso completato</h1>
+              <p className="text-[15px] text-muted-foreground">Un attimo, ti portiamo nell&apos;app…</p>
+            </div>
+          )}
 
-        {status === "confirmed" && (
-          <>
-            <p className="text-slate-300">Email confermata. Se stavi usando l'app, torna nell'app e accedi.</p>
-            <Link href="/login" className="inline-block text-sm font-semibold text-cyan-400 hover:underline">
-              Vai al login
-            </Link>
-          </>
-        )}
+          {status === "confirmed" && (
+            <>
+              <MailCheck className="mx-auto size-8 text-success" aria-hidden />
+              <h1 className="font-display text-[30px] font-bold leading-tight">Email confermata</h1>
+              <p className="text-[15px] text-muted-foreground">
+                Se stavi usando l&apos;app, torna nell&apos;app e accedi.
+              </p>
+              <Button asChild className="w-full">
+                <Link href="/login">Vai al login</Link>
+              </Button>
+            </>
+          )}
 
-        {status === "error" && (
-          <>
-            <h2 className="text-2xl font-bold text-red-400">✗ Errore</h2>
-            <p className="text-slate-400">{errorMessage}</p>
-            <p className="text-slate-500 text-sm">Reindirizzamento alla pagina di login...</p>
-          </>
-        )}
+          {status === "error" && (
+            <>
+              <div role="alert" className="space-y-3">
+                <TriangleAlert className="mx-auto size-8 text-danger" aria-hidden />
+                <h1 className="font-display text-[30px] font-bold leading-tight">Accesso non riuscito</h1>
+                <p className="text-[15px] text-muted-foreground">{errorMessage}</p>
+              </div>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/login">Vai al login</Link>
+              </Button>
+            </>
+          )}
         </div>
-      </div>
+      </main>
     </AppLayout>
   );
 }

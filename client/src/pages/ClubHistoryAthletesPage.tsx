@@ -1,4 +1,3 @@
-import { assetUrl } from "@/lib/asset-base";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import AppLayout from "@/components/AppLayout";
@@ -53,6 +52,21 @@ function isNewPersonalBest(row: any): boolean {
     return sessionCs < pbCs;
   }
   return isNewRecordNote(row?.notes);
+}
+
+function summarizeAthleteResults(results: any[]) {
+  let pointsTotal = 0;
+  let newRecordsCount = 0;
+  for (const row of results) {
+    const points = Number(row?.points ?? NaN);
+    if (Number.isFinite(points)) pointsTotal += points;
+    if (isNewPersonalBest(row)) newRecordsCount += 1;
+  }
+  return {
+    resultsCount: results.length,
+    pointsTotal: pointsTotal.toFixed(1),
+    newRecordsCount,
+  };
 }
 
 export default function ClubHistoryAthletesPage() {
@@ -125,7 +139,7 @@ export default function ClubHistoryAthletesPage() {
     return (
       <AppLayout>
         <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento storico atleti...</div>
+          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento storico atleti…</div>
         </div>
       </AppLayout>
     );
@@ -150,20 +164,8 @@ export default function ClubHistoryAthletesPage() {
   const detail = athleteDetailQuery.data as any;
   const detailResults = (detail?.results as any[]) ?? [];
   const totalAthletes = Number((athletesQuery.data as any)?.total ?? athletes.length);
-  const athleteSummary = useMemo(() => {
-    let pointsTotal = 0;
-    let newRecordsCount = 0;
-    for (const row of detailResults) {
-      const points = Number(row?.points ?? NaN);
-      if (Number.isFinite(points)) pointsTotal += points;
-      if (isNewPersonalBest(row)) newRecordsCount += 1;
-    }
-    return {
-      resultsCount: detailResults.length,
-      pointsTotal: pointsTotal.toFixed(1),
-      newRecordsCount,
-    };
-  }, [detailResults]);
+  // A plain computation, not a hook: this runs after the early returns above.
+  const athleteSummary = summarizeAthleteResults(detailResults);
 
   const jumpToDetail = () => {
     if (typeof window === "undefined") return;
@@ -193,13 +195,12 @@ export default function ClubHistoryAthletesPage() {
     <AppLayout>
       <div className="compact-shell mx-auto max-w-7xl space-y-4 px-3 pb-24 sm:px-4">
         <section className="surface-panel relative overflow-hidden p-4 sm:p-5">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_52%)]" />
           <div className="relative flex flex-wrap items-start justify-between gap-3">
             <div>
               <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft className="h-4 w-4" /> Torna al club
               </Link>
-              <h1 className="mt-1 text-2xl font-display font-bold">Storico Atleti</h1>
+              <h2 className="mt-1 text-2xl font-display font-bold">Storico Atleti</h2>
               <p className="text-sm text-muted-foreground">{club?.name ?? "Club"}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge variant="outline">Fonte Oppidum</Badge>
@@ -207,16 +208,16 @@ export default function ClubHistoryAthletesPage() {
               </div>
             </div>
             <Link href={`/community/club/${clubId}/history/meets`} className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto" variant="outline-neon" size="sm">Vai a Storico Meeting</Button>
+              <Button className="w-full sm:w-auto" variant="outline" size="sm">Vai a Storico Meeting</Button>
             </Link>
           </div>
         </section>
 
         <section className="surface-panel p-4 space-y-3">
-          <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">Filtri</p>
+          <p className="text-xs font-semibold text-muted-foreground">Filtri</p>
           <div className="grid gap-2 md:grid-cols-[1fr_220px]">
             <Input
-              placeholder="Cerca atleta..."
+              placeholder="Cerca atleta…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -240,9 +241,9 @@ export default function ClubHistoryAthletesPage() {
               <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> Atleti</span>
               <span>{(athletesQuery.data as any)?.total ?? athletes.length}</span>
             </div>
-            <p className="text-[11px] text-muted-foreground xl:hidden">Tocca un atleta per aprire il dettaglio.</p>
+            <p className="text-xs text-muted-foreground xl:hidden">Tocca un atleta per aprire il dettaglio.</p>
             {athletesQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento elenco...</p>
+              <p className="text-sm text-muted-foreground">Caricamento elenco…</p>
             ) : athletes.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nessun atleta trovato.</p>
             ) : (
@@ -258,18 +259,10 @@ export default function ClubHistoryAthletesPage() {
                     }}
                     className={`group relative w-full overflow-hidden rounded-2xl border text-left transition-all ${
                       active
-                        ? "border-primary/70 shadow-[0_0_0_1px_rgba(34,211,238,0.35),0_0_20px_rgba(34,211,238,0.18)]"
-                        : "border-border/60 hover:border-primary/45"
+                        ? "border-action-text bg-raised"
+                        : "border-border hover:bg-raised"
                     }`}
                   >
-                    <img
-                      src={assetUrl("/images/theme-v3/landing-tour-poster.png")}
-                      alt=""
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.18]"
-                      loading="lazy"
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(106deg,rgba(2,10,23,0.86)_0%,rgba(5,20,35,0.64)_45%,rgba(2,10,23,0.56)_100%)]" />
                     <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{athlete.athlete_name}</p>
@@ -278,13 +271,11 @@ export default function ClubHistoryAthletesPage() {
                       <div className="flex items-center gap-1.5">
                         <HistoryMetricCircle
                           size="sm"
-                          tone="cyan"
                           label="Ris"
                           value={String(Number(athlete.results_count ?? 0))}
                         />
                         <HistoryMetricCircle
                           size="sm"
-                          tone="lime"
                           label="Meet"
                           value={String(Number(athlete.meets_count ?? 0))}
                         />
@@ -300,7 +291,7 @@ export default function ClubHistoryAthletesPage() {
             {!selectedAthleteSlug ? (
               <p className="text-sm text-muted-foreground">Seleziona un atleta.</p>
             ) : athleteDetailQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento dettaglio atleta...</p>
+              <p className="text-sm text-muted-foreground">Caricamento dettaglio atleta…</p>
             ) : !detail?.athlete ? (
               <p className="text-sm text-muted-foreground">Dettaglio atleta non disponibile.</p>
             ) : (
@@ -313,17 +304,16 @@ export default function ClubHistoryAthletesPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {detail.athlete.linkedUserId ? <Badge variant="outline">Utente collegato</Badge> : null}
-                      <Button type="button" variant="outline-neon" size="sm" className="xl:hidden" onClick={jumpToList}>
+                      <Button type="button" variant="outline" size="sm" className="xl:hidden" onClick={jumpToList}>
                         Torna all'elenco
                       </Button>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <HistoryMetricCircle label="Risultati" tone="cyan" value={String(athleteSummary.resultsCount)} />
-                    <HistoryMetricCircle label="Punti" tone="lime" value={athleteSummary.pointsTotal} />
+                    <HistoryMetricCircle label="Risultati" value={String(athleteSummary.resultsCount)} />
+                    <HistoryMetricCircle label="Punti" value={athleteSummary.pointsTotal} />
                     <HistoryMetricCircle
                       label="Nuovi PB"
-                      tone="violet"
                       value={String(athleteSummary.newRecordsCount)}
                       highlight={athleteSummary.newRecordsCount > 0}
                     />
@@ -343,45 +333,33 @@ export default function ClubHistoryAthletesPage() {
                           key={row.id}
                           className={`relative overflow-hidden rounded-2xl border bg-card/30 p-3 ${
                             hasNewRecord
-                              ? "animate-pulse border-fuchsia-300/70 shadow-[0_0_0_1px_rgba(217,70,239,0.36),0_0_24px_rgba(34,211,238,0.2)]"
-                              : "border-border/60"
+                              ? "border-xp"
+                              : "border-border"
                           }`}
                         >
-                          <img
-                            src={assetUrl("/images/theme-v3/landing-tour-poster.png")}
-                            alt=""
-                            aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.2] saturate-[0.9] contrast-[1.03]"
-                            loading="lazy"
-                          />
-                          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(102deg,color-mix(in_oklch,var(--background)_90%,transparent)_0%,color-mix(in_oklch,var(--background)_74%,transparent)_44%,color-mix(in_oklch,var(--background)_56%,transparent)_100%)]" />
-                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_88%_12%,color-mix(in_oklch,var(--electric-lime)_12%,transparent),transparent_42%)]" />
                           <div className="relative z-10">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <p className="text-sm font-semibold break-words">{row.meet_name}</p>
                               <Badge variant="outline" className="max-w-full truncate">{row.event_label}</Badge>
                             </div>
                             {hasNewRecord ? (
-                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-fuchsia-300">Nuovo record personale</p>
+                              <p className="mt-1 text-xs font-semibold text-xp">Nuovo record personale</p>
                             ) : null}
                             <p className="mt-1 text-xs text-muted-foreground break-words">{formatDate(row.meet_date)}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <HistoryMetricCircle
                                 size="sm"
-                                tone="cyan"
                                 label="Tempo"
                                 value={formatTime(row.final_time_raw)}
                                 highlight={hasNewRecord}
                               />
                               <HistoryMetricCircle
                                 size="sm"
-                                tone="violet"
                                 label="PB"
                                 value={hasPb ? pbValue : "-"}
                               />
                               <HistoryMetricCircle
                                 size="sm"
-                                tone="lime"
                                 label="Punti"
                                 value={formatPoints(row.points)}
                               />

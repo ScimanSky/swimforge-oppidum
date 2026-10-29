@@ -1,21 +1,44 @@
 /**
- * Notification Bell Component - Sistema notifiche real-time
+ * Notification bell in the shell header: unread count (Realtime plus a 30 s poll), the latest 20
+ * notifications in a popover, «Segna tutte come lette», and a tap opens what it is about.
  */
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { Bell } from "lucide-react";
+import {
+  AtSign,
+  Award,
+  Bell,
+  CalendarDays,
+  Droplet,
+  Heart,
+  Mail,
+  MessageCircle,
+  Shield,
+  Trophy,
+  UserPlus,
+  Users,
+  Waves,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { formatTimeAgo } from "@/lib/format";
+import { toInAppPath } from "@/lib/navigation";
+import { uniqueRealtimeTopic } from "@/lib/realtime-topic";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+const LIST_INPUT = { limit: 20, onlyUnread: false } as const;
 
 const coerceBoolean = (value: unknown): boolean | undefined => {
   if (typeof value === "boolean") return value;
@@ -29,6 +52,45 @@ const coerceBoolean = (value: unknown): boolean | undefined => {
   }
   return undefined;
 };
+
+const ICONS: Record<string, LucideIcon> = {
+  post_like: Droplet,
+  splash: Droplet,
+  reaction: Heart,
+  comment: MessageCircle,
+  mention: AtSign,
+  follow: UserPlus,
+  event_invite: CalendarDays,
+  dm: Mail,
+  badge_earned: Award,
+  club_invite: Users,
+  activity_shared: Waves,
+  meet_published: Trophy,
+  report_update: Shield,
+};
+
+/** «9+» above nine. */
+const countLabel = (count: number) => (count > 9 ? "9+" : String(count));
+
+/** Where a notification leads: its own in-app link, else a page that fits its type. */
+function notificationPath(notification: any): string {
+  // In-app paths only: another site's address cannot be pushed to the history.
+  const link = toInAppPath(typeof notification.link === "string" ? notification.link : null);
+  if (link) return link;
+  const referenceId = Number(notification.referenceId ?? notification.reference_id);
+  switch (notification.type) {
+    case "mention":
+    case "reaction":
+    case "splash":
+    case "comment":
+    case "activity_shared":
+      return Number.isFinite(referenceId) && referenceId > 0 ? `/post/${referenceId}` : "/home";
+    case "follow":
+      return "/home/community";
+    default:
+      return "/home";
+  }
+}
 
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,7 +113,7 @@ export default function NotificationBell() {
   });
 
   const notificationsQuery = trpc.community.notifications.list.useQuery(
-    { limit: 20, onlyUnread: false },
+    LIST_INPUT,
     { enabled: isOpen && inAppEnabled }
   );
 
@@ -60,8 +122,14 @@ export default function NotificationBell() {
       utils.community.notifications.unreadCount.invalidate();
       utils.community.notifications.list.invalidate();
     },
-    onError: () => {
-      toast.error("Impossibile segnare la notifica come letta");
+    onError: (error, variables) => {
+      const one = variables?.notificationIds?.length === 1;
+      toast.error(
+        errorToastMessage(
+          error,
+          one ? "Impossibile segnare la notifica come letta" : "Impossibile segnare le notifiche come lette"
+        )
+      );
       utils.community.notifications.unreadCount.invalidate();
       utils.community.notifications.list.invalidate();
     },
@@ -73,7 +141,7 @@ export default function NotificationBell() {
     if (!currentUserId || !inAppEnabled) return;
 
     const channel = supabase
-      .channel(`notifications:${currentUserId}`)
+      .channel(uniqueRealtimeTopic(`notifications:${currentUserId}`))
       .on(
         "postgres_changes" as any,
         {
@@ -94,15 +162,17 @@ export default function NotificationBell() {
     };
   }, [currentUserId, inAppEnabled, utils]);
 
-  const unreadCount = unreadCountQuery.data?.count || 0;
+  const unreadCount = Math.max(0, Number(unreadCountQuery.data?.count) || 0);
 
   if (!inAppEnabled) {
     return null;
   }
 
   const handleMarkAllRead = () => {
-    markReadMutation.mutate({});
-    toast.success("Tutte le notifiche segnate come lette");
+    markReadMutation.mutate(
+      {},
+      { onSuccess: () => toast.success("Tutte le notifiche segnate come lette") }
+    );
   };
 
   const handleNotificationClick = (notification: any) => {
@@ -115,7 +185,7 @@ export default function NotificationBell() {
         old ? { count: Math.max(0, old.count - 1) } : old
       );
       // Mark the item read in the cached list
-      utils.community.notifications.list.setData({ limit: 20, onlyUnread: false }, (old) =>
+      utils.community.notifications.list.setData(LIST_INPUT, (old) =>
         old?.map((n: any) => Number(n.id) === notificationId ? { ...n, isRead: true } : n)
       );
       if (hasValidNotificationId) {
@@ -126,138 +196,97 @@ export default function NotificationBell() {
       }
     }
     setIsOpen(false);
-    const referenceId = Number(notification.referenceId ?? notification.reference_id);
-    const fallbackLink = (() => {
-      switch (notification.type) {
-        case "mention":
-        case "reaction":
-        case "splash":
-        case "comment":
-        case "activity_shared":
-          return Number.isFinite(referenceId) && referenceId > 0 ? `/post/${referenceId}` : "/home";
-        case "follow":
-          return "/home/community";
-        case "report_update":
-          return "/home";
-        default:
-          return "/home";
-      }
-    })();
-    navigate(notification.link || fallbackLink);
+    navigate(notificationPath(notification));
   };
 
-  const getNotificationIcon = (type: string) => {
-    // Restituisce emoji in base al tipo
-    switch (type) {
-      case "post_like":
-      case "splash":
-        return "💧";
-      case "comment":
-        return "💬";
-      case "follow":
-        return "👥";
-      case "event_invite":
-        return "📅";
-      case "dm":
-        return "✉️";
-      case "badge_earned":
-        return "🏅";
-      case "club_invite":
-        return "🏊";
-      case "reaction":
-        return "✨";
-      case "activity_shared":
-        return "🏊";
-      case "report_update":
-        return "🛡️";
-      default:
-        return "🔔";
-    }
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const diffMs = Date.now() - date.getTime();
-    const diffMinutes = Math.floor(diffMs / 60000);
-    
-    if (diffMinutes < 1) return "adesso";
-    if (diffMinutes < 60) return `${diffMinutes} min fa`;
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours}h fa`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}g fa`;
-    return date.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
-  };
+  const notifications = (notificationsQuery.data ?? []) as any[];
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={unreadCount > 0 ? `Notifiche, ${unreadCount} non lette` : "Notifiche"}
+        >
+          <Bell className="size-5" aria-hidden />
           {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            <span
+              aria-hidden
+              className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
             >
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </Badge>
+              {countLabel(unreadCount)}
+            </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] p-0" align="end">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-semibold">Notifiche</h3>
+        <div className="flex items-center justify-between gap-2 border-b border-border p-4">
+          <h2 className="text-[17px] font-bold">Notifiche</h2>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={handleMarkAllRead}
-              className="text-xs"
+              disabled={markReadMutation.isPending}
+              className="text-action-text"
             >
               Segna tutte come lette
             </Button>
           )}
         </div>
-        <ScrollArea className="h-[400px]">
-          {notificationsQuery.isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-            </div>
-          ) : !notificationsQuery.data || notificationsQuery.data.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-              <Bell className="h-8 w-8 mb-2" />
+        <ScrollArea className="h-[min(400px,60dvh)]">
+          {notificationsQuery.isPending ? (
+            <LoadingSkeleton label="Caricamento delle notifiche…" count={4} className="space-y-2 p-4" />
+          ) : notificationsQuery.isError ? (
+            <LoadError variant="inline" onRetry={() => void notificationsQuery.refetch()} className="p-4" />
+          ) : notifications.length === 0 ? (
+            <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
+              <Bell className="mb-2 size-8" aria-hidden />
               <p className="text-sm">Nessuna notifica</p>
             </div>
           ) : (
-            <div className="divide-y">
-              {notificationsQuery.data.map((notification: any) => (
-                <button
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification)}
-                  className={`w-full text-left p-4 hover:bg-accent transition-colors ${
-                    !notification.isRead ? "bg-primary/10" : ""
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <div className="text-2xl flex-shrink-0">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm mb-1">{notification.title}</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatTimeAgo(notification.createdAt)}
-                      </p>
-                    </div>
-                    {!notification.isRead && (
-                      <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
+            <ul className="divide-y divide-border">
+              {notifications.map((notification) => {
+                const Icon = ICONS[String(notification.type)] ?? Bell;
+                const unread = !notification.isRead;
+                return (
+                  <li key={notification.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleNotificationClick(notification)}
+                      className={cn(
+                        "flex w-full gap-3 p-4 text-left transition-colors hover:bg-raised",
+                        unread && "bg-primary/10"
+                      )}
+                    >
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-full bg-raised",
+                          unread ? "text-action-text" : "text-muted-foreground"
+                        )}
+                      >
+                        <Icon className="size-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        {/* Spaces between the blocks keep the button's name readable. */}
+                        <span className="mb-1 block text-sm font-semibold">{notification.title}</span>{" "}
+                        <span className="line-clamp-2 block text-sm text-muted-foreground">
+                          {notification.message}
+                        </span>{" "}
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {formatTimeAgo(notification.createdAt)}
+                          {unread ? <span className="sr-only">, non letta</span> : null}
+                        </span>
+                      </span>
+                      {unread ? <span aria-hidden className="mt-2 size-2 shrink-0 rounded-full bg-primary" /> : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </ScrollArea>
       </PopoverContent>

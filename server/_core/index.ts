@@ -16,12 +16,7 @@ import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
 import { assertAuthEnv } from "./env";
 import { healthRouter } from "../routes/health";
-import {
-  LinkPreviewInputError,
-  buildLinkPreviewImageProxyUrl,
-  fetchLinkPreviewImage,
-  fetchLinkPreviewMetadata,
-} from "../lib/link_preview";
+import { linkPreviewRouter } from "../routes/link_preview";
 
 // Security middleware
 import { requestLogger, errorHandler, logger } from "../middleware/logger";
@@ -110,14 +105,6 @@ function authorizeCronRequest(req: Request, res: Response): boolean {
   }
 
   return true;
-}
-
-function queryParamToString(value: unknown): string | null {
-  if (Array.isArray(value)) {
-    const first = value[0];
-    return typeof first === "string" ? first : null;
-  }
-  return typeof value === "string" ? value : null;
 }
 
 function buildSwaggerAuthMiddleware() {
@@ -379,55 +366,8 @@ async function startServer() {
     }
   });
 
-  app.get("/api/link-preview", async (req, res) => {
-    const rawUrl = queryParamToString(req.query.url);
-    if (!rawUrl) {
-      return res.status(400).json({ error: "Parametro url mancante." });
-    }
-
-    try {
-      const metadata = await fetchLinkPreviewMetadata(rawUrl);
-      return res.json({
-        ...metadata,
-        imageProxyUrl: metadata.imageUrl ? buildLinkPreviewImageProxyUrl(metadata.imageUrl) : null,
-      });
-    } catch (error) {
-      if (error instanceof LinkPreviewInputError) {
-        return res.status(400).json({ error: error.message });
-      }
-
-      const err = toError(error);
-      log.warn("[LinkPreview] Metadata fetch failed", {
-        event: "link_preview:metadata_failed",
-        message: err.message,
-      });
-      return res.status(502).json({ error: "Anteprima link non disponibile." });
-    }
-  });
-
-  app.get("/api/link-preview/image", async (req, res) => {
-    const rawUrl = queryParamToString(req.query.url);
-    if (!rawUrl) {
-      return res.status(400).json({ error: "Parametro url mancante." });
-    }
-
-    try {
-      const image = await fetchLinkPreviewImage(rawUrl);
-      res.setHeader("Content-Type", image.mimeType);
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
-      return res.status(200).send(image.buffer);
-    } catch (error) {
-      if (error instanceof LinkPreviewInputError) {
-        return res.status(400).json({ error: error.message });
-      }
-      const err = toError(error);
-      log.warn("[LinkPreview] Image proxy failed", {
-        event: "link_preview:image_failed",
-        message: err.message,
-      });
-      return res.status(502).json({ error: "Immagine anteprima non disponibile." });
-    }
-  });
+  // Link previews: authenticated, SSRF-guarded fetches of external pages and images.
+  app.use(linkPreviewRouter);
 
   // tRPC API
   app.use(

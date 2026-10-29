@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { motion } from "framer-motion";
 import { useLocation, useSearch } from "wouter";
 
 import { trpc } from "@/lib/trpc";
@@ -18,6 +18,14 @@ import {
 } from "@/lib/onboarding";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import {
   OnboardingWelcomeComposition,
   ONBOARDING_WELCOME_DURATION_FRAMES,
   ONBOARDING_WELCOME_FPS,
@@ -25,7 +33,7 @@ import {
   ONBOARDING_WELCOME_WIDTH,
 } from "./OnboardingWelcomeComposition";
 import { OnboardingIdentitySetup } from "./OnboardingIdentitySetup";
-import { OnboardingFirstAction } from "./OnboardingFirstAction";
+import { OnboardingFirstAction, firstActionTitle } from "./OnboardingFirstAction";
 
 type Stage = "hidden" | "welcome" | "identity" | "tour" | "first-action";
 
@@ -409,187 +417,185 @@ export default function OnboardingFlow() {
   const step = TOUR_STEPS[currentStep];
   const tooltip = getTooltipPosition(highlightRect);
 
-  return createPortal(
-    <AnimatePresence>
+  return (
+    <>
       {stage === "welcome" && (
-        <motion.div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <OnboardingDialog
+          title="Benvenuto nel tour guidato"
+          description="Un video rapido e poi una guida interattiva sui punti chiave dell'app."
+          onDismiss={() => void skipWelcome()}
+          className="max-w-4xl"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="w-full max-w-4xl overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_82%,transparent)] shadow-[0_0_52px_var(--neon-soft)]"
-          >
-            <div className="border-b border-border/70 px-5 py-4 sm:px-6">
-              <h2 className="font-display text-xl font-bold text-foreground">Benvenuto nel tour guidato</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Un video rapido e poi una guida interattiva sui punti chiave dell'app.
-              </p>
-            </div>
-
-            <div className="bg-black/25 p-3 sm:p-4">
-              <Suspense
-                fallback={(
-                  <div
-                    className="w-full animate-pulse rounded-2xl bg-black/40"
-                    style={{ aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}` }}
-                  />
-                )}
-              >
-                <OnboardingPlayer
-                  component={OnboardingWelcomeComposition}
-                  durationInFrames={ONBOARDING_WELCOME_DURATION_FRAMES}
-                  fps={ONBOARDING_WELCOME_FPS}
-                  compositionHeight={ONBOARDING_WELCOME_HEIGHT}
-                  compositionWidth={ONBOARDING_WELCOME_WIDTH}
-                  controls={false}
-                  autoPlay
-                  loop={false}
-                  inputProps={{ userName: meQuery.data?.name ?? null }}
-                  style={{
-                    width: "100%",
-                    borderRadius: 16,
-                    aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
-                  }}
+          {/* The video repeats the dialog's title and line: hidden from screen readers. */}
+          <div className="bg-raised p-3 sm:p-4" aria-hidden>
+            <Suspense
+              fallback={(
+                <div
+                  className="w-full animate-pulse rounded-2xl bg-card"
+                  style={{ aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}` }}
                 />
-              </Suspense>
-            </div>
+              )}
+            >
+              <OnboardingPlayer
+                component={OnboardingWelcomeComposition}
+                durationInFrames={ONBOARDING_WELCOME_DURATION_FRAMES}
+                fps={ONBOARDING_WELCOME_FPS}
+                compositionHeight={ONBOARDING_WELCOME_HEIGHT}
+                compositionWidth={ONBOARDING_WELCOME_WIDTH}
+                controls={false}
+                autoPlay
+                loop={false}
+                inputProps={{ userName: meQuery.data?.name ?? null }}
+                style={{
+                  width: "100%",
+                  borderRadius: 16,
+                  aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
+                }}
+              />
+            </Suspense>
+          </div>
 
-            <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
-              <Button variant="ghost-neon" onClick={() => void skipWelcome()}>
-                Salta tour
-              </Button>
-              <Button variant="neon" onClick={handleWelcomeContinue} disabled={!welcomeCompleted}>
-                {welcomeCompleted ? "Inizia tour interattivo" : "Attendi fine intro..."}
-              </Button>
-            </div>
-          </motion.div>
-        </motion.div>
+          <div className="flex flex-col gap-2 border-t border-border px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
+            <Button variant="ghost" onClick={() => void skipWelcome()}>
+              Salta tour
+            </Button>
+            <Button onClick={handleWelcomeContinue} disabled={!welcomeCompleted}>
+              {welcomeCompleted ? "Inizia tour interattivo" : "Attendi la fine dell'intro…"}
+            </Button>
+          </div>
+        </OnboardingDialog>
       )}
 
       {stage === "identity" && onboardingUserId && (
-        <motion.div
-          key="identity"
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <OnboardingDialog
+          title="Configura il tuo profilo"
+          description="Due minuti per personalizzare SwimForge."
+          onDismiss={() => void completeOnboarding()}
+          className="max-w-lg"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="w-full max-w-lg overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_90%,transparent)] p-6 shadow-[0_0_52px_var(--neon-soft)]"
-          >
-            <div className="mb-4 border-b border-border/70 pb-4">
-              <h2 className="font-display text-xl font-bold text-foreground">Configura il tuo profilo</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Due minuti per personalizzare SwimForge.</p>
-            </div>
+          <div className="p-5 sm:p-6">
             <OnboardingIdentitySetup
               userId={onboardingUserId}
               onComplete={handleIdentityComplete}
               onSkip={() => void completeOnboarding()}
             />
-          </motion.div>
-        </motion.div>
+          </div>
+        </OnboardingDialog>
       )}
 
       {stage === "tour" && (
-        <motion.div
-          className="fixed inset-0 z-[120]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <div className="absolute inset-0 bg-[rgba(2,8,24,0.72)]" />
+        <Dialog open onOpenChange={(open) => { if (!open) void completeOnboarding(); }}>
+          <DialogPortal>
+            {/* Transparent: blocks the page; the dim comes from the highlight's cut-out shadow. */}
+            <DialogOverlay className="z-[120] bg-transparent" />
+            <motion.div
+              aria-hidden
+              className="pointer-events-none fixed z-[120] rounded-2xl border-2 border-action-text"
+              animate={
+                highlightRect
+                  ? {
+                      top: Math.max(8, highlightRect.top - 8),
+                      left: Math.max(8, highlightRect.left - 8),
+                      width: Math.max(24, highlightRect.width + 16),
+                      height: Math.max(24, highlightRect.height + 16),
+                    }
+                  : {
+                      top: window.innerHeight / 2 - 80,
+                      left: window.innerWidth / 2 - 150,
+                      width: 300,
+                      height: 160,
+                    }
+              }
+              transition={{ type: "spring", stiffness: 220, damping: 28, mass: 0.8 }}
+              style={{ boxShadow: "0 0 0 9999px color-mix(in oklch, var(--background) 72%, transparent)" }}
+            />
+            <DialogPrimitive.Content
+              onInteractOutside={(event) => event.preventDefault()}
+              className="fixed z-[121] rounded-2xl border border-border bg-card p-4 outline-none"
+              style={{ width: tooltip.width, left: tooltip.left, top: tooltip.top }}
+            >
+              <p className="text-xs font-semibold text-muted-foreground">
+                Passo {currentStep + 1} di {TOUR_STEPS.length}
+              </p>
+              <DialogTitle className="mt-1 text-[17px] font-bold leading-snug">{step?.title ?? "Tour"}</DialogTitle>
+              <DialogDescription className="mt-2 text-sm text-muted-foreground">{step?.body}</DialogDescription>
 
-          <motion.div
-            className="pointer-events-none absolute rounded-2xl border border-[color-mix(in_oklch,var(--electric-cyan)_58%,transparent)]"
-            animate={
-              highlightRect
-                ? {
-                    top: Math.max(8, highlightRect.top - 8),
-                    left: Math.max(8, highlightRect.left - 8),
-                    width: Math.max(24, highlightRect.width + 16),
-                    height: Math.max(24, highlightRect.height + 16),
-                  }
-                : {
-                    top: window.innerHeight / 2 - 80,
-                    left: window.innerWidth / 2 - 150,
-                    width: 300,
-                    height: 160,
-                  }
-            }
-            transition={{ type: "spring", stiffness: 220, damping: 28, mass: 0.8 }}
-            style={{
-              boxShadow: "0 0 0 9999px rgba(2,8,24,0.65), 0 0 0 1px rgba(0,245,255,0.35), 0 0 28px rgba(0,245,255,0.34)",
-            }}
-          />
-
-          <motion.div
-            className="absolute rounded-2xl border border-border/70 bg-[color-mix(in_oklch,var(--background)_84%,transparent)] p-4 shadow-[0_0_34px_var(--neon-soft)]"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            style={{
-              width: tooltip.width,
-              left: tooltip.left,
-              top: tooltip.top,
-            }}
-          >
-            <div className="mb-2 text-xs uppercase tracking-[0.16em] text-[var(--electric-cyan)]">
-              Step {currentStep + 1} di {TOUR_STEPS.length}
-            </div>
-            <h3 className="font-display text-lg font-semibold text-foreground">{step?.title ?? "Tour"}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{step?.body}</p>
-
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <Button variant="ghost-neon" onClick={() => void completeOnboarding()}>
-                Chiudi
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button variant="outline-neon" onClick={handleBackStep} disabled={currentStep === 0}>
-                  Indietro
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <Button variant="ghost" onClick={() => void completeOnboarding()}>
+                  Chiudi
                 </Button>
-                <Button variant="neon" onClick={handleNextStep}>
-                  {currentStep >= TOUR_STEPS.length - 1 ? "Fine" : "Avanti"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={handleBackStep} disabled={currentStep === 0}>
+                    Indietro
+                  </Button>
+                  <Button onClick={handleNextStep}>
+                    {currentStep >= TOUR_STEPS.length - 1 ? "Fine" : "Avanti"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        </motion.div>
+            </DialogPrimitive.Content>
+          </DialogPortal>
+        </Dialog>
       )}
 
       {stage === "first-action" && (
-        <motion.div
-          key="first-action"
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <OnboardingDialog
+          title={firstActionTitle(onboardingRole)}
+          onDismiss={() => void completeOnboarding()}
+          className="max-w-md"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_90%,transparent)] p-6 shadow-[0_0_52px_var(--neon-soft)]"
-          >
+          <div className="p-5 sm:p-6">
             <OnboardingFirstAction
               role={onboardingRole}
               onDismiss={() => void completeOnboarding()}
             />
-          </motion.div>
-        </motion.div>
+          </div>
+        </OnboardingDialog>
       )}
-    </AnimatePresence>,
-    document.body,
+    </>
+  );
+}
+
+/**
+ * A step of the onboarding as a modal dialog (focus kept inside and given back, Escape = the
+ * step's own «skip»): title and optional line in a header, the step below. Above the cookie
+ * banner (z-[85]); a click outside does not close it.
+ */
+function OnboardingDialog({
+  title,
+  description,
+  onDismiss,
+  className,
+  children,
+}: {
+  title: string;
+  description?: string;
+  onDismiss: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onDismiss(); }}>
+      <DialogPortal>
+        <DialogOverlay className="z-[120] bg-background/80" />
+        <DialogPrimitive.Content
+          // Without a description line, say so (Radix otherwise warns about a missing one).
+          {...(description ? {} : { "aria-describedby": undefined })}
+          onInteractOutside={(event) => event.preventDefault()}
+          className={cn(
+            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed left-1/2 top-1/2 z-[120] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card outline-none",
+            className,
+          )}
+        >
+          <div className="border-b border-border px-5 py-4 sm:px-6">
+            <DialogTitle className="text-[17px] font-bold">{title}</DialogTitle>
+            {description ? (
+              <DialogDescription className="mt-1 text-sm text-muted-foreground">{description}</DialogDescription>
+            ) : null}
+          </div>
+          {children}
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </Dialog>
   );
 }

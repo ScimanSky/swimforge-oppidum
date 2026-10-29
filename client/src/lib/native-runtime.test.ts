@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StatusBar } from "@capacitor/status-bar";
+import { SystemBars } from "@capacitor/core";
 import {
   createDeepLinkHandler,
-  NATIVE_THEME_COLORS,
   backButtonAction,
-  syncNativeStatusBar,
+  syncNativeSystemBars,
 } from "./native-runtime";
 
 describe("backButtonAction", () => {
@@ -23,6 +22,12 @@ describe("backButtonAction", () => {
   it("lands on Oggi instead of exiting when there is nowhere to go back to", () => {
     expect(backButtonAction("/post/7", false)).toBe("home");
     expect(backButtonAction("/home", false)).toBe("home");
+    expect(backButtonAction("/messages", false)).toBe("home");
+  });
+  it("a chat or «Nuovo messaggio» opened from a link goes up to the conversation list", () => {
+    expect(backButtonAction("/messages?con=5", false)).toBe("parent");
+    expect(backButtonAction("/messages?new=1", false)).toBe("parent");
+    expect(backButtonAction("/messages?con=5", true)).toBe("back");
   });
   // Signed out on a cold start: Oggi would 401 and reload the login page, looping.
   it.each(["/login", "/", "/register", "/auth/callback", "/privacy", "/login/?next=1"])(
@@ -59,6 +64,8 @@ describe("createDeepLinkHandler", () => {
     const { handle, navigate } = setup();
     expect(handle("https://www.swimforge.it/post/7?c=1")).toBe(true);
     expect(navigate).toHaveBeenCalledWith("/post/7?c=1");
+    expect(handle("https://swimforge.it/messages?con=5")).toBe(true);
+    expect(navigate).toHaveBeenLastCalledWith("/messages?con=5");
   });
 
   it("ignores unknown and empty URLs", () => {
@@ -98,9 +105,9 @@ vi.mock("@capacitor/app", () => ({
     exitApp: vi.fn(async () => {}),
   },
 }));
-vi.mock("@capacitor/status-bar", () => ({
-  StatusBar: { setStyle: vi.fn(async () => {}), setBackgroundColor: vi.fn(async () => {}) },
-  Style: { Dark: "DARK", Light: "LIGHT" },
+vi.mock("@capacitor/core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@capacitor/core")>()),
+  SystemBars: { setStyle: vi.fn(async () => {}) },
 }));
 vi.mock("@capacitor/splash-screen", () => ({ SplashScreen: { hide: vi.fn(async () => {}) } }));
 const pushMocks = vi.hoisted(() => ({ setPushNavigate: vi.fn() }));
@@ -157,37 +164,41 @@ describe("initNativeRuntime launch URL", () => {
   });
 });
 
-describe("syncNativeStatusBar", () => {
+describe("syncNativeSystemBars", () => {
   beforeEach(() => {
-    vi.mocked(StatusBar.setStyle).mockClear();
-    vi.mocked(StatusBar.setBackgroundColor).mockClear();
+    vi.mocked(SystemBars.setStyle).mockClear();
     platformMock.native = true;
   });
 
-  it("follows the dark theme: light icons on the dark background", () => {
-    syncNativeStatusBar("dark");
-    expect(StatusBar.setStyle).toHaveBeenCalledWith({ style: "DARK" });
-    expect(StatusBar.setBackgroundColor).toHaveBeenCalledWith({ color: NATIVE_THEME_COLORS.dark });
+  // No `bar`: the style applies to the status bar and to the navigation bar.
+  it("follows the dark theme: light icons on both system bars", () => {
+    syncNativeSystemBars("dark");
+    expect(SystemBars.setStyle).toHaveBeenCalledTimes(1);
+    expect(SystemBars.setStyle).toHaveBeenCalledWith({ style: "DARK" });
   });
 
-  it("follows the light theme: dark icons on the light background", () => {
-    syncNativeStatusBar("light");
-    expect(StatusBar.setStyle).toHaveBeenCalledWith({ style: "LIGHT" });
-    expect(StatusBar.setBackgroundColor).toHaveBeenCalledWith({ color: "#F4F7F9" });
+  it("follows the light theme: dark icons on both system bars", () => {
+    syncNativeSystemBars("light");
+    expect(SystemBars.setStyle).toHaveBeenCalledTimes(1);
+    expect(SystemBars.setStyle).toHaveBeenCalledWith({ style: "LIGHT" });
+  });
+
+  it("ignores a failing plugin call", async () => {
+    vi.mocked(SystemBars.setStyle).mockRejectedValueOnce(new Error("not implemented"));
+    expect(() => syncNativeSystemBars("dark")).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("does nothing on the web", () => {
     platformMock.native = false;
-    syncNativeStatusBar("dark");
-    expect(StatusBar.setStyle).not.toHaveBeenCalled();
-    expect(StatusBar.setBackgroundColor).not.toHaveBeenCalled();
+    syncNativeSystemBars("dark");
+    expect(SystemBars.setStyle).not.toHaveBeenCalled();
   });
 
-  it("initNativeRuntime leaves the status bar to the theme", async () => {
+  it("initNativeRuntime leaves the system bars to the theme", async () => {
     const { initNativeRuntime } = await import("./native-runtime");
     const cleanup = initNativeRuntime({ navigate: vi.fn(), onAuthCallback: vi.fn() });
-    expect(StatusBar.setStyle).not.toHaveBeenCalled();
-    expect(StatusBar.setBackgroundColor).not.toHaveBeenCalled();
+    expect(SystemBars.setStyle).not.toHaveBeenCalled();
     cleanup();
   });
 });
@@ -234,6 +245,15 @@ describe("Android back button", () => {
       wentBack: false,
       navigated: [["/today", { replace: true }]],
     });
+  });
+
+  it("a chat opened from a notification goes back to the list, not to Oggi", async () => {
+    expect(await pressBack({ sfIdx: 0 }, "/messages?con=5")).toEqual({
+      exited: false,
+      wentBack: false,
+      navigated: [["/messages", { replace: true }]],
+    });
+    expect(await pressBack({ sfIdx: 2 }, "/messages?con=5")).toEqual({ exited: false, wentBack: true, navigated: [] });
   });
 
   it("exits on Oggi, with or without history behind", async () => {

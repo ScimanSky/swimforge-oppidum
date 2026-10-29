@@ -10,6 +10,7 @@ import { LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Crown, Shield, User } from "lucide-react";
 import { formatInteger } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { Link } from "wouter";
 import { toast } from "sonner";
 
@@ -54,7 +55,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
       toast.success("Ruolo aggiornato");
       await refreshAll();
     },
-    onError: (error) => toast.error(error.message || "Impossibile aggiornare il ruolo"),
+    onError: (error) => toast.error(errorToastMessage(error, "Impossibile aggiornare il ruolo")),
   });
 
   const banMemberMutation = trpc.community.clubs.banMember.useMutation({
@@ -62,7 +63,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
       toast.success("Membro bannato");
       await refreshAll();
     },
-    onError: (error) => toast.error(error.message || "Impossibile bannare il membro"),
+    onError: (error) => toast.error(errorToastMessage(error, "Impossibile bannare il membro")),
   });
 
   const unbanMemberMutation = trpc.community.clubs.unbanMember.useMutation({
@@ -70,7 +71,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
       toast.success("Membro riammesso");
       await refreshAll();
     },
-    onError: (error) => toast.error(error.message || "Impossibile riammettere il membro"),
+    onError: (error) => toast.error(errorToastMessage(error, "Impossibile riammettere il membro")),
   });
 
   const approveRequestMutation = trpc.community.clubs.approveRequest.useMutation({
@@ -78,7 +79,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
       toast.success("Richiesta approvata");
       await refreshAll();
     },
-    onError: (error) => toast.error(error.message || "Impossibile approvare la richiesta"),
+    onError: (error) => toast.error(errorToastMessage(error, "Impossibile approvare la richiesta")),
   });
 
   const rejectRequestMutation = trpc.community.clubs.rejectRequest.useMutation({
@@ -86,7 +87,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
       toast.success("Richiesta rifiutata");
       await refreshAll();
     },
-    onError: (error) => toast.error(error.message || "Impossibile rifiutare la richiesta"),
+    onError: (error) => toast.error(errorToastMessage(error, "Impossibile rifiutare la richiesta")),
   });
 
   const displayName = (member: any) =>
@@ -205,7 +206,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
               ) : null}
             </div>
             {requestsQuery.isLoading ? (
-              <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
+              <p className="mt-2 text-sm text-muted-foreground">Caricamento…</p>
             ) : requestsQuery.error ? (
               <p className="mt-2 text-sm text-muted-foreground">{requestsQuery.error.message}</p>
             ) : requestsQuery.data && requestsQuery.data.length > 0 ? (
@@ -250,7 +251,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
               ) : null}
             </div>
             {bannedQuery.isLoading ? (
-              <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
+              <p className="mt-2 text-sm text-muted-foreground">Caricamento…</p>
             ) : bannedQuery.error ? (
               <p className="mt-2 text-sm text-muted-foreground">{bannedQuery.error.message}</p>
             ) : bannedQuery.data && bannedQuery.data.length > 0 ? (

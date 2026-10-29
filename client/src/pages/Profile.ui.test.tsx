@@ -26,13 +26,25 @@ const state = vi.hoisted(() => ({
   userAchievementBadges: [] as any[],
   activities: [] as any[],
   records: [] as any[],
+  recordsEnabled: [] as Array<boolean | undefined>,
+  me: { id: 7, name: "Marta", email: "marta@example.com" } as any,
+  meError: null as unknown,
+  meRefetch: vi.fn(),
   theme: "dark" as "dark" | "light",
   setTheme: vi.fn() as ((theme: "dark" | "light") => void) | undefined,
 }));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
-    auth: { me: { useQuery: () => ({ data: { id: 7, name: "Marta", email: "marta@example.com" } }) } },
+    auth: {
+      me: {
+        useQuery: () => ({
+          data: state.me,
+          isError: Boolean(state.meError),
+          refetch: state.meRefetch,
+        }),
+      },
+    },
     profile: {
       get: {
         useQuery: () => ({
@@ -42,7 +54,14 @@ vi.mock("@/lib/trpc", () => ({
       },
     },
     records: {
-      getByUser: { useQuery: () => ({ data: { records: state.records }, isLoading: false }) },
+      getByUser: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          state.recordsEnabled.push(options?.enabled);
+          return options?.enabled === false
+            ? { data: undefined, isPending: true, isError: false }
+            : { data: { records: state.records }, isPending: false, isError: false };
+        },
+      },
     },
     activities: { list: { useQuery: () => ({ data: state.activities }) } },
     badges: {
@@ -101,6 +120,10 @@ describe("Profilo (Corsia)", () => {
     state.userAchievementBadges = [];
     state.activities = [];
     state.records = [];
+    state.recordsEnabled = [];
+    state.me = { id: 7, name: "Marta", email: "marta@example.com" };
+    state.meError = null;
+    state.meRefetch = vi.fn();
     state.profileLoading = false;
     state.badgesLoading = false;
     state.theme = "dark";
@@ -283,5 +306,29 @@ describe("Profilo (Corsia)", () => {
     renderProfile();
     expect(screen.getByRole("radio", { name: "Chiaro" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Scuro" })).not.toBeChecked();
+  });
+  it("records: asked for once auth.me is known, loading meanwhile, never «nessun record»", () => {
+    state.me = undefined;
+    renderProfile();
+    const board = screen.getByRole("region", { name: "Record personali" });
+    expect(within(board).getByRole("status")).toHaveTextContent("Caricamento dei record…");
+    expect(within(board).queryByText("Ancora nessun record personale.")).toBeNull();
+    expect(state.recordsEnabled.every(enabled => enabled === false)).toBe(true);
+  });
+
+  it("records: a failed auth.me offers «Riprova» instead of an endless loading", async () => {
+    state.me = undefined;
+    state.meError = new Error("rete");
+    renderProfile();
+    expect(screen.queryByRole("region", { name: "Record personali" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.meRefetch).toHaveBeenCalled();
+  });
+
+  it("records: own profile remembers the FINA tables", async () => {
+    renderProfile();
+    await userEvent.click(screen.getByRole("radio", { name: "Donne" }));
+    expect(localStorage.getItem("swimforge:finaGender")).toBe("female");
+    localStorage.clear();
   });
 });

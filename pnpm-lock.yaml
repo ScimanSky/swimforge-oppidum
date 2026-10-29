@@ -62,9 +62,6 @@ importers:
       '@capacitor/splash-screen':
         specifier: 8.0.2
         version: 8.0.2(@capacitor/core@8.5.3)
-      '@capacitor/status-bar':
-        specifier: 8.0.4
-        version: 8.0.4(@capacitor/core@8.5.3)
       '@fontsource/barlow-condensed':
         specifier: 5.3.0
         version: 5.3.0
@@ -591,11 +588,6 @@ packages:
 
   '@capacitor/splash-screen@8.0.2':
     resolution: {integrity: sha512-0C6rYScr13WfAE9nPl4ScOQynmjFv9NT3Th+RZkD4ezYHmER6mcl1/lDYsv7jg3Rj3FOvLrlTlmNkUrr83kZzQ==}
-    peerDependencies:
-      '@capacitor/core': '>=8.0.0'
-
-  '@capacitor/status-bar@8.0.4':
-    resolution: {integrity: sha512-ZMzBUyHBzwDUxcHadEhvOvmoPmMQGMZgaMRJu8ohELeI6IaxoVH9ZhdF/OHnY3/yykv3Glev8Tnbh4aZY/0B0w==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -6555,10 +6547,6 @@ snapshots:
       '@capacitor/core': 8.5.3
 
   '@capacitor/splash-screen@8.0.2(@capacitor/core@8.5.3)':
-    dependencies:
-      '@capacitor/core': 8.5.3
-
-  '@capacitor/status-bar@8.0.4(@capacitor/core@8.5.3)':
     dependencies:
       '@capacitor/core': 8.5.3
 

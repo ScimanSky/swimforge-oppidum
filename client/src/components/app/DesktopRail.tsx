@@ -13,7 +13,7 @@ export type DesktopRailProps = {
 /** Desktop (≥ lg): the four tabs and the «Crea» button, below the header. */
 export function DesktopRail({ activeTab, createOpen, onCreateOpenChange, onCreateAction, isGarminSyncing }: DesktopRailProps) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-border bg-background px-3 pb-4 pt-20 lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-border bg-background px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] lg:flex">
       <nav data-tour="main-navigation" aria-label="Navigazione" className="space-y-1">
         {NAV_TABS.map((tab) => (
           <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} layout="rail" />

@@ -17,7 +17,7 @@ export default function GarminSyncCountPicker({ value, onChange, disabled, class
     <fieldset
       disabled={disabled}
       className={cn(
-        "m-0 inline-flex min-w-0 rounded-lg border border-border/60 bg-background/40 p-0.5",
+        "m-0 inline-flex min-w-0 rounded-xl border border-border bg-raised p-0.5",
         disabled && "opacity-50",
         className,
       )}
@@ -36,7 +36,7 @@ export default function GarminSyncCountPicker({ value, onChange, disabled, class
           <span
             className={cn(
               // min-h-11: 44px touch target; the text stays compact.
-              "flex min-h-11 cursor-pointer select-none items-center whitespace-nowrap rounded-md px-2.5 text-xs font-medium",
+              "flex min-h-11 cursor-pointer select-none items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold",
               "text-muted-foreground transition-colors hover:text-foreground",
               "peer-checked:bg-primary peer-checked:text-primary-foreground",
               "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",

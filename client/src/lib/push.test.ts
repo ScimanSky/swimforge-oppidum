@@ -153,6 +153,12 @@ describe("registerPushToken", () => {
     expect(navigate).toHaveBeenCalledWith("/post/9");
     await emit("pushNotificationActionPerformed", { actionId: "tap", notification: { data: { url: "https://x" } } });
     expect(navigate).toHaveBeenLastCalledWith("/home");
+    // A direct message opens the chat with its sender.
+    await emit("pushNotificationActionPerformed", {
+      actionId: "tap",
+      notification: { data: { url: "/messages?con=3", tag: "dm" } },
+    });
+    expect(navigate).toHaveBeenLastCalledWith("/messages?con=3");
 
     await emit("pushNotificationReceived", { title: "Nuovo like", body: "Ada ha messo like", data: { url: "/post/9" } });
     expect(mocks.toast).toHaveBeenCalledWith(
