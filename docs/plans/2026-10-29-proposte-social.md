@@ -63,7 +63,7 @@ stesso flusso del resto del progetto:
     massimo un'immagine generata a settimana.
 
 ## Lotto 4: con la fase 3
-19. «Nuotala anch'io»: sessioni condivise nel feed, «Salva nelle mie sessioni», «Invia al
+19. «Sessioni condivise»: un post può contenere un allenamento, con «Salva nelle mie sessioni», «Invia al
     Garmin», «fatta» collegata alla nuotata.
 
 ## Proposta 20: informativa privacy
