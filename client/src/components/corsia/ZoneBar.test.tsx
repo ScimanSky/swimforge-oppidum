@@ -49,6 +49,22 @@ describe("ZoneBar", () => {
     ]);
   });
 
+  it("con i nomi delle zone li scrive dopo la sigla", () => {
+    render(
+      <ZoneBar
+        seconds={[0, 300, 900, 0, 0]}
+        names={["Recupero", "Aerobica", "Soglia", "Anaerobica", "Massima"]}
+      />
+    );
+    expect(screen.getAllByRole("listitem").map(item => item.textContent)).toEqual([
+      "Z1 Recupero 0%",
+      "Z2 Aerobica 25%",
+      "Z3 Soglia 75%, prevalente",
+      "Z4 Anaerobica 0%",
+      "Z5 Massima 0%",
+    ]);
+  });
+
   it("senza dati non disegna nulla", () => {
     const { container } = render(<ZoneBar seconds={[]} />);
     expect(container).toBeEmptyDOMElement();

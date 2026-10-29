@@ -69,6 +69,7 @@ describe("Statistiche", () => {
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     for (const name of ["Andamento", "Analisi prestazioni", "Analisi avanzate"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
+      expect(screen.getByRole("heading", { level: 2, name })).toBeTruthy();
     }
     expect(screen.getByText("Nessun dato in questo periodo")).toBeTruthy();
 
@@ -88,12 +89,59 @@ describe("Statistiche", () => {
     await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
     expect(screen.getByText("Prestazione")).toBeTruthy();
     expect(screen.getByText("72")).toBeTruthy();
-    expect(screen.getByText("Dati insufficienti")).toBeTruthy();
+    // consistencyScore is null: no tile for it, no «Dati insufficienti».
+    expect(screen.queryByText("Costanza")).toBeNull();
+    expect(screen.queryByText("Dati insufficienti")).toBeNull();
     expect(screen.getByText("−8")).toBeTruthy();
     expect(screen.getByText("Serie attuale")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Come si calcola: SEI" }));
     expect(screen.getByRole("dialog", { name: "Indice di efficienza in acqua (SEI)" })).toBeTruthy();
+  });
+
+  it("dà un nome alle zone cardio e titoli h3 sotto le sezioni h2", async () => {
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Analisi prestazioni" }));
+    expect(screen.getByRole("heading", { level: 3, name: "Zone cardio" })).toBeTruthy();
+    const zones = screen.getAllByRole("listitem").map((item) => item.textContent);
+    expect(zones).toEqual([
+      "Z1 Recupero 10%",
+      "Z2 Aerobica 50%, prevalente",
+      "Z3 Soglia 30%",
+      "Z4 Anaerobica 10%",
+      "Z5 Massima 0%",
+    ]);
+  });
+
+  it("mostra la tendenza reale anche entro ±2 %", async () => {
+    state.advanced.trendIndicator = { direction: "down", percentage: 2 };
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
+    expect(screen.getByText("−2")).toBeTruthy();
+  });
+
+  it("senza dati non mostra riquadri vuoti ma una riga per sezione", async () => {
+    state.advanced = {
+      performanceIndex: null,
+      consistencyScore: null,
+      recoveryReadinessScore: null,
+      streak: undefined,
+      swimmingEfficiencyIndex: null,
+      technicalConsistencyIndex: null,
+      strokeEfficiencyRating: null,
+      aerobicCapacityScore: null,
+      poiBaseline: false,
+      progressiveOverloadIndex: 0,
+      trendBaseline: false,
+      trendIndicator: null,
+      predictions: null,
+    };
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
+    expect(screen.getAllByText("Servono più nuotate per questa analisi")).toHaveLength(2);
+    expect(screen.queryByText("Dati insufficienti")).toBeNull();
+    expect(screen.queryByText("Prestazione")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Come si calcola/ })).toBeNull();
   });
 
   it("mostra lo stato di caricamento", () => {

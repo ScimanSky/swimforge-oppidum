@@ -49,13 +49,16 @@ export function zoneShares(
  * Corsia cardio zones (`renders/Sessione.png`): one bar split by time in zone with the
  * `--zone-*` palette, percentages below, the dominant zone in `<strong>` and announced as
  * «prevalente». Renders nothing without zone data. The bar is decorative: the percentages are
- * the text alternative.
+ * the text alternative. With `names` (one per zone) the legend reads «Z1 Recupero 12%» and
+ * wraps on narrow screens instead of spreading across one line.
  */
 export function ZoneBar({
   seconds,
+  names,
   className,
 }: {
   seconds: readonly (number | null | undefined)[];
+  names?: readonly string[];
   className?: string;
 }) {
   const shares = zoneShares(seconds);
@@ -73,13 +76,19 @@ export function ZoneBar({
             />
           ))}
       </div>
-      <ul className="mt-3 flex justify-between gap-2 text-xs tabular-nums">
+      <ul
+        className={cn(
+          "mt-3 flex text-xs tabular-nums",
+          names ? "flex-wrap gap-x-4 gap-y-1" : "justify-between gap-2"
+        )}
+      >
         {shares.map(share => {
           const label = (
             <>
               <abbr title={`Zona ${share.zone}`} className="no-underline">
                 Z{share.zone}
               </abbr>{" "}
+              {names?.[share.zone - 1] ? `${names[share.zone - 1]} ` : null}
               {share.percent}%
             </>
           );

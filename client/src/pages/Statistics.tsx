@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   LineChart,
@@ -91,45 +91,64 @@ function MetricInfoButton({ label, info }: { label: string; info: MetricInfo }) 
   );
 }
 
-/** Tile for one score: Metric (value out of `max`) and the «how it is computed» button. */
-function ScoreTile({
-  label,
-  value,
-  unit,
-  info,
-}: {
-  label: string;
-  value: string | null;
-  unit?: string;
-  info?: MetricInfo;
-}) {
+type Score = { label: string; value: string | null; unit?: string; info?: MetricInfo };
+
+/** Tile for one score: Metric and the «how it is computed» button. */
+function ScoreTile({ label, value, unit, info }: Score & { value: string }) {
   return (
     <div className="flex items-start justify-between gap-2 rounded-2xl bg-raised p-4">
-      {value !== null ? (
-        <Metric value={value} unit={unit} label={label} size="responsive" />
-      ) : (
-        <span className="block min-w-0">
-          <span className="block text-sm text-muted-foreground">Dati insufficienti</span>
-          <span className="mt-1.5 block truncate text-xs font-medium text-muted-foreground">
-            {label}
-          </span>
-        </span>
-      )}
+      <Metric value={value} unit={unit} label={label} size="responsive" />
       {info ? <MetricInfoButton label={label} info={info} /> : null}
     </div>
+  );
+}
+
+const NOT_ENOUGH_DATA = "Servono più nuotate per questa analisi";
+
+/**
+ * A card of score tiles. A score without data has no tile («una metrica senza dato non si
+ * mostra»); a card left without tiles says so in one line.
+ */
+function ScoreSection({
+  title,
+  scores,
+  children,
+}: {
+  title: string;
+  scores: Score[];
+  children?: ReactNode;
+}) {
+  const shown = scores.filter((score): score is Score & { value: string } => score.value !== null);
+  const isEmpty = shown.length === 0 && !children;
+  return (
+    <section className="surface-panel p-4">
+      <h3 className={cardTitle}>{title}</h3>
+      {isEmpty ? (
+        <p className="mt-2 text-sm text-muted-foreground">{NOT_ENOUGH_DATA}</p>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {shown.map((score) => (
+            <ScoreTile key={score.label} {...score} />
+          ))}
+          {children}
+        </div>
+      )}
+    </section>
   );
 }
 
 const scoreValue = (value: number | null | undefined) =>
   value !== null && value !== undefined && Number.isFinite(value) ? formatInteger(value) : null;
 
-/** Signed percentage («+12», «−4», «0» inside the neutral range). */
-const signedValue = (value: number | null, neutralRange = 0) => {
+/** Signed rounded percentage: «+12», «−4», «0». */
+const signedValue = (value: number | null) => {
   if (value === null || !Number.isFinite(value)) return null;
   const rounded = Math.round(value);
-  if (Math.abs(rounded) <= neutralRange || rounded === 0) return "0";
+  if (rounded === 0) return "0";
   return rounded > 0 ? `+${formatInteger(rounded)}` : `−${formatInteger(-rounded)}`;
 };
+
+const HR_ZONE_NAMES = ["Recupero", "Aerobica", "Soglia", "Anaerobica", "Massima"] as const;
 
 export default function Statistics() {
   const [period, setPeriod] = useState(30);
@@ -208,7 +227,7 @@ export default function Statistics() {
         ) : (
           <Accordion type="single" collapsible defaultValue="timeline" className="space-y-3">
             <AccordionItem value="timeline" className="border-0">
-              <AccordionTrigger className={accordionTrigger}>
+              <AccordionTrigger headingLevel={2} className={accordionTrigger}>
                 <span className="inline-flex items-center gap-2">
                   <BarChart3 className="size-4 text-muted-foreground" aria-hidden />
                   Andamento
@@ -257,7 +276,7 @@ export default function Statistics() {
             </AccordionItem>
 
             <AccordionItem value="performance" className="border-0">
-              <AccordionTrigger className={accordionTrigger}>
+              <AccordionTrigger headingLevel={2} className={accordionTrigger}>
                 <span className="inline-flex items-center gap-2">
                   <Gauge className="size-4 text-muted-foreground" aria-hidden />
                   Analisi prestazioni
@@ -266,17 +285,17 @@ export default function Statistics() {
               <AccordionContent className="space-y-3 pt-3">
                 {hasHrZones && (
                   <section className="surface-panel p-4">
-                    <h4 className={cardTitle}>Zone cardio</h4>
+                    <h3 className={cardTitle}>Zone cardio</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Tempo nelle cinque zone di frequenza cardiaca.
                     </p>
-                    <ZoneBar seconds={hrZones} className="mt-4" />
+                    <ZoneBar seconds={hrZones} names={HR_ZONE_NAMES} className="mt-4" />
                   </section>
                 )}
 
                 {performance && performance.paceDistribution.length > 0 && (
                   <section className="surface-panel p-4">
-                    <h4 className={cardTitle}>Distribuzione del passo</h4>
+                    <h3 className={cardTitle}>Distribuzione del passo</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Nuotate per fascia di passo (min/100 m).
                     </p>
@@ -324,93 +343,96 @@ export default function Statistics() {
 
             {advanced && (
               <AccordionItem value="advanced" className="border-0">
-                <AccordionTrigger className={accordionTrigger}>
+                <AccordionTrigger headingLevel={2} className={accordionTrigger}>
                   <span className="inline-flex items-center gap-2">
                     <Sparkles className="size-4 text-muted-foreground" aria-hidden />
                     Analisi avanzate
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-3 pt-3">
-                  <section className="surface-panel p-4">
-                    <h4 className={cardTitle}>Punteggi</h4>
-                    <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-                      <ScoreTile
-                        label="Prestazione"
-                        value={scoreValue(advanced.performanceIndex)}
-                        unit="/100"
-                        info={metricsDefinitions.performanceIndex}
-                      />
-                      <ScoreTile
-                        label="Costanza"
-                        value={scoreValue(advanced.consistencyScore)}
-                        unit="/100"
-                        info={metricsDefinitions.consistencyScore}
-                      />
-                      <ScoreTile
-                        label="Recupero"
-                        value={scoreValue(advanced.recoveryReadinessScore)}
-                        unit="/100"
-                        info={metricsDefinitions.rrs}
-                      />
+                  <ScoreSection
+                    title="Punteggi"
+                    scores={[
+                      {
+                        label: "Prestazione",
+                        value: scoreValue(advanced.performanceIndex),
+                        unit: "/100",
+                        info: metricsDefinitions.performanceIndex,
+                      },
+                      {
+                        label: "Costanza",
+                        value: scoreValue(advanced.consistencyScore),
+                        unit: "/100",
+                        info: metricsDefinitions.consistencyScore,
+                      },
+                      {
+                        label: "Recupero",
+                        value: scoreValue(advanced.recoveryReadinessScore),
+                        unit: "/100",
+                        info: metricsDefinitions.rrs,
+                      },
+                    ]}
+                  >
+                    {streak ? (
                       <div className="rounded-2xl bg-raised p-4">
                         <Metric
-                          value={formatInteger(streak?.current ?? 0)}
-                          unit={streak?.current === 1 ? "giorno" : "giorni"}
+                          value={formatInteger(streak.current)}
+                          unit={streak.current === 1 ? "giorno" : "giorni"}
                           label="Serie attuale"
                           size="responsive"
                         />
                         <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                          Record {formatInteger(streak?.record ?? 0)} g
+                          Record {formatInteger(streak.record)} g
                         </p>
                       </div>
-                    </div>
-                  </section>
+                    ) : null}
+                  </ScoreSection>
 
-                  <section className="surface-panel p-4">
-                    <h4 className={cardTitle}>Metriche avanzate</h4>
-                    <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-                      <ScoreTile
-                        label="SEI"
-                        value={scoreValue(advanced.swimmingEfficiencyIndex)}
-                        unit="/100"
-                        info={metricsDefinitions.sei}
-                      />
-                      <ScoreTile
-                        label="TCI"
-                        value={scoreValue(advanced.technicalConsistencyIndex)}
-                        unit="/100"
-                        info={metricsDefinitions.tci}
-                      />
-                      <ScoreTile
-                        label="SER"
-                        value={scoreValue(advanced.strokeEfficiencyRating)}
-                        unit="/100"
-                        info={metricsDefinitions.ser}
-                      />
-                      <ScoreTile
-                        label="ACS"
-                        value={scoreValue(advanced.aerobicCapacityScore)}
-                        unit="/100"
-                        info={metricsDefinitions.acs}
-                      />
-                      <ScoreTile
-                        label="Carico progressivo"
-                        value={signedValue(progressiveOverloadValue)}
-                        unit="%"
-                        info={metricsDefinitions.poi}
-                      />
-                      <ScoreTile
-                        label="Tendenza"
-                        value={signedValue(trendValue, 2)}
-                        unit="%"
-                        info={metricsDefinitions.trend}
-                      />
-                    </div>
-                  </section>
+                  <ScoreSection
+                    title="Metriche avanzate"
+                    scores={[
+                      {
+                        label: "SEI",
+                        value: scoreValue(advanced.swimmingEfficiencyIndex),
+                        unit: "/100",
+                        info: metricsDefinitions.sei,
+                      },
+                      {
+                        label: "TCI",
+                        value: scoreValue(advanced.technicalConsistencyIndex),
+                        unit: "/100",
+                        info: metricsDefinitions.tci,
+                      },
+                      {
+                        label: "SER",
+                        value: scoreValue(advanced.strokeEfficiencyRating),
+                        unit: "/100",
+                        info: metricsDefinitions.ser,
+                      },
+                      {
+                        label: "ACS",
+                        value: scoreValue(advanced.aerobicCapacityScore),
+                        unit: "/100",
+                        info: metricsDefinitions.acs,
+                      },
+                      {
+                        label: "Carico progressivo",
+                        value: signedValue(progressiveOverloadValue),
+                        unit: "%",
+                        info: metricsDefinitions.poi,
+                      },
+                      {
+                        label: "Tendenza",
+                        value: signedValue(trendValue),
+                        unit: "%",
+                        info: metricsDefinitions.trend,
+                      },
+                    ]}
+                  />
 
                   {advanced.predictions && (
                     <section className="surface-panel p-4">
-                      <h4 className={cardTitle}>Previsioni</h4>
+                      <h3 className={cardTitle}>Previsioni</h3>
                       <p className="mt-2 text-sm text-muted-foreground">
                         Al ritmo attuale raggiungerai{" "}
                         <span className="font-bold text-foreground tabular-nums">
