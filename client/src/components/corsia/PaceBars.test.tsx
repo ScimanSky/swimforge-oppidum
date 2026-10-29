@@ -43,11 +43,13 @@ describe("PaceBars", () => {
     const { container } = render(<PaceBars bars={bars} />);
     expect(screen.getByText("Più veloce: rip. 7 · 1:47")).toBeInTheDocument();
     expect(container).toHaveTextContent("Rip. 1");
-    const columns = container.querySelectorAll("[aria-hidden] > div[title]");
-    expect(Array.from(columns, column => column.className)).toEqual([
-      expect.stringContaining("bg-chart-1/35"),
-      expect.not.stringContaining("/35"),
-      expect.stringContaining("bg-chart-1/35"),
+    // One bar per repeat; the tooltip marks the fastest, the height follows the speed.
+    expect(screen.getAllByTitle(/^Rip\./).map(bar => bar.title)).toEqual([
+      "Rip. 1 · 1:55",
+      "Rip. 7 · 1:47 · la più veloce",
+      "Rip. 10 · 1:52",
     ]);
+    expect(screen.getByTitle("Rip. 7 · 1:47 · la più veloce")).toHaveStyle({ height: "100%" });
+    expect(screen.getByTitle("Rip. 1 · 1:55")).toHaveStyle({ height: "35%" });
   });
 });

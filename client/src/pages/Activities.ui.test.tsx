@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Activities from "./Activities";
@@ -309,7 +309,7 @@ describe("Activities UI interactions", () => {
     expect(within(panel).queryByText("FC massima")).not.toBeInTheDocument();
     expect(within(panel).queryByText("Calorie")).not.toBeInTheDocument();
     expect(within(panel).getByText("Zone cardio")).toBeInTheDocument();
-    expect(within(panel).getByText((_, el) => el?.tagName === "LI" && el.textContent === "Z3 75%")).toHaveClass("font-bold");
+    expect(within(panel).getByText(", prevalente").closest("li")).toHaveTextContent("Z3 75%, prevalente");
     expect(screen.getByRole("link", { name: "Dettaglio vasche" })).toHaveAttribute("href", "/track/101");
 
     await userEvent.click(second);
@@ -345,6 +345,30 @@ describe("Activities UI interactions", () => {
     expect(screen.queryByText("Open Water")).not.toBeInTheDocument();
     expect(screen.getByText("Acque libere")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Questa settimana" })).toBeInTheDocument();
+  });
+
+  it("narrowing the window with a selected card switches the list to links, without crashing", async () => {
+    const media = Object.assign(new EventTarget(), { matches: true, media: "(min-width: 1280px)" });
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: vi.fn(() => media),
+    });
+    state.activitiesData = [swim(), swim({ id: 102, activityName: "Lago", isOpenWater: true })];
+
+    render(<Activities />);
+    await userEvent.click(screen.getByRole("button", { name: "Lago" }));
+    expect(screen.getByRole("region", { name: "Lago" })).toBeInTheDocument();
+
+    act(() => {
+      media.matches = false;
+      media.dispatchEvent(new Event("change"));
+    });
+
+    expect(screen.getByRole("link", { name: "Pool Session" })).toHaveAttribute("href", "/track/101");
+    expect(screen.getByRole("link", { name: "Lago" })).toHaveAttribute("href", "/track/102");
+    expect(screen.queryByRole("button", { name: "Lago" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Lago" })).not.toBeInTheDocument();
   });
 
   it("without matchMedia (jsdom) the layout is the wide one", () => {

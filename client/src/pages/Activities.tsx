@@ -32,6 +32,7 @@ import { WeekCard } from "@/components/corsia/WeekCard"
 import { ShareToggle } from "@/components/corsia/ShareToggle"
 import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { useCurrentDay } from "@/hooks/useCurrentDay"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { summarizeWeek } from "@/lib/week-summary"
 import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
 import { activityMetrics, activityZoneSeconds } from "@/lib/activity-metrics"
@@ -46,25 +47,6 @@ import {
 /** From here the list keeps a selection and shows the detail panel beside it. */
 const WIDE_QUERY = "(min-width: 1280px)"
 
-/** Without `matchMedia` (jsdom, very old WebViews) the layout is the desktop one. */
-const matchesWide = () =>
-  typeof window === "undefined" || typeof window.matchMedia !== "function"
-    ? true
-    : window.matchMedia(WIDE_QUERY).matches
-
-function useIsWide() {
-  const [wide, setWide] = useState(matchesWide)
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
-    const media = window.matchMedia(WIDE_QUERY)
-    const sync = () => setWide(media.matches)
-    sync()
-    media.addEventListener?.("change", sync)
-    return () => media.removeEventListener?.("change", sync)
-  }, [])
-  return wide
-}
-
 export default function Activities() {
   const [filter, setFilter] = useState("all")
   const [sort, setSort] = useState("recent")
@@ -73,7 +55,8 @@ export default function Activities() {
   const [shareActivityId, setShareActivityId] = useState<number | null>(null)
   const [syncPromptOpen, setSyncPromptOpen] = useState(false)
   const [syncPromptActivity, setSyncPromptActivity] = useState<any | null>(null)
-  const isWide = useIsWide()
+  // Without `matchMedia` (jsdom, very old WebViews) the layout is the desktop one.
+  const isWide = useMediaQuery(WIDE_QUERY)
   const [page, setPage] = useState(1)
   const panelTitleId = useId()
 

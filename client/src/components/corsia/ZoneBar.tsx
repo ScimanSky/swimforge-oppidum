@@ -47,8 +47,9 @@ export function zoneShares(
 
 /**
  * Corsia cardio zones (`renders/Sessione.png`): one bar split by time in zone with the
- * `--zone-*` palette, percentages below, the dominant zone in bold. Renders nothing without
- * zone data. The bar is decorative: the percentages are the text alternative.
+ * `--zone-*` palette, percentages below, the dominant zone in `<strong>` and announced as
+ * «prevalente». Renders nothing without zone data. The bar is decorative: the percentages are
+ * the text alternative.
  */
 export function ZoneBar({
   seconds,
@@ -73,20 +74,28 @@ export function ZoneBar({
           ))}
       </div>
       <ul className="mt-3 flex justify-between gap-2 text-xs tabular-nums">
-        {shares.map(share => (
-          <li
-            key={share.zone}
-            className={cn(
-              "whitespace-nowrap",
-              share.dominant ? "font-bold text-foreground" : "text-muted-foreground"
-            )}
-          >
-            <abbr title={`Zona ${share.zone}`} className="no-underline">
-              Z{share.zone}
-            </abbr>{" "}
-            {share.percent}%
-          </li>
-        ))}
+        {shares.map(share => {
+          const label = (
+            <>
+              <abbr title={`Zona ${share.zone}`} className="no-underline">
+                Z{share.zone}
+              </abbr>{" "}
+              {share.percent}%
+            </>
+          );
+          return (
+            <li key={share.zone} className="whitespace-nowrap text-muted-foreground">
+              {share.dominant ? (
+                <strong className="font-bold text-foreground">
+                  {label}
+                  <span className="sr-only">, prevalente</span>
+                </strong>
+              ) : (
+                label
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

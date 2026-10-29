@@ -30,18 +30,18 @@ describe("zoneShares", () => {
 });
 
 describe("ZoneBar", () => {
-  it("cinque etichette, la prevalente in grassetto, segmenti solo per le zone con tempo", () => {
+  it("cinque etichette, la prevalente in <strong> e detta, segmenti solo per le zone con tempo", () => {
     const { container } = render(<ZoneBar seconds={[0, 300, 900, 0, 0]} />);
     const items = screen.getAllByRole("listitem");
     expect(items.map(item => item.textContent)).toEqual([
       "Z1 0%",
       "Z2 25%",
-      "Z3 75%",
+      "Z3 75%, prevalente",
       "Z4 0%",
       "Z5 0%",
     ]);
-    expect(items[2]).toHaveClass("font-bold");
-    expect(items[1]).not.toHaveClass("font-bold");
+    expect(items[2].querySelector("strong")).toHaveTextContent("Z3 75%, prevalente");
+    expect(items[1].querySelector("strong")).toBeNull();
     const segments = container.querySelectorAll("[aria-hidden] > div");
     expect(Array.from(segments, segment => segment.className)).toEqual([
       expect.stringContaining("bg-zone-2"),

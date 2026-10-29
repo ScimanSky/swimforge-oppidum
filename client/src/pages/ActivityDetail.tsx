@@ -324,6 +324,20 @@ const segmentLine = (segment: {
     .filter(Boolean)
     .join(" · ")
 
+/** «Stile libero · 2 vasche · 100 m»; a recovery (already in the title) has none of them. */
+const repeatSummary = (repeat: RepeatRow) =>
+  [
+    repeat.stroke && repeat.stroke !== "recovery" ? getStrokeLabel(repeat.stroke) : null,
+    repeat.lengthsCount > 0 ? `${repeat.lengthsCount} vasche` : null,
+    positiveNumber(repeat.distance) ? formatDistance(repeat.distance) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
+/** Buttons inside the desktop repeats table: compact, with a visible focus ring. */
+const TABLE_BUTTON =
+  "inline-flex min-h-6 items-center justify-center rounded-md hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+
 type DetailItem = { label: string; value: string | number | null | undefined }
 
 /** Metrics and details of the selected lap/split/repeat; missing values are left out. */
@@ -367,7 +381,7 @@ function EmptyNote({ children }: { children: ReactNode }) {
   return <p className="rounded-xl bg-raised p-4 text-sm text-muted-foreground">{children}</p>
 }
 
-/** Selectable row (lap or split): title, stroke chip, the values it has. */
+/** Selectable row (lap or split): title, stroke chip (left out when the title already says it), the values it has. */
 function SegmentButton({
   title,
   stroke,
@@ -393,7 +407,7 @@ function SegmentButton({
     >
       <span className="flex items-center justify-between gap-2">
         <span className="truncate text-sm font-semibold">{title}</span>
-        {stroke ? <Chip>{stroke}</Chip> : null}
+        {stroke && stroke !== title ? <Chip>{stroke}</Chip> : null}
       </span>
       {line ? (
         <span className="mt-1 block text-xs text-muted-foreground tabular-nums">{line}</span>
@@ -673,11 +687,11 @@ export default function ActivityDetail() {
         pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke", "type"]),
       ) ?? activityStroke
       const stroke = (distance ?? 0) === 0 ? "recovery" : parsedStroke
-      const strokeLabel = stroke ? STROKE_LABELS[stroke] ?? stroke : null
 
       return {
         index,
-        label: strokeLabel ? `Frazione ${index + 1} · ${strokeLabel}` : `Frazione ${index + 1}`,
+        // The stroke is in the row's chip, not repeated in the title.
+        label: `Frazione ${index + 1}`,
         distance,
         duration,
         pace,
@@ -718,7 +732,7 @@ export default function ActivityDetail() {
     () =>
       laps.map((lap, index) => ({
         index,
-        label: lap.displayStroke === "recovery" ? "Recupero" : `${lap.label} · ${getStrokeLabel(lap.displayStroke)}`,
+        label: lap.label,
         distance: lap.distance,
         duration: lap.duration,
         pace: lap.pace,
@@ -784,6 +798,16 @@ export default function ActivityDetail() {
   )
 
   const selectedRepeatMetricSource = selectedLength ?? selectedRepeat
+
+  const selectRepeat = (repeatKey: string) => {
+    setSelectedRepeatKey(repeatKey)
+    setSelectedLengthKey(null)
+  }
+
+  const selectLength = (repeatKey: string, lengthKey: string) => {
+    setSelectedRepeatKey(repeatKey)
+    setSelectedLengthKey(lengthKey)
+  }
 
   const toggleRepeat = (repeatKey: string) => {
     setExpandedRepeatKeys((prev) => ({ ...prev, [repeatKey]: !prev[repeatKey] }))
@@ -932,9 +956,11 @@ export default function ActivityDetail() {
                 Condividi con foto o commento
               </Button>
             ) : null}
-            <Button variant="outline" size="icon-lg" asChild>
-              <Link href="/coach?tab=session-iq" aria-label="Coach AI" title="Coach AI">
+            {/* The coach's Session IQ reads only the last synced session: no per-activity link (Phase 3). */}
+            <Button variant="outline" size="lg" asChild>
+              <Link href="/coach">
                 <Sparkles className="size-5" aria-hidden />
+                Coach AI
               </Link>
             </Button>
           </div>
@@ -1104,33 +1130,46 @@ export default function ActivityDetail() {
                               const rows = [
                                 <tr
                                   key={repeat.key}
-                                  onClick={() => {
-                                    setSelectedRepeatKey(repeat.key)
-                                    setSelectedLengthKey(null)
-                                  }}
+                                  onClick={() => selectRepeat(repeat.key)}
                                   className={cn(
                                     "cursor-pointer border-b border-border transition-colors",
                                     isRepeatSelected ? "bg-primary/15" : "hover:bg-raised",
                                   )}
                                 >
                                   <td className="px-2 py-2">
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation()
-                                        toggleRepeat(repeat.key)
-                                      }}
-                                      aria-expanded={isExpanded}
-                                      aria-label={`Vasche della ripetuta ${repeat.repeatNumber}`}
-                                      className="inline-flex items-center gap-1 font-semibold text-foreground"
-                                    >
-                                      {isExpanded ? (
-                                        <ChevronDown className="size-4" aria-hidden />
-                                      ) : (
-                                        <ChevronRight className="size-4" aria-hidden />
-                                      )}
-                                      {repeat.repeatNumber}
-                                    </button>
+                                    <span className="inline-flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          toggleRepeat(repeat.key)
+                                        }}
+                                        aria-expanded={isExpanded}
+                                        aria-label={`Vasche della ripetuta ${repeat.repeatNumber}`}
+                                        className={TABLE_BUTTON}
+                                      >
+                                        {isExpanded ? (
+                                          <ChevronDown className="size-4" aria-hidden />
+                                        ) : (
+                                          <ChevronRight className="size-4" aria-hidden />
+                                        )}
+                                      </button>
+                                      {/* Keyboard selection; the row click stays for the mouse. */}
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          selectRepeat(repeat.key)
+                                        }}
+                                        aria-pressed={isRepeatSelected}
+                                        className={cn(TABLE_BUTTON, "px-1 font-semibold text-foreground")}
+                                      >
+                                        <span className="sr-only">
+                                          {repeat.distance === 0 ? "Recupero" : "Ripetuta"}
+                                        </span>{" "}
+                                        {repeat.repeatNumber}
+                                      </button>
+                                    </span>
                                   </td>
                                   <td className="px-2 py-2">{getStrokeLabel(repeat.stroke)}</td>
                                   <td className="px-2 py-2 text-right">{repeat.lengthsCount}</td>
@@ -1156,16 +1195,25 @@ export default function ActivityDetail() {
                                   return (
                                     <tr
                                       key={length.key}
-                                      onClick={() => {
-                                        setSelectedRepeatKey(repeat.key)
-                                        setSelectedLengthKey(length.key)
-                                      }}
+                                      onClick={() => selectLength(repeat.key, length.key)}
                                       className={cn(
                                         "cursor-pointer border-b border-border",
                                         isLengthSelected ? "bg-primary/15" : "bg-raised/50 hover:bg-raised",
                                       )}
                                     >
-                                      <td className="px-2 py-2 pl-6 text-muted-foreground">{length.label}</td>
+                                      <td className="px-2 py-2 pl-6">
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation()
+                                            selectLength(repeat.key, length.key)
+                                          }}
+                                          aria-pressed={isLengthSelected}
+                                          className={cn(TABLE_BUTTON, "px-1 text-muted-foreground")}
+                                        >
+                                          <span className="sr-only">Vasca</span> {length.label}
+                                        </button>
+                                      </td>
                                       <td className="px-2 py-2">{getStrokeLabel(length.stroke)}</td>
                                       <td className="px-2 py-2 text-right">1</td>
                                       <td className="px-2 py-2 text-right">{formatDistance(length.distance)}</td>
@@ -1212,8 +1260,7 @@ export default function ActivityDetail() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setSelectedRepeatKey(repeat.key)
-                                  setSelectedLengthKey(null)
+                                  selectRepeat(repeat.key)
                                   toggleRepeat(repeat.key)
                                 }}
                                 aria-expanded={isExpanded}
@@ -1221,12 +1268,13 @@ export default function ActivityDetail() {
                               >
                                 <span className="min-w-0">
                                   <span className="block text-sm font-semibold text-foreground">
-                                    Ripetuta {repeat.repeatNumber}
+                                    {repeat.label}
                                   </span>
-                                  <span className="block text-xs text-muted-foreground tabular-nums">
-                                    {getStrokeLabel(repeat.stroke)} · {repeat.lengthsCount} vasche ·{" "}
-                                    {formatDistance(repeat.distance)}
-                                  </span>
+                                  {repeatSummary(repeat) ? (
+                                    <span className="block text-xs text-muted-foreground tabular-nums">
+                                      {repeatSummary(repeat)}
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span className="inline-flex items-center gap-2">
                                   <Chip className="tabular-nums">{formatSplitDuration(repeat.duration)}</Chip>
@@ -1247,10 +1295,7 @@ export default function ActivityDetail() {
                                       stroke={getStrokeLabel(length.stroke)}
                                       line={segmentLine(length)}
                                       selected={selectedLength?.key === length.key}
-                                      onSelect={() => {
-                                        setSelectedRepeatKey(repeat.key)
-                                        setSelectedLengthKey(length.key)
-                                      }}
+                                      onSelect={() => selectLength(repeat.key, length.key)}
                                     />
                                   ))}
 
@@ -1314,7 +1359,7 @@ export default function ActivityDetail() {
                     </h4>
                     {selectedLength || selectedRepeat ? (
                       <span className="text-xs text-muted-foreground">
-                        {selectedLength ? `Vasca ${selectedLength.label}` : `Ripetuta ${selectedRepeat?.repeatNumber}`}
+                        {selectedLength ? `Vasca ${selectedLength.label}` : selectedRepeat?.label}
                       </span>
                     ) : null}
                   </div>

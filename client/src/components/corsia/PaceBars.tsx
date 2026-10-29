@@ -48,7 +48,7 @@ export function PaceBars({ bars }: { bars: readonly PaceBar[] }) {
         {bars.map(bar => (
           <div
             key={bar.number}
-            title={`Rip. ${bar.number} · ${formatPaceValue(bar.pace)}`}
+            title={`Rip. ${bar.number} · ${formatPaceValue(bar.pace)}${bar.fastest ? " · la più veloce" : ""}`}
             className={cn(
               "min-w-0 flex-1 rounded-t-md",
               bar.fastest ? "bg-chart-1" : "bg-chart-1/35"

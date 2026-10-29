@@ -226,7 +226,7 @@ describe("ActivityDetail (Corsia)", () => {
     expect(screen.queryByText("Passo per ripetuta")).not.toBeInTheDocument();
   });
 
-  it("cardio zones: percentages per zone, the dominant one in bold", () => {
+  it("cardio zones: percentages per zone, the dominant one strong and announced", () => {
     render(<ActivityDetail />);
 
     const zones = screen.getByRole("region", { name: "Zone cardio" });
@@ -234,11 +234,11 @@ describe("ActivityDetail (Corsia)", () => {
     expect(items.map(item => item.textContent)).toEqual([
       "Z1 8%",
       "Z2 22%",
-      "Z3 38%",
+      "Z3 38%, prevalente",
       "Z4 24%",
       "Z5 8%",
     ]);
-    expect(items[2]).toHaveClass("font-bold");
+    expect(items[2].querySelector("strong")).toHaveTextContent("Z3 38%, prevalente");
   });
 
   it("pace per repeat names the fastest repeat (recovery left out)", () => {
@@ -293,13 +293,13 @@ describe("ActivityDetail (Corsia)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("the coach AI button opens the coach on the session analysis", () => {
+  it("«Coach AI» is a labelled link to the coach, not to a session it would not analyse", () => {
     render(<ActivityDetail />);
 
-    expect(screen.getByRole("link", { name: "Coach AI" })).toHaveAttribute(
-      "href",
-      "/coach?tab=session-iq"
-    );
+    const coach = screen.getByRole("link", { name: "Coach AI" });
+    expect(coach).toHaveAttribute("href", "/coach");
+    expect(coach).toHaveTextContent("Coach AI");
+    expect(coach.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("laps are selectable and the repeats view lists repeats and their lengths", async () => {
@@ -311,7 +311,7 @@ describe("ActivityDetail (Corsia)", () => {
     expect(screen.getByText("Giro 2 selezionato")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
-    const repeat = screen.getByRole("button", { name: /^Ripetuta 1/ });
+    const repeat = screen.getByRole("button", { name: /^Ripetuta 1(?!\d)/, expanded: false });
     await userEvent.click(repeat);
     expect(repeat).toHaveAttribute("aria-expanded", "true");
     expect(screen.getAllByRole("button", { name: /Vasca 1\.2/ }).length).toBeGreaterThan(0);
@@ -374,6 +374,53 @@ describe("ActivityDetail (Corsia)", () => {
     const panel = screen.getByRole("region", { name: "Metriche selezionate" });
     expect(within(panel).getByText("Passo migliore")).toBeInTheDocument();
     expect(within(panel).getByText("1:40 /100")).toBeInTheDocument();
+  });
+
+  it("table rows are selectable by keyboard: a button in the first cell, pressed when selected", async () => {
+    const user = userEvent.setup();
+    render(<ActivityDetail />);
+    await user.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const table = within(screen.getByRole("table"));
+    const first = table.getByRole("button", { name: "Ripetuta 1" });
+    const second = table.getByRole("button", { name: "Ripetuta 2" });
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(second).toHaveAttribute("aria-pressed", "false");
+
+    second.focus();
+    await user.keyboard("{Enter}");
+    expect(second).toHaveAttribute("aria-pressed", "true");
+    expect(first).toHaveAttribute("aria-pressed", "false");
+    const panel = screen.getByRole("region", { name: "Metriche selezionate" });
+    expect(within(panel).getByText("Ripetuta 2")).toBeInTheDocument();
+
+    await user.click(table.getByRole("button", { name: "Vasche della ripetuta 2" }));
+    const length = table.getByRole("button", { name: "Vasca 2.1" });
+    length.focus();
+    await user.keyboard(" ");
+    expect(length).toHaveAttribute("aria-pressed", "true");
+    expect(second).toHaveAttribute("aria-pressed", "false");
+    expect(within(panel).getByText("Vasca 2.1")).toBeInTheDocument();
+  });
+
+  it("recovery repeats are titled «Recupero», never «Ripetuta N»", async () => {
+    render(<ActivityDetail />);
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const recovery = screen.getByRole("button", { name: /^Recupero/, expanded: false });
+    expect(recovery).toHaveTextContent(/^Recupero0:30$/);
+    expect(screen.queryByRole("button", { name: /^Ripetuta 3/ })).not.toBeInTheDocument();
+  });
+
+  it("segment rows show the stroke once (title or chip, not both)", () => {
+    render(<ActivityDetail />);
+
+    const splits = within(screen.getByRole("region", { name: "Frazioni" }));
+    const split = splits.getByRole("button", { name: /^Frazione 1/ });
+    expect(within(split).getAllByText(/Stile libero/)).toHaveLength(1);
+    const laps = within(screen.getByRole("region", { name: "Giri" }));
+    const recovery = laps.getByRole("button", { name: /^Recupero/ });
+    expect(within(recovery).getAllByText(/Recupero/)).toHaveLength(1);
   });
 
   it("shows the not-found state", () => {
