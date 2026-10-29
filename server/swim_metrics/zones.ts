@@ -2,10 +2,10 @@
  * Pace zones relative to CSS (Swim Smooth, TrainingPeaks). The boundaries are a convention,
  * as a share of the threshold speed: Z1 < 85% ≤ Z2 < 92% ≤ Z3 < 97% ≤ Z4 < 103% ≤ Z5.
  */
-import type { Zones5 } from "@shared/swimMetrics";
+import { ZONE_SPEED_BOUNDS, type Zones5 } from "@shared/swimMetrics";
 import { activeLaps, type MetricLap } from "./laps";
 
-const ZONE_UPPER_BOUNDS = [0.85, 0.92, 0.97, 1.03] as const;
+const ZONE_UPPER_BOUNDS = ZONE_SPEED_BOUNDS;
 
 /** 0-based zone of a speed ratio (lap speed / CSS speed); a boundary goes to the upper zone. */
 export function zoneOf(speedRatio: number): 0 | 1 | 2 | 3 | 4 {

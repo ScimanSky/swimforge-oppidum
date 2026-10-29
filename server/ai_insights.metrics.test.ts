@@ -74,6 +74,9 @@ describe("generateAIInsights from the swim metrics", () => {
     expect(prompt).toContain("GLOSSARIO DELLE METRICHE");
     expect(prompt).toContain("non inventare altri indici");
     for (const name of OLD_NAMES) expect(prompt).not.toMatch(name);
+    // The Stroke Index example no longer claims «a parità di passo» on its own.
+    expect(prompt).not.toContain("a parità di passo fai più strada per bracciata");
+    expect(prompt).toContain("distanza per bracciata");
   });
 
   it("caches the insights for the 90-day metrics (old 30-day insights are never reused)", async () => {

@@ -260,6 +260,28 @@ export function pacingCvReading(cv: number): "molto regolare" | "regolare" | "ir
   return "irregolare";
 }
 
+// ─── Pace zones ─────────────────────────────────────────────────────────────
+
+/** Upper bounds of Z1..Z4 as a share of the CSS speed (a boundary goes to the upper zone). */
+export const ZONE_SPEED_BOUNDS = [0.85, 0.92, 0.97, 1.03] as const;
+export const ZONE_NAMES = ["Facile", "Aerobico", "Medio", "Soglia", "Sopra soglia"] as const;
+
+/**
+ * The five zones as paces (s/100 m) for a CSS pace: pace = CSS pace / speed ratio. `slowPace` is
+ * the slow end (null for Z1, open-ended), `fastPace` the fast end (null for Z5).
+ */
+export function zonePaceRanges(
+  cssPaceSecondsPer100: number,
+): { zone: 1 | 2 | 3 | 4 | 5; name: string; fastPace: number | null; slowPace: number | null }[] {
+  const paceAt = (ratio: number) => cssPaceSecondsPer100 / ratio;
+  return ZONE_NAMES.map((name, index) => ({
+    zone: (index + 1) as 1 | 2 | 3 | 4 | 5,
+    name,
+    fastPace: index < ZONE_SPEED_BOUNDS.length ? paceAt(ZONE_SPEED_BOUNDS[index]) : null,
+    slowPace: index > 0 ? paceAt(ZONE_SPEED_BOUNDS[index - 1]) : null,
+  }));
+}
+
 // ─── Pools ──────────────────────────────────────────────────────────────────
 
 /** A 25-yard pool (22.86 m; the database keeps whole metres, so 23). */

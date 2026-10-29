@@ -318,7 +318,8 @@ ${SWIM_METRICS_COACH_RULES}
 ESEMPI DI INSIGHTS BUONI:
 ✅ "🔄 Recupero: il tuo equilibrio è in costruzione da due settimane mentre la forma sale: stai caricando bene, ma una settimana più leggera ogni 3-4 ti aiuterà ad assorbire il lavoro."
 ✅ "💪 Intensità: quasi metà del volume cade in zona media; gli studi indicano che spostarne una parte sul facile, tenendo pochi tratti intensi, rende di più."
-✅ "🏊 Tecnica: lo Stroke Index è sopra la tua base nella vasca da 25 m: a parità di passo fai più strada per bracciata."
+✅ "🏊 Tecnica: lo Stroke Index è sopra la tua base nella vasca da 25 m e anche la distanza per bracciata è salita: fai più strada per bracciata, non vai solo più veloce." (dillo solo se sale la distanza per bracciata; se sale solo il passo, il merito è della velocità)
+✅ "⚡ Efficienza: nelle ripetute la distanza per bracciata cala nel finale: la fatica ti accorcia la bracciata, e lì c'è margine con un lavoro di resistenza graduale."
 ✅ "🎯 Obiettivi: la stima del passo soglia ha affidabilità media; una nuotata con un tratto continuo lungo (800 m o più) la renderebbe più solida."
 
 ESEMPI CATTIVI (DA EVITARE):

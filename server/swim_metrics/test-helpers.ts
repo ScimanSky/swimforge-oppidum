@@ -45,6 +45,8 @@ export function sampleSwimMetrics(): SwimMetrics {
     intensityFactor: 0.92, stss: 56.3, zoneMeters: [500, 1000, 500, 400, 100],
     strokeIndex: 2.15, dpsMeters: 2.05, strokeRate: 30.2, swolf: 36.5,
     pacingCv: 2.8, pacingFade: 3.1,
+    swimDistanceMeters: 2500, loadEstimated: false, unclassifiedMeters: 0,
+    cssPaceSecondsPer100: 104.3, cssSource: "stima", dpsDropPct: 2.0, strokeRateRisePct: 1.5,
     ...overrides,
   });
   return {
@@ -59,6 +61,7 @@ export function sampleSwimMetrics(): SwimMetrics {
         activityId: 6, date: "2026-10-27", poolLengthMeters: null, isOpenWater: true, distanceMeters: 2000,
         movingSeconds: 2400, hasLaps: false, intensityFactor: 0.86, stss: 42.4, zoneMeters: null,
         strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null, pacingCv: null, pacingFade: null,
+        swimDistanceMeters: null, loadEstimated: true, unclassifiedMeters: null, dpsDropPct: null, strokeRateRisePct: null,
       }),
     ],
     css: {
@@ -70,6 +73,13 @@ export function sampleSwimMetrics(): SwimMetrics {
           { distanceMeters: 800, seconds: 800, date: "2026-10-15" },
         ],
         testDate: null,
+        dPrimeMeters: 33.6, r2: 0.999,
+        droppedPoints: [
+          {
+            distanceMeters: 300, seconds: 300, date: "2026-10-10",
+            slowerThan: { distanceMeters: 400, seconds: 380, date: "2026-10-06" },
+          },
+        ],
       },
       history: [{ month: "2026-10", paceSecondsPer100: 104.3 }],
       missing: null,
@@ -81,15 +91,25 @@ export function sampleSwimMetrics(): SwimMetrics {
       missing: null,
     },
     intensity: {
-      last28: { zoneMeters: [3000, 4200, 1800, 900, 100], easyPct: 72, mediumPct: 18, hardPct: 10 },
+      last28: {
+        zoneMeters: [3000, 4200, 1800, 900, 100], easyPct: 72, mediumPct: 18, hardPct: 10,
+        unclassifiedMeters: 1200, coveragePct: 80,
+      },
       weeks: [],
       missing: null,
     },
-    efficiency: { poolLengthMeters: 25, latest: 2.15, avg28: 2.1, baseline: 2.02, deltaPct: 4, missing: null },
+    efficiency: {
+      poolLengthMeters: 25, latest: 2.15, avg28: 2.1, baseline: 2.02, deltaPct: 4, missing: null,
+      n28: 5, nBaseline: 9, dps28: 2.05, dpsBaseline: 1.98, pace28: 112, paceBaseline: 115,
+    },
     pacing: {
       cv28: 2.8, fade28: 3.1,
-      latestSet: { date: "2026-10-26", distanceMeters: 100, stroke: "freestyle", repSeconds: [92, 93, 94] },
+      latestSet: {
+        date: "2026-10-26", distanceMeters: 100, stroke: "freestyle", repSeconds: [92, 93, 94],
+        repDps: [2.4, 2.35, 2.25], dpsDropPct: 6.3,
+      },
       missing: null,
+      dpsDrop28: 2.0, strokeRateRise28: 1.5,
     },
     volume: { weeks: [], avgKm4: 7.4, avgSessions4: 2.8, changePct: 12, streakWeeks: 5 },
   };
