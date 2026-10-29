@@ -246,8 +246,9 @@ export default function GarminSection({ garminConnected, headingRef }: GarminSec
                   </DialogDescription>
                 </DialogHeader>
 
+                {/* Keyed: a new form per step, so the code field mounts afresh and takes the focus. */}
                 {authStep === "credentials" ? (
-                  <form onSubmit={handleConnect} className="space-y-4">
+                  <form key="credentials" onSubmit={handleConnect} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="garmin-email">Email Garmin</Label>
                       <Input
@@ -293,7 +294,7 @@ export default function GarminSection({ garminConnected, headingRef }: GarminSec
                     </Button>
                   </form>
                 ) : (
-                  <form onSubmit={handleMfaSubmit} className="space-y-4">
+                  <form key="mfa" onSubmit={handleMfaSubmit} className="space-y-4">
                     <p className="flex items-center gap-2 rounded-xl bg-raised p-3 text-sm">
                       <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                       <span>

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GarminSection from "./GarminSection";
@@ -18,6 +18,10 @@ const state = vi.hoisted(() => ({
   disconnectCalls: 0,
   disconnectOptions: null as any,
   connectCalls: [] as unknown[],
+  connectOptions: null as any,
+  mfaCalls: [] as unknown[],
+  mfaOptions: null as any,
+  invalidateStatus: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -33,20 +37,27 @@ vi.mock("framer-motion", () => ({
 }));
 
 vi.mock("@/lib/trpc", () => {
-  const idleMutation = () => ({ mutate: vi.fn(), isPending: false });
   return {
     trpc: {
       useUtils: () => ({
-        garmin: { status: { invalidate: vi.fn() } },
+        garmin: { status: { invalidate: state.invalidateStatus } },
         activities: { list: { invalidate: state.invalidateActivities } },
         profile: { get: { invalidate: state.invalidateProfile } },
       }),
       garmin: {
         status: { useQuery: () => ({ ...state.status, refetch: state.refetchStatus }) },
         connect: {
-          useMutation: () => ({ mutate: (vars: unknown) => state.connectCalls.push(vars), isPending: false }),
+          useMutation: (options: any) => {
+            state.connectOptions = options;
+            return { mutate: (vars: unknown) => state.connectCalls.push(vars), isPending: false };
+          },
         },
-        completeMfa: { useMutation: idleMutation },
+        completeMfa: {
+          useMutation: (options: any) => {
+            state.mfaOptions = options;
+            return { mutate: (vars: unknown) => state.mfaCalls.push(vars), isPending: false };
+          },
+        },
         disconnect: {
           useMutation: (options: any) => {
             state.disconnectOptions = options;
@@ -159,6 +170,7 @@ describe("GarminSection (Corsia)", () => {
     state.status = { data: { connected: true, email: "a@b.it", lastSync: "2026-10-27T09:47:00" } };
     state.disconnectCalls = 0;
     state.connectCalls = [];
+    state.mfaCalls = [];
     vi.clearAllMocks();
   });
   afterEach(cleanup);
@@ -192,6 +204,67 @@ describe("GarminSection (Corsia)", () => {
     await user.type(screen.getByLabelText("Password Garmin"), "segreta");
     await user.click(screen.getByRole("button", { name: "Collega account" }));
     expect(state.connectCalls).toEqual([{ email: "me@garmin.it", password: "segreta" }]);
+  });
+
+  it("collegamento riuscito: conferma, il dialogo si chiude e lo stato si aggiorna", async () => {
+    state.status = { data: { connected: false } };
+    const user = userEvent.setup();
+    render(<GarminSection garminConnected={false} />);
+    await user.click(screen.getByRole("button", { name: "Collega" }));
+    await user.type(screen.getByLabelText("Email Garmin"), "me@garmin.it");
+    await user.type(screen.getByLabelText("Password Garmin"), "segreta");
+    await user.click(screen.getByRole("button", { name: "Collega account" }));
+
+    act(() => state.connectOptions.onSuccess({ success: true }));
+    expect(state.toastSuccess).toHaveBeenCalledWith("Garmin Connect collegato con successo!");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(state.invalidateStatus).toHaveBeenCalled();
+  });
+
+  it("verifica in due passaggi: chiede il codice ricevuto via email e lo invia", async () => {
+    state.status = { data: { connected: false } };
+    const user = userEvent.setup();
+    render(<GarminSection garminConnected={false} />);
+    await user.click(screen.getByRole("button", { name: "Collega" }));
+    await user.type(screen.getByLabelText("Email Garmin"), "me@garmin.it");
+    await user.type(screen.getByLabelText("Password Garmin"), "segreta");
+    await user.click(screen.getByRole("button", { name: "Collega account" }));
+
+    act(() => state.connectOptions.onSuccess({ success: false, mfaRequired: true }));
+    const dialog = screen.getByRole("dialog", { name: "Verifica il codice" });
+    expect(state.toastInfo).toHaveBeenCalledWith("Controlla la tua email per il codice di verifica");
+    expect(dialog).toHaveTextContent("Controlla la tua email me@garmin.it");
+    const code = within(dialog).getByLabelText("Codice di verifica");
+    expect(code).toHaveFocus();
+    expect(code).toHaveAccessibleDescription("Inserisci il codice a 6 cifre ricevuto via email da Garmin.");
+    expect(within(dialog).getByRole("button", { name: "Verifica codice" })).toBeDisabled();
+
+    await user.type(code, "123456");
+    await user.click(within(dialog).getByRole("button", { name: "Verifica codice" }));
+    expect(state.mfaCalls).toEqual([{ mfaCode: "123456", email: "me@garmin.it" }]);
+
+    act(() => state.mfaOptions.onSuccess({ success: false, error: "Codice MFA non valido" }));
+    expect(state.toastError).toHaveBeenCalledWith("Codice MFA non valido");
+    expect(screen.getByRole("dialog", { name: "Verifica il codice" })).toBeInTheDocument();
+
+    act(() => state.mfaOptions.onSuccess({ success: true }));
+    expect(state.toastSuccess).toHaveBeenCalledWith("Garmin Connect collegato con successo!");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("dal codice si può tornare alle credenziali", async () => {
+    state.status = { data: { connected: false } };
+    const user = userEvent.setup();
+    render(<GarminSection garminConnected={false} />);
+    await user.click(screen.getByRole("button", { name: "Collega" }));
+    await user.type(screen.getByLabelText("Email Garmin"), "me@garmin.it");
+    await user.type(screen.getByLabelText("Password Garmin"), "segreta");
+    await user.click(screen.getByRole("button", { name: "Collega account" }));
+    act(() => state.connectOptions.onSuccess({ success: false, mfaRequired: true }));
+
+    await user.click(screen.getByRole("button", { name: "Indietro" }));
+    expect(screen.getByRole("dialog", { name: "Collega Garmin Connect" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Email Garmin")).toHaveValue("me@garmin.it");
   });
 
   it("stato in caricamento: niente «Collega» finché non si sa", () => {
