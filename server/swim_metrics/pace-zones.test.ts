@@ -54,6 +54,10 @@ describe("paceZonesSchema", () => {
     expect(fieldErrors({ ...OWNER, c1c2: 110 })).toEqual({
       c1c2: ["Il confine tra C1 e C2 deve essere più veloce di quello tra B2 e C1 (1:49)."],
     });
+    // Tenths are said as typed: 1:48,8 is not faster than 1:48,5.
+    expect(fieldErrors({ ...OWNER, b2c1: 108.5, c1c2: 108.8 })).toEqual({
+      c1c2: ["Il confine tra C1 e C2 deve essere più veloce di quello tra B2 e C1 (1:48,5)."],
+    });
   });
 
   it("a pace out of range is not also reported as out of order", () => {

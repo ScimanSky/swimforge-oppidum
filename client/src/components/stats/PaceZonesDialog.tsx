@@ -1,9 +1,11 @@
 /**
  * «Le tue zone»: the five boundaries between the pace zones A1–C3, pre-filled with the ones in
- * effect, with a live preview of the seven zones. Paces in m:ss (also «1.50», «1,50», «1'50»),
- * checked here for their format; range and order are checked by the server, whose Italian
- * messages (`error.data.zodError.fieldErrors`) are shown each under its field. Saved zones win
- * everywhere; «Ripristina calcolo automatico» goes back to the zones from the threshold pace.
+ * effect (to the tenth), with a live preview of the seven zones. Paces in m:ss (also «1.50»,
+ * «1,50», «1'50», «1’50» and tenths «1:48,5»), checked here for their format, the first wrong
+ * field taking the focus; range and order are checked by the server, whose Italian messages
+ * (`error.data.zodError.fieldErrors`) are shown each under its field. «Salva» waits for a change.
+ * Saved zones win everywhere; «Ripristina calcolo automatico» goes back to the zones from the
+ * threshold pace, or without one «Rimuovi le tue zone» says that there will be no zones.
  */
 import { useId, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -32,7 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatPaceValue } from "@/lib/format";
 import { requestFieldErrors, type RequestError } from "@/lib/request-errors";
-import { cssReadingText, formatClock, formatZonePace, parseMinSec } from "@/lib/swim-metrics-view";
+import { cssReadingText, formatClockTenths, formatZonePace, parseMinSec } from "@/lib/swim-metrics-view";
 import { trpc } from "@/lib/trpc";
 
 type Field = PaceZoneBoundaryKey;
@@ -46,6 +48,9 @@ const TITLE = "Le tue zone";
 const FORMAT_ERROR = "Scrivi il passo come minuti:secondi, per esempio 1:50.";
 const SAVE_FAILED = "Non riesco a salvare le zone. Riprova.";
 const CLEAR_FAILED = "Non riesco a ripristinare il calcolo automatico. Riprova.";
+const REMOVE_FAILED = "Non riesco a rimuovere le tue zone. Riprova.";
+const REMOVE_NOTE =
+  "Senza passo soglia, se rimuovi le tue zone non ci saranno più zone: niente passi negli allenamenti, niente zone nelle statistiche e niente carico, finché non inserisci un test o il passo soglia viene stimato dalle tue nuotate.";
 
 /** «85%, 90%, 95% e 104%»: the boundaries other than the CSS, from the shared convention. */
 const OTHER_SHARES = (() => {
@@ -57,12 +62,19 @@ const OTHER_SHARES = (() => {
 
 const emptyDraft = (): Draft => Object.fromEntries(PACE_ZONE_BOUNDARY_KEYS.map((key) => [key, ""])) as Draft;
 
-/** The bounds in effect, in m:ss; empty without zones. */
+/** The bounds in effect, in m:ss with the tenths («1:48,5»); empty without zones. */
 function initialDraft(zones: SwimZones): Draft {
   const bounds = zones.bounds;
   if (!bounds) return emptyDraft();
-  return Object.fromEntries(PACE_ZONE_BOUNDARY_KEYS.map((key) => [key, formatClock(bounds[key])])) as Draft;
+  return Object.fromEntries(PACE_ZONE_BOUNDARY_KEYS.map((key) => [key, formatClockTenths(bounds[key])])) as Draft;
 }
+
+/** True when every field reads as the value it started with («1,50» and «1:50» are the same). */
+const unchanged = (draft: Draft, initial: Draft) =>
+  PACE_ZONE_BOUNDARY_KEYS.every((key) => {
+    const value = parseMinSec(draft[key]);
+    return draft[key].trim() === initial[key].trim() || (value !== null && value === parseMinSec(initial[key]));
+  });
 
 /** The five paces in seconds when every field reads as m:ss. */
 function parseDraft(draft: Draft): PaceZoneBounds | null {
@@ -121,6 +133,9 @@ export function PaceZonesDialog({ zones, css }: { zones: SwimZones; css: CssResu
   const id = useId();
   const utils = trpc.useUtils();
   const isManual = zones.source === "manuali";
+  // Without a CSS, removing the manual zones leaves no zones at all: the button says so.
+  const removesAll = isManual && !css;
+  const removeNoteId = `${id}-remove-note`;
 
   const fieldId = (field: Field) => `${id}-${field}`;
   const done = (message: string) => {
@@ -141,8 +156,8 @@ export function PaceZonesDialog({ zones, css }: { zones: SwimZones; css: CssResu
     onError: (error) => showRequestErrors(error, SAVE_FAILED),
   });
   const clear = trpc.statistics.clearPaceZones.useMutation({
-    onSuccess: () => done("Zone automatiche ripristinate."),
-    onError: (error) => showRequestErrors(error, CLEAR_FAILED),
+    onSuccess: () => done(removesAll ? "Zone rimosse." : "Zone automatiche ripristinate."),
+    onError: (error) => showRequestErrors(error, removesAll ? REMOVE_FAILED : CLEAR_FAILED),
   });
 
   const onOpenChange = (next: boolean) => {
@@ -162,12 +177,16 @@ export function PaceZonesDialog({ zones, css }: { zones: SwimZones; css: CssResu
     }
     setErrors(found);
     setRequestMessage(null);
+    // The first wrong field takes the focus, so its message is read out.
+    const first = PACE_ZONE_BOUNDARY_KEYS.find((field) => found[field]);
+    if (first) document.getElementById(fieldId(first))?.focus();
     const bounds = parseDraft(draft);
     if (Object.keys(found).length > 0 || !bounds) return;
     save.mutate(bounds);
   };
 
   const pending = save.isPending || clear.isPending;
+  const nothingChanged = unchanged(draft, initialDraft(zones));
 
   return (
     <>
@@ -227,6 +246,11 @@ export function PaceZonesDialog({ zones, css }: { zones: SwimZones; css: CssResu
                 {note}
               </p>
             ))}
+            {removesAll ? (
+              <p id={removeNoteId} className="text-xs text-muted-foreground">
+                {REMOVE_NOTE}
+              </p>
+            ) : null}
             {requestMessage ? (
               <p role="alert" className="text-sm text-destructive">
                 {requestMessage}
@@ -238,15 +262,16 @@ export function PaceZonesDialog({ zones, css }: { zones: SwimZones; css: CssResu
                   type="button"
                   variant="outline"
                   disabled={pending}
+                  aria-describedby={removesAll ? removeNoteId : undefined}
                   onClick={() => {
                     setRequestMessage(null);
                     clear.mutate();
                   }}
                 >
-                  Ripristina calcolo automatico
+                  {removesAll ? "Rimuovi le tue zone" : "Ripristina calcolo automatico"}
                 </Button>
               ) : null}
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending || nothingChanged}>
                 {save.isPending ? "Salvataggio…" : "Salva"}
               </Button>
             </DialogFooter>

@@ -15,10 +15,12 @@ import { invalidateSwimMetrics } from "./index";
 
 export const PACE_ZONES_RANGE_MESSAGE = "Scrivi un passo tra 1:00 e 4:00 per 100 m.";
 
-/** m:ss, rounding the total first (119.6 s is 2:00). */
+/** m:ss with the tenths as the editor writes them («1:48,5»; «1:50» without tenths). */
 function clock(seconds: number): string {
-  const total = Math.round(seconds);
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+  const tenths = Math.round(seconds * 10);
+  const whole = Math.floor(tenths / 10);
+  const tenth = tenths % 10;
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}${tenth ? `,${tenth}` : ""}`;
 }
 
 const inRange = (value: number) =>

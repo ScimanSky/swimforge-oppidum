@@ -86,7 +86,18 @@ describe("Test del passo soglia", () => {
     expect(within(dialog).getByLabelText("Tempo sui 200 m")).toHaveAccessibleDescription(
       /Inserisci il tempo sui 200 m\./
     );
+    // The first wrong field takes the focus, so its message is read out.
+    expect(t400).toHaveFocus();
     expect(state.saveCalls).toHaveLength(0);
+  });
+
+  it("accetta i decimi e l'apostrofo tipografico", async () => {
+    const dialog = await openDialog();
+    await userEvent.type(within(dialog).getByLabelText("Tempo sui 400 m"), "6’20,5");
+    await userEvent.type(within(dialog).getByLabelText("Tempo sui 200 m"), "3:00.2");
+    fireEvent.change(within(dialog).getByLabelText("Data del test"), { target: { value: "2026-10-12" } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salva il test" }));
+    expect(state.saveCalls).toEqual([{ t400Seconds: 380.5, t200Seconds: 180.2, date: "2026-10-12" }]);
   });
 
   it("invia i secondi e la data; accetta anche il punto al posto dei due punti", async () => {

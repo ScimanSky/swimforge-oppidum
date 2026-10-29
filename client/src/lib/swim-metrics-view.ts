@@ -641,11 +641,20 @@ export function metricHeaders(m: SwimMetrics): Record<SwimMetricKey, MetricHeade
 // ─── CSS test entry ─────────────────────────────────────────────────────────
 
 /**
- * «6:20» → 380 seconds. Also «6.20», «6,20» and «6'20» (phone keyboards without «:»); null
- * when it is not minutes and two-digit seconds.
+ * «6:20» → 380 seconds. Also «6.20», «6,20», «6'20» and «6’20» (phone keyboards without «:»),
+ * with tenths: «1:48.5» and «1:48,5» → 108.5; null when it is not minutes and two-digit
+ * seconds.
  */
 export function parseMinSec(input: string): number | null {
-  const match = input.trim().match(/^(\d{1,2})\s*[:.,']\s*([0-5]\d)$/)
+  const match = input.trim().match(/^(\d{1,2})\s*[:.,'’′]\s*([0-5]\d)(?:[.,](\d))?$/)
   if (!match) return null
-  return Number(match[1]) * 60 + Number(match[2])
+  return Number(match[1]) * 60 + Number(match[2]) + (match[3] ? Number(match[3]) / 10 : 0)
+}
+
+/** «1:48,5», or «1:50» when the tenths are zero: a pace as the editors show and read it. */
+export function formatClockTenths(seconds: number): string {
+  const tenths = Math.round(seconds * 10)
+  const whole = Math.floor(tenths / 10)
+  const tenth = tenths % 10
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}${tenth ? `,${tenth}` : ""}`
 }

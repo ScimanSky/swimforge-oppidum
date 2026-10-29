@@ -7,10 +7,25 @@ import {
   intensityCoverageText,
   loadEstimatedText,
   metricHeaders,
+  formatClockTenths,
+  parseMinSec,
   zoneShareItems,
   zonesSourceText,
   zoneTableRows,
 } from "./swim-metrics-view";
+
+describe("passi scritti a mano", () => {
+  it("minuti e secondi con :, punto, virgola, apostrofo anche tipografico, e i decimi", () => {
+    expect(["1:50", "1.50", "1,50", "1'50", "1’50", "1:48.5", "1:48,5", " 1:48,5 "].map(parseMinSec)).toEqual([
+      110, 110, 110, 110, 110, 108.5, 108.5, 108.5,
+    ]);
+    expect(["1:5", "1:60", "1:48,55", "abc", ""].map(parseMinSec)).toEqual([null, null, null, null, null]);
+  });
+
+  it("i passi delle zone ai decimi, senza «,0»", () => {
+    expect([127.647, 108.5, 110, 104.327].map(formatClockTenths)).toEqual(["2:07,6", "1:48,5", "1:50", "1:44,3"]);
+  });
+});
 
 describe("metriche: testi del riquadro", () => {
   it("intensità: la quota per lettera di zona, mai con le parole dei livelli", () => {

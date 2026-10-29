@@ -64,9 +64,10 @@ describe("Le tue zone", () => {
     vi.mocked(toast.success).mockClear();
   });
 
-  it("cinque confini, ognuno tra due zone, con i valori in uso e da dove vengono", async () => {
+  it("cinque confini, ognuno tra due zone, con i valori in uso (ai decimi) e da dove vengono", async () => {
     const dialog = await openEditor();
-    expect(LABELS.map((label) => field(dialog, label).value)).toEqual(["2:08", "2:01", "1:54", "1:49", "1:44"]);
+    // Passo soglia 1:48,5: 108,5 / 0,85 = 127,6 s and so on.
+    expect(LABELS.map((label) => field(dialog, label).value)).toEqual(["2:07,6", "2:00,6", "1:54,2", "1:48,5", "1:44,3"]);
     expect(field(dialog, "Tra A1 e A2")).toHaveAccessibleDescription(
       "Più lento: A1 Recupero attivo. Uguale o più veloce: A2 Fondo lento."
     );
@@ -99,30 +100,56 @@ describe("Le tue zone", () => {
     expect(dialog).toHaveTextContent("Ogni confine deve essere più veloce del precedente.");
   });
 
+  it("«Salva» aspetta una modifica: riscrivere lo stesso passo in un altro modo non conta", async () => {
+    const dialog = await openEditor();
+    const save = () => within(dialog).getByRole("button", { name: "Salva" });
+    expect(save()).toBeDisabled();
+    await retype(dialog, "Tra B2 e C1", "1:50");
+    expect(save()).toBeEnabled();
+    await retype(dialog, "Tra B2 e C1", "1:48.5");
+    expect(save()).toBeDisabled();
+  });
+
+  it("accetta i decimi («1:48,5», «1:48.5») e l'apostrofo tipografico («1’50»)", async () => {
+    const dialog = await openEditor();
+    await retype(dialog, "Tra B2 e C1", "1’50");
+    await retype(dialog, "Tra C1 e C2", "1:45,5");
+    expect(preview(dialog).slice(3, 5)).toEqual([
+      "B2 Fondo medio-alto · 1:50–1:54",
+      "C1 Soglia anaerobica · 1:46–1:50 · max 200 m",
+    ]);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+    expect(state.saveCalls).toEqual([{ a1a2: 127.6, a2b1: 120.6, b1b2: 114.2, b2c1: 110, c1c2: 105.5 }]);
+  });
+
   it("salva i secondi per 100 m; il coach e le statistiche si aggiornano", async () => {
     const dialog = await openEditor();
     await retype(dialog, "Tra B2 e C1", "1.50");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
-    expect(state.saveCalls).toEqual([{ a1a2: 128, a2b1: 121, b1b2: 114, b2c1: 110, c1c2: 104 }]);
+    expect(state.saveCalls).toEqual([{ a1a2: 127.6, a2b1: 120.6, b1b2: 114.2, b2c1: 110, c1c2: 104.3 }]);
     act(() => state.saveOptions.onSuccess({ success: true }));
     expect(state.invalidate).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith("Zone salvate: valgono ovunque, anche per il coach.");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("un passo non in m:ss: errore sotto il campo, niente invio", async () => {
+  it("un passo non in m:ss: errore sotto il campo, il campo prende il focus, niente invio", async () => {
     const dialog = await openEditor();
     await retype(dialog, "Tra A2 e B1", "2:1");
+    await retype(dialog, "Tra C1 e C2", "abc");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
     expect(field(dialog, "Tra A2 e B1")).toHaveAttribute("aria-invalid", "true");
     expect(field(dialog, "Tra A2 e B1")).toHaveAccessibleDescription(
       "Scrivi il passo come minuti:secondi, per esempio 1:50."
     );
+    expect(field(dialog, "Tra A2 e B1")).toHaveFocus();
+    expect(field(dialog, "Tra C1 e C2")).toHaveAttribute("aria-invalid", "true");
     expect(state.saveCalls).toHaveLength(0);
   });
 
   it("gli errori del server stanno sotto il loro campo, il primo prende il focus", async () => {
     const dialog = await openEditor();
+    await retype(dialog, "Tra C1 e C2", "1:50");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
     const order = "Il confine tra C1 e C2 deve essere più veloce di quello tra B2 e C1 (1:49).";
     const range = "Scrivi un passo tra 1:00 e 4:00 per 100 m.";
@@ -150,6 +177,22 @@ describe("Le tue zone", () => {
     expect(state.clearCalls).toBe(1);
     act(() => state.clearOptions.onSuccess({ success: true }));
     expect(toast.success).toHaveBeenCalledWith("Zone automatiche ripristinate.");
+  });
+
+  it("senza passo soglia, con le tue zone: «Rimuovi le tue zone» dice che non ci saranno più zone", async () => {
+    const metrics = emptySwimMetricsFixture();
+    const bounds = { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 };
+    metrics.zones = { source: "manuali", bounds, ranges: paceZoneRanges(bounds), autoBounds: null, manualUpdatedAt: "2026-10-25T09:00:00.000Z" };
+    const dialog = await openEditor(metrics);
+    expect(within(dialog).queryByRole("button", { name: "Ripristina calcolo automatico" })).toBeNull();
+    const remove = within(dialog).getByRole("button", { name: "Rimuovi le tue zone" });
+    expect(remove).toHaveAccessibleDescription(
+      "Senza passo soglia, se rimuovi le tue zone non ci saranno più zone: niente passi negli allenamenti, niente zone nelle statistiche e niente carico, finché non inserisci un test o il passo soglia viene stimato dalle tue nuotate."
+    );
+    await userEvent.click(remove);
+    expect(state.clearCalls).toBe(1);
+    act(() => state.clearOptions.onSuccess({ success: true }));
+    expect(toast.success).toHaveBeenCalledWith("Zone rimosse.");
   });
 
   it("senza passo soglia: campi vuoti e cosa fare", async () => {

@@ -147,6 +147,9 @@ export function CssTestDialog({ current }: { current: CssResult | null }) {
     const found = validate(draft);
     setErrors(found);
     setRequestMessage(null);
+    // The first wrong field takes the focus, so its message is read out.
+    const first = FIELD_ORDER.find((field) => found[field]);
+    if (first) document.getElementById(fieldId(first))?.focus();
     if (Object.keys(found).length > 0) return;
     save.mutate({
       t400Seconds: parseMinSec(draft.t400)!,
