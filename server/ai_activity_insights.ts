@@ -51,19 +51,6 @@ function safeJsonParse(text: string) {
   }
 }
 
-function formatRawData(rawData: unknown) {
-  if (!rawData) return "n/d";
-  try {
-    const text = JSON.stringify(rawData);
-    if (text.length > 3500) {
-      return text.slice(0, 3500) + "...";
-    }
-    return text;
-  } catch {
-    return "n/d";
-  }
-}
-
 type SegmentContext = {
   totalLaps: number;
   avgLapDistanceMeters: number | null;
@@ -359,10 +346,15 @@ function normalizeActivity(activity: Record<string, unknown>) {
     return false;
   })();
 
-  const strokeType =
-    (activity["strokeType"] ?? activity["stroke_type"]) ??
-    (typeof raw?.["activityName"] === "string" ? (raw["activityName"] as string) : null) ??
-    "n/d";
+  // Never the Garmin activity name: free text, often the city or the pool.
+  const strokeTypeValue = activity["strokeType"] ?? activity["stroke_type"];
+  const strokeType = typeof strokeTypeValue === "string" && strokeTypeValue.trim() ? strokeTypeValue.trim() : "n/d";
+  const poolLengthMeters = toNumber(activity["poolLengthMeters"] ?? activity["pool_length_meters"]);
+  const lapsCount = toNumber(activity["lapsCount"] ?? activity["laps_count"]);
+  const avgStrokesPerLength = toNumber(activity["avgStrokes"] ?? activity["avg_strokes"]);
+  const hrZoneSeconds = [1, 2, 3, 4, 5].map((zone) =>
+    toNumber(activity[`hrZone${zone}Seconds`] ?? activity[`hr_zone_${zone}_seconds`]),
+  );
 
   return {
     distanceMeters,
@@ -378,8 +370,68 @@ function normalizeActivity(activity: Record<string, unknown>) {
     vo2MaxValue,
     isOpenWater,
     strokeType,
-    raw,
+    poolLengthMeters,
+    lapsCount,
+    avgStrokesPerLength,
+    hrZoneSeconds,
   };
+}
+
+export type NormalizedActivity = ReturnType<typeof normalizeActivity>;
+
+/** «Z1 300, Z2 900, …» (seconds per heart-rate zone), n/d when the swim has none. */
+function formatHrZones(zoneSeconds: Array<number | null>): string {
+  if (!zoneSeconds.some((seconds) => seconds !== null && seconds > 0)) return "n/d";
+  return zoneSeconds.map((seconds, index) => `Z${index + 1} ${seconds ?? 0}`).join(", ");
+}
+
+/**
+ * The per-swim analysis prompt. Only explicit swim fields (distance, time, pace, pool, laps, heart
+ * rate and zones, SWOLF, strokes, training effect): never the raw Garmin payload, which carries the
+ * owner's name, ids and start coordinates, nor the free text of the swim (name, place, notes).
+ */
+export function buildActivityInsightPrompt(normalized: NormalizedActivity, segmentContextText: string): string {
+  return `Sei un analista di performance di nuoto. Analizza UNA singola sessione.
+
+REGOLE:
+- Usa SOLO i dati forniti di questa sessione.
+- NON usare dati globali o storici.
+- Output in JSON puro, senza markdown.
+- Mantieni tono professionale, mirato e non generico.
+- NON ripetere i dati grezzi (distanza, durata, HR) come elenco.
+- Deve emergere interpretazione: cosa indicano i numeri e perché.
+- 1 titolo, 1 summary, 3-5 bullet analitici.
+- Inserisci 1 consiglio pratico specifico per la prossima sessione.
+- Inserisci 1 focus tecnico (es: pacing, virata, bracciata, respirazione, coerenza).
+
+DATI SESSIONE:
+- Distanza: ${normalized.distanceMeters ?? "n/d"} m
+- Durata: ${normalized.durationSeconds ?? "n/d"} s
+- Pace medio: ${formatPace(normalized.avgPacePer100m)}
+- Stroke: ${normalized.strokeType}
+- Open water: ${normalized.isOpenWater ? "sì" : "no"}
+- Vasca: ${normalized.isOpenWater || !normalized.poolLengthMeters ? "n/d" : `${normalized.poolLengthMeters} m`}
+- Lap: ${normalized.lapsCount ?? "n/d"}
+- HR medio: ${normalized.avgHeartRate ?? "n/d"}
+- HR max: ${normalized.maxHeartRate ?? "n/d"}
+- Zone FC (secondi): ${formatHrZones(normalized.hrZoneSeconds)}
+- SWOLF medio: ${normalized.avgSwolf ?? "n/d"}
+- Bracciate per vasca: ${normalized.avgStrokesPerLength ?? "n/d"}
+- Stroke cadence: ${normalized.avgStrokeCadence ?? "n/d"}
+- Stroke distance: ${normalized.avgStrokeDistance ?? "n/d"}
+- Training effect: ${normalized.trainingEffect ?? "n/d"}
+- Anaerobic TE: ${normalized.anaerobicTrainingEffect ?? "n/d"}
+- VO2max: ${normalized.vo2MaxValue ?? "n/d"}
+- Segmenti/Laps disponibili:
+- ${segmentContextText}
+
+FORMAT JSON richiesto:
+{
+  "title": "...",
+  "summary": "...",
+  "bullets": ["...", "...", "..."],
+  "tags": ["Tecnica", "Intensità", "Recupero", "Consiglio"]
+}`;
 }
 
 export async function generateActivityInsight(activity: Record<string, unknown>) {
@@ -399,49 +451,11 @@ export async function generateActivityInsight(activity: Record<string, unknown>)
   log.debug("[AI Insights] Activity context prepared", {
     event: "ai_activity_insights:context_ready",
     activityId: activityId ?? null,
-    hasRawData: Boolean(normalized.raw),
     hasSegmentContext: Boolean(segmentContext),
     segmentLapCount: segmentContext?.totalLaps ?? 0,
   });
 
-  const prompt = `Sei un analista di performance di nuoto. Analizza UNA singola sessione.
-
-REGOLE:
-- Usa SOLO i dati forniti di questa sessione.
-- NON usare dati globali o storici.
-- Output in JSON puro, senza markdown.
-- Mantieni tono professionale, mirato e non generico.
-- NON ripetere i dati grezzi (distanza, durata, HR) come elenco.
-- Deve emergere interpretazione: cosa indicano i numeri e perché.
-- 1 titolo, 1 summary, 3-5 bullet analitici.
-- Inserisci 1 consiglio pratico specifico per la prossima sessione.
-- Inserisci 1 focus tecnico (es: pacing, virata, bracciata, respirazione, coerenza).
-
-DATI SESSIONE:
-- Distanza: ${normalized.distanceMeters ?? "n/d"} m
-- Durata: ${normalized.durationSeconds ?? "n/d"} s
-- Pace medio: ${formatPace(normalized.avgPacePer100m)}
-- Stroke: ${normalized.strokeType || "n/d"}
-- Open water: ${normalized.isOpenWater ? "sì" : "no"}
-- HR medio: ${normalized.avgHeartRate ?? "n/d"}
-- HR max: ${normalized.maxHeartRate ?? "n/d"}
-- SWOLF medio: ${normalized.avgSwolf ?? "n/d"}
-- Stroke cadence: ${normalized.avgStrokeCadence ?? "n/d"}
-- Stroke distance: ${normalized.avgStrokeDistance ?? "n/d"}
-- Training effect: ${normalized.trainingEffect ?? "n/d"}
-- Anaerobic TE: ${normalized.anaerobicTrainingEffect ?? "n/d"}
-- VO2max: ${normalized.vo2MaxValue ?? "n/d"}
-- Segmenti/Laps disponibili:
-- ${segmentContextText}
-- Raw data (JSON): ${formatRawData(normalized.raw)}
-
-FORMAT JSON richiesto:
-{
-  "title": "...",
-  "summary": "...",
-  "bullets": ["...", "...", "..."],
-  "tags": ["Tecnica", "Intensità", "Recupero", "Consiglio"]
-}`;
+  const prompt = buildActivityInsightPrompt(normalized, segmentContextText);
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
