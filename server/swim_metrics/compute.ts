@@ -15,11 +15,11 @@ import {
 import { cssFromTest, cssHistory, cssLapsOf, CSS_WINDOW_DAYS, type CssEstimate } from "./css";
 import { efficiencySummary, sessionEfficiency } from "./efficiency";
 import { activeLaps, isPoolSwim, type MetricActivity } from "./laps";
-import { loadSeries, rampPerWeek, sessionLoad, tsbReading } from "./load";
+import { lapsLoad, loadSeries, rampPerWeek, sessionLoad, tsbReading } from "./load";
 import { round } from "./math";
 import { pacingSummary, sessionPacing, type RepeatSet } from "./pacing";
 import { volumeSummary } from "./volume";
-import { addZones, emptyZones, intensitySplit, sessionZones } from "./zones";
+import { addZones, emptyZones, intensitySplit, sessionZones, unclassifiedMeters } from "./zones";
 
 export type CssTest = { t200Seconds: number; t400Seconds: number; date: string };
 
@@ -42,17 +42,22 @@ export const MISSING = {
   load: "Serve il passo soglia: inserisci un test o nuota due tratti continui a stile libero, uno lungo almeno il doppio dell'altro (es. 200 e 400 m).",
   intensity: "Servono il passo soglia e nuotate con i giri.",
   intensityNoLaps: "Nessuna nuotata in vasca con i giri negli ultimi 28 giorni.",
+  intensityNoFreestyle:
+    "Nelle ultime 4 settimane non ci sono giri a stile libero da classificare: le zone si calcolano solo sullo stile libero.",
 } as const;
 
 type InternalSession = {
   activity: MetricActivity;
   cssSpeed: number | null;
-  distanceMeters: number;
+  /** Σ active laps; null without laps. */
+  swimDistanceMeters: number | null;
   movingSeconds: number;
   hasLaps: boolean;
   intensityFactor: number | null;
   stss: number | null;
+  loadEstimated: boolean;
   zoneMeters: Zones5 | null;
+  unclassifiedMeters: number | null;
   strokeIndex: number | null;
   dpsMeters: number | null;
   strokeRate: number | null;
@@ -125,10 +130,15 @@ function cssResolver(
 function computeSession(activity: MetricActivity, cssSpeed: number | null): InternalSession {
   const active = activeLaps(activity.laps);
   const hasLaps = active.length > 0;
-  const distanceMeters = hasLaps ? active.reduce((sum, lap) => sum + lap.distanceMeters, 0) : activity.distanceMeters;
-  const movingSeconds = hasLaps ? active.reduce((sum, lap) => sum + lap.seconds, 0) : activity.durationSeconds;
-  const load = cssSpeed ? sessionLoad(distanceMeters, movingSeconds, cssSpeed) : { intensityFactor: null, stss: null };
   const pool = isPoolSwim(activity);
+  const swimDistanceMeters = hasLaps ? active.reduce((sum, lap) => sum + lap.distanceMeters, 0) : null;
+  const movingSeconds = hasLaps ? active.reduce((sum, lap) => sum + lap.seconds, 0) : activity.durationSeconds;
+  // With laps: sTSS on the swum laps (like the zones). Without: TrainingPeaks on the whole swim.
+  const load = !cssSpeed
+    ? { intensityFactor: null, stss: null }
+    : hasLaps
+      ? lapsLoad(active, cssSpeed, { allFreestyle: !pool })
+      : sessionLoad(activity.distanceMeters, activity.durationSeconds, cssSpeed);
   const efficiency = pool
     ? sessionEfficiency(activity.laps)
     : { strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null, speedMps: null };
@@ -136,11 +146,13 @@ function computeSession(activity: MetricActivity, cssSpeed: number | null): Inte
   return {
     activity,
     cssSpeed,
-    distanceMeters,
+    swimDistanceMeters,
     movingSeconds,
     hasLaps,
     ...load,
-    zoneMeters: pool && hasLaps && cssSpeed ? sessionZones(activity.laps, cssSpeed) : null,
+    loadEstimated: load.stss !== null && !hasLaps,
+    zoneMeters: pool && hasLaps && cssSpeed ? sessionZones(active, cssSpeed) : null,
+    unclassifiedMeters: pool && hasLaps ? unclassifiedMeters(active) : null,
     ...efficiency,
     pacingCv: pacing.cv,
     pacingFade: pacing.fade,
@@ -155,11 +167,14 @@ function toSessionMetrics(s: InternalSession): SessionMetrics {
     poolLengthMeters: s.activity.isOpenWater ? null : s.activity.poolLengthMeters,
     isOpenWater: s.activity.isOpenWater,
     distanceMeters: s.activity.distanceMeters,
+    swimDistanceMeters: s.swimDistanceMeters,
     movingSeconds: Math.round(s.movingSeconds),
     hasLaps: s.hasLaps,
     intensityFactor: round(s.intensityFactor, 2),
     stss: round(s.stss, 1),
+    loadEstimated: s.loadEstimated,
     zoneMeters: s.zoneMeters,
+    unclassifiedMeters: s.unclassifiedMeters,
     strokeIndex: round(s.strokeIndex, 2),
     dpsMeters: round(s.dpsMeters, 2),
     strokeRate: round(s.strokeRate, 1),
@@ -233,19 +248,47 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
   const weekKeys = Array.from({ length: INTENSITY_WEEKS }, (_, i) =>
     addDaysToKey(currentWeek, -7 * (INTENSITY_WEEKS - 1 - i)),
   );
-  const perWeek = new Map(weekKeys.map((key) => [key, emptyZones()]));
+  const perWeek = new Map(weekKeys.map((key) => [key, { zones: emptyZones(), unclassified: 0 }]));
   let zones28 = emptyZones();
+  let unclassified28 = 0;
+  let volume28 = 0;
   for (const s of sessions) {
+    const recent = s.activity.day >= from28;
+    if (recent) volume28 += s.activity.distanceMeters;
     if (!s.zoneMeters) continue;
-    const week = weekStartOfKey(s.activity.day);
-    if (perWeek.has(week)) perWeek.set(week, addZones(perWeek.get(week)!, s.zoneMeters));
-    if (s.activity.day >= from28) zones28 = addZones(zones28, s.zoneMeters);
+    const week = perWeek.get(weekStartOfKey(s.activity.day));
+    if (week) {
+      week.zones = addZones(week.zones, s.zoneMeters);
+      week.unclassified += s.unclassifiedMeters ?? 0;
+    }
+    if (recent) {
+      zones28 = addZones(zones28, s.zoneMeters);
+      unclassified28 += s.unclassifiedMeters ?? 0;
+    }
   }
   const split = intensitySplit(zones28);
+  const zoned28 = zones28.reduce((sum, metres) => sum + metres, 0);
   const intensity: SwimMetrics["intensity"] = {
-    last28: split ? { zoneMeters: zones28, ...split } : null,
-    weeks: weekKeys.map((weekStart) => ({ weekStart, zoneMeters: perWeek.get(weekStart)! })),
-    missing: !anyCss ? MISSING.intensity : split ? null : MISSING.intensityNoLaps,
+    last28: split
+      ? {
+          zoneMeters: zones28,
+          ...split,
+          unclassifiedMeters: unclassified28,
+          coveragePct: volume28 > 0 ? Math.min(100, Math.round((zoned28 / volume28) * 100)) : 0,
+        }
+      : null,
+    weeks: weekKeys.map((weekStart) => ({
+      weekStart,
+      zoneMeters: perWeek.get(weekStart)!.zones,
+      unclassifiedMeters: perWeek.get(weekStart)!.unclassified,
+    })),
+    missing: !anyCss
+      ? MISSING.intensity
+      : split
+        ? null
+        : unclassified28 > 0
+          ? MISSING.intensityNoFreestyle
+          : MISSING.intensityNoLaps,
   };
 
   // ── Efficiency, pacing, volume ──

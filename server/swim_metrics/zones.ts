@@ -19,13 +19,24 @@ export function zoneOf(speedRatio: number): 0 | 1 | 2 | 3 | 4 {
 
 export const emptyZones = (): Zones5 => [0, 0, 0, 0, 0];
 
-/** Metres per zone of the active laps of a swim. */
+/**
+ * Metres per zone of the active freestyle laps of a swim. The CSS is a freestyle pace: other
+ * strokes, drill and kick (and laps without a stroke) are not zoned.
+ */
 export function sessionZones(laps: MetricLap[], cssSpeedMps: number): Zones5 {
   const zones = emptyZones();
   for (const lap of activeLaps(laps)) {
+    if (lap.stroke !== "freestyle") continue;
     zones[zoneOf(lap.distanceMeters / lap.seconds / cssSpeedMps)] += lap.distanceMeters;
   }
   return zones;
+}
+
+/** Metres of active laps that are not freestyle («non classificati» in the zones). */
+export function unclassifiedMeters(laps: MetricLap[]): number {
+  return activeLaps(laps)
+    .filter((lap) => lap.stroke !== "freestyle")
+    .reduce((sum, lap) => sum + lap.distanceMeters, 0);
 }
 
 export function addZones(a: Zones5, b: Zones5): Zones5 {

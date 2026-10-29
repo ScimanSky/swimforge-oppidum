@@ -146,13 +146,17 @@ describe("getSwimMetrics", () => {
     const [a, , ow] = metrics.sessions;
     expect(a).toMatchObject({ date: "2026-10-06", poolLengthMeters: 25, hasLaps: true, isOpenWater: false });
     expect(a.movingSeconds).toBe(380 + 175 + REPS_A.reduce((s, t) => s + t, 0) + 230);
-    expect(a.zoneMeters!.reduce((s, z) => s + z, 0)).toBe(1600);
+    expect(a.zoneMeters!.reduce((s, z) => s + z, 0)).toBe(1400); // the 200 backstroke is not zoned
+    expect(a.unclassifiedMeters).toBe(200);
+    expect(a.swimDistanceMeters).toBe(1600);
+    expect(a.loadEstimated).toBe(false);
     expect(a.intensityFactor).toBeGreaterThan(0.9);
     expect(a.stss).toBeGreaterThan(0);
     expect(a.strokeIndex).toBeGreaterThan(2);
     expect(a.pacingCv).toBe(1.5); // the 8×100: sample SD 1.41 s on 93.6 s
     expect(ow).toMatchObject({ isOpenWater: true, hasLaps: false, poolLengthMeters: null, zoneMeters: null, strokeIndex: null, pacingCv: null });
     expect(ow.stss).toBeGreaterThan(0);
+    expect(ow.loadEstimated).toBe(true);
 
     // Load: 90 days, today's reading.
     expect(metrics.load.days).toHaveLength(90);
@@ -162,7 +166,8 @@ describe("getSwimMetrics", () => {
 
     // Intensity: 8 weeks; the last 28 days hold both pool swims.
     expect(metrics.intensity.weeks).toHaveLength(8);
-    expect(metrics.intensity.last28!.zoneMeters.reduce((s, z) => s + z, 0)).toBe(1600 + 1600);
+    expect(metrics.intensity.last28!.zoneMeters.reduce((s, z) => s + z, 0)).toBe(1400 + 1600);
+    expect(metrics.intensity.last28).toMatchObject({ unclassifiedMeters: 200, coveragePct: 58 }); // 3000 of 5200 m
     const { easyPct, mediumPct, hardPct } = metrics.intensity.last28!;
     expect(easyPct + mediumPct + hardPct).toBe(100);
 

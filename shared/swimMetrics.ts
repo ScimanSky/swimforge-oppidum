@@ -28,10 +28,17 @@ export type CssResult = {
 export type TsbReading = "molto_riposato" | "fresco" | "neutro" | "in_costruzione" | "carico_alto";
 export type SessionMetrics = {
   activityId: number; date: string; poolLengthMeters: number | null; isOpenWater: boolean;
+  /** Total of the activity (volume). */
   distanceMeters: number; movingSeconds: number; hasLaps: boolean;
   intensityFactor: number | null; stss: number | null; zoneMeters: Zones5 | null;
   strokeIndex: number | null; dpsMeters: number | null; strokeRate: number | null; swolf: number | null;
   pacingCv: number | null; pacingFade: number | null;
+  /** Σ active laps (the swum distance behind pace-derived values); null without laps. */
+  swimDistanceMeters?: number | null;
+  /** True when the load comes from distance / total time (no laps), as TrainingPeaks defines it. */
+  loadEstimated?: boolean;
+  /** Active metres not zoned: other strokes, drill, kick, no stroke (pool swims with laps). */
+  unclassifiedMeters?: number | null;
 };
 export type SwimMetrics = {
   generatedAt: string;
@@ -44,8 +51,14 @@ export type SwimMetrics = {
     missing: string | null;
   };
   intensity: {
-    last28: { zoneMeters: Zones5; easyPct: number; mediumPct: number; hardPct: number } | null;
-    weeks: { weekStart: string; zoneMeters: Zones5 }[]; // last 8 weeks
+    last28: {
+      zoneMeters: Zones5; easyPct: number; mediumPct: number; hardPct: number;
+      /** Active metres not zoned (other strokes, drill, kick) in the 28 days. */
+      unclassifiedMeters?: number;
+      /** Zoned metres / all metres swum in the 28 days × 100 (whole percent). */
+      coveragePct?: number;
+    } | null;
+    weeks: { weekStart: string; zoneMeters: Zones5; unclassifiedMeters?: number }[]; // last 8 weeks
     missing: string | null;
   };
   efficiency: {
@@ -111,7 +124,7 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
     measures:
       "Quanto carico hai accumulato: la forma (carico medio delle ultime 6 settimane), la fatica (ultima settimana) e il loro equilibrio.",
     formula:
-      "Carico della nuotata = IF³ × ore × 100, con IF = velocità della nuotata / velocità al passo soglia (massimo 1,3). Forma = media esponenziale a 42 giorni del carico giornaliero, fatica = media a 7 giorni, equilibrio = forma − fatica a fine di ieri.",
+      "Carico = IF³ × ore × 100, con IF = velocità / velocità al passo soglia (massimo 1,3). Si calcola giro per giro sui tratti nuotati (tempo in movimento), come le zone; TrainingPeaks usa la durata totale con le pause, per questo nelle sedute a intervalli il nostro carico è un po' più alto. IF della nuotata = (media pesata sul tempo degli IF³ dei giri)^(1/3). Nuotate senza giri: IF = (distanza / durata totale) / velocità soglia, come TrainingPeaks (carico stimato). Forma = media esponenziale a 42 giorni del carico giornaliero, fatica = media a 7 giorni, equilibrio = forma − fatica a fine di ieri.",
     source:
       "Carico del nuoto (sTSS) di TrainingPeaks, con il cubo che segue la resistenza dell'acqua; modello di Banister nella forma di TrainingPeaks (forma a 42 giorni, fatica a 7).",
     howToRead:
@@ -123,6 +136,7 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
       "Da −30 a −10 (escluso): in costruzione.",
       "Sotto −30: carico alto.",
       "Forma che cresce più di 8 punti a settimana: crescita molto rapida.",
+      "Giri non a stile libero (altri stili, tecnica, gambe, stile non registrato): IF fisso 0,80, perché il passo soglia è a stile libero. È una convenzione nostra.",
     ],
   },
   intensity: {
@@ -130,13 +144,14 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
     measures:
       "Come si divide il tuo volume tra lavoro facile, medio e intenso, in base al passo di ogni giro rispetto al passo soglia.",
     formula:
-      "Ogni giro attivo va in una zona secondo la sua velocità rispetto alla velocità soglia: Z1 sotto 85%, Z2 85–92%, Z3 92–97%, Z4 97–103%, Z5 sopra 103%. Si somma la distanza per zona.",
+      "Ogni giro attivo a stile libero va in una zona secondo la sua velocità rispetto alla velocità soglia: Z1 sotto 85%, Z2 85–92%, Z3 92–97%, Z4 97–103%, Z5 sopra 103% (in passo: passo soglia / percentuale). Si somma la distanza per zona. Gli altri stili, la tecnica e le gambe restano non classificati; la copertura è la quota dei metri delle ultime 4 settimane che sta nelle zone.",
     source:
       "Zone di passo relative al passo soglia (Swim Smooth, TrainingPeaks); distribuzione dell'intensità polarizzata o piramidale (Seiler, 2010; Stöggl e Sperlich, 2014).",
     howToRead:
       "Gli studi sugli sport di resistenza indicano che la maggior parte del volume facile e una piccola parte intensa funzionano meglio di tanto lavoro medio.",
     conventions: [
       "I confini delle zone sono una convenzione.",
+      "Le zone valgono solo per lo stile libero, perché il passo soglia è a stile libero: gli altri stili non sono classificati.",
       "Se la zona media (Z3) supera circa il 35% del volume: molto lavoro in zona media. È un'indicazione basata sugli studi, non una regola.",
     ],
   },
