@@ -77,6 +77,8 @@ type InternalSession = {
   speedMps: number | null;
   pacingCv: number | null;
   pacingFade: number | null;
+  dpsDrop: number | null;
+  strokeRateRise: number | null;
   lastSet: RepeatSet | null;
 };
 
@@ -159,7 +161,9 @@ function computeSession(activity: MetricActivity, css: SwimCss | null): Internal
   const efficiency = pool
     ? sessionEfficiency(activity.laps)
     : { strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null, speedMps: null };
-  const pacing = pool ? sessionPacing(activity.laps) : { cv: null, fade: null, sets: [] };
+  const pacing = pool
+    ? sessionPacing(activity.laps)
+    : { cv: null, fade: null, dpsDrop: null, strokeRateRise: null, sets: [] };
   return {
     activity,
     cssSpeed,
@@ -174,6 +178,8 @@ function computeSession(activity: MetricActivity, css: SwimCss | null): Internal
     ...efficiency,
     pacingCv: pacing.cv,
     pacingFade: pacing.fade,
+    dpsDrop: pacing.dpsDrop,
+    strokeRateRise: pacing.strokeRateRise,
     lastSet: pacing.sets[pacing.sets.length - 1] ?? null,
   };
 }
@@ -201,6 +207,8 @@ function toSessionMetrics(s: InternalSession): SessionMetrics {
     swolf: round(s.swolf, 1),
     pacingCv: round(s.pacingCv, 1),
     pacingFade: round(s.pacingFade, 1),
+    dpsDropPct: round(s.dpsDrop, 1),
+    strokeRateRisePct: round(s.strokeRateRise, 1),
   };
 }
 
@@ -324,6 +332,8 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
     isOpenWater: s.activity.isOpenWater,
     pacingCv: s.pacingCv,
     pacingFade: s.pacingFade,
+    dpsDrop: s.dpsDrop,
+    strokeRateRise: s.strokeRateRise,
     lastSet: s.lastSet,
   }));
   const eff = efficiencySummary(summaryRows, now);
@@ -352,8 +362,16 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
     pacing: {
       cv28: round(pacing.cv28, 1),
       fade28: round(pacing.fade28, 1),
-      latestSet: pacing.latestSet,
+      latestSet: pacing.latestSet
+        ? {
+            ...pacing.latestSet,
+            repDps: pacing.latestSet.repDps?.map((dps) => round(dps, 2)!) ?? null,
+            dpsDropPct: round(pacing.latestSet.dpsDropPct, 1),
+          }
+        : null,
       missing: pacing.missing,
+      dpsDrop28: round(pacing.dpsDrop28, 1),
+      strokeRateRise28: round(pacing.strokeRateRise28, 1),
     },
     volume: volumeSummary(activities, now, input.streakWeekCounts ?? input.streakDates),
   };

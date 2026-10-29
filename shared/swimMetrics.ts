@@ -41,6 +41,8 @@ export type SessionMetrics = {
   unclassifiedMeters?: number | null;
   /** The CSS this swim's load and zones use: a valid test or its month's estimate; null without. */
   cssPaceSecondsPer100?: number | null; cssSource?: "stima" | "test" | null;
+  /** Stroke holding in the repeat sets (distance-weighted): DPS drop and stroke rate rise, %. */
+  dpsDropPct?: number | null; strokeRateRisePct?: number | null;
 };
 export type SwimMetrics = {
   generatedAt: string;
@@ -76,8 +78,16 @@ export type SwimMetrics = {
   };
   pacing: {
     cv28: number | null; fade28: number | null;
-    latestSet: { date: string; distanceMeters: number; stroke: string; repSeconds: number[] } | null;
+    latestSet: {
+      date: string; distanceMeters: number; stroke: string; repSeconds: number[];
+      /** Distance per cycle of each rep (m); null without stroke data on every rep. */
+      repDps?: number[] | null;
+      /** DPS drop of this set, % (first third against last third). */
+      dpsDropPct?: number | null;
+    } | null;
     missing: string | null;
+    /** Stroke holding: medians of the last 28 days, % (DPS drop; stroke rate rise). */
+    dpsDrop28?: number | null; strokeRateRise28?: number | null;
   };
   volume: {
     weeks: { weekStart: string; km: number; sessions: number }[]; // last 12 weeks, oldest first
@@ -172,18 +182,19 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
     ],
   },
   pacing: {
-    name: "Regolarità nelle ripetute",
+    name: "Regolarità e tenuta nelle ripetute",
     measures:
-      "Quanto tieni costante il passo nelle serie di ripetute e quanto cali nel finale.",
+      "Quanto tieni costante il passo nelle serie di ripetute, quanto cali nel finale e quanto tieni la bracciata (la distanza per bracciata) fino in fondo.",
     formula:
-      "Una serie è fatta di almeno 3 giri attivi consecutivi con la stessa distanza (almeno 50 m) e lo stesso stile; un recupero più lungo di 1 minuto e del doppio dei recuperi precedenti della serie (es. tra riscaldamento e serie centrale) ne apre una nuova. Variabilità = deviazione standard campionaria (n − 1) / media dei tempi × 100; calo = (media dell'ultimo terzo − media del primo terzo) / media del primo terzo × 100.",
+      "Una serie è fatta di almeno 3 giri attivi consecutivi con la stessa distanza (almeno 50 m) e lo stesso stile; un recupero più lungo di 1 minuto e del doppio dei recuperi precedenti della serie (es. tra riscaldamento e serie centrale) ne apre una nuova. Variabilità = deviazione standard campionaria (n − 1) / media dei tempi × 100; calo = (media dell'ultimo terzo − media del primo terzo) / media del primo terzo × 100. Tenuta della bracciata, sulle serie con le bracciate di ogni ripetuta: calo della distanza per bracciata = (media del primo terzo − media dell'ultimo terzo) / media del primo terzo × 100; aumento della frequenza calcolato allo stesso modo.",
     source:
-      "Variabilità del passo (coefficiente di variazione) e calo nel finale, misure usate negli studi sul pacing e dagli allenatori.",
+      "Variabilità del passo (coefficiente di variazione) e calo nel finale, misure usate negli studi sul pacing e dagli allenatori. Con la fatica la distanza per bracciata si accorcia e la frequenza sale (Craig e Pendergast, 1979; Keskinen e Komi, 1993).",
     howToRead:
-      "Più bassa è la variabilità, più sei regolare; un calo alto vuol dire che parti troppo forte o che la serie è troppo lunga per il passo scelto.",
+      "Più bassa è la variabilità, più sei regolare; un calo alto vuol dire che parti troppo forte o che la serie è troppo lunga per il passo scelto. Se nel finale la distanza per bracciata cala, la fatica ti accorcia la bracciata: è il segnale da allenare.",
     conventions: [
       "Sono convenzioni nostre: variabilità sotto 2% molto regolare, 2–4% regolare, sopra 4% irregolare.",
       "Calo sopra 5%: cali nel finale.",
+      "Distanza per bracciata che cala più del 5% nel finale: la bracciata si accorcia nel finale (convenzione nostra).",
     ],
   },
   volume: {
@@ -238,6 +249,8 @@ export const SWIM_METRIC_THRESHOLDS = {
   rampPerWeek: 8,
   /** Fade above this percent: «cali nel finale». */
   pacingFadePct: 5,
+  /** Distance per cycle dropping above this percent: «la bracciata si accorcia nel finale». */
+  dpsDropPct: 5,
 } as const;
 
 /** Our convention: CV < 2% very even, 2–4% even, > 4% uneven. */

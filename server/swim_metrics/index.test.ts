@@ -233,7 +233,16 @@ describe("getSwimMetrics", () => {
     expect(metrics.efficiency.missing).toMatch(/base/);
 
     // Pacing: the 4×200 of 15/10 is the most recent set.
-    expect(metrics.pacing.latestSet).toEqual({ date: "2026-10-15", distanceMeters: 200, stroke: "freestyle", repSeconds: [190, 192, 191, 195] });
+    expect(metrics.pacing.latestSet).toEqual({
+      date: "2026-10-15",
+      distanceMeters: 200,
+      stroke: "freestyle",
+      repSeconds: [190, 192, 191, 195],
+      repDps: [2.38, 2.38, 2.38, 2.38], // 84 cycles every 200
+      dpsDropPct: 0,
+    });
+    // The 8×100 of 06/10 also holds its 42 cycles: no stroke shortening in 28 days.
+    expect(metrics.pacing).toMatchObject({ dpsDrop28: 0 });
     expect(metrics.pacing.cv28).not.toBeNull();
 
     // Volume.

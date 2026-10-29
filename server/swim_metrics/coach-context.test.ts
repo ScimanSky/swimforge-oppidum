@@ -50,7 +50,7 @@ describe("swimMetricsForCoach", () => {
 describe("swimMetricsGlossary", () => {
   it("is generated from the shared definitions", () => {
     const glossary = swimMetricsGlossary();
-    for (const name of ["Passo soglia", "Forma e fatica", "Intensità", "Efficienza della bracciata", "Regolarità nelle ripetute", "Volume e costanza"]) {
+    for (const name of ["Passo soglia", "Forma e fatica", "Intensità", "Efficienza della bracciata", "Regolarità e tenuta nelle ripetute", "Volume e costanza"]) {
       expect(glossary).toContain(`- ${name}:`);
     }
     expect(glossary).toContain("Wakayoshi");

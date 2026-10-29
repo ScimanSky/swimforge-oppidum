@@ -164,7 +164,12 @@ describe("readings shared by the interface and the coach", () => {
   });
 
   it("conventional thresholds", () => {
-    expect(SWIM_METRIC_THRESHOLDS).toEqual({ mediumZonePct: 35, rampPerWeek: 8, pacingFadePct: 5 });
+    expect(SWIM_METRIC_THRESHOLDS).toEqual({ mediumZonePct: 35, rampPerWeek: 8, pacingFadePct: 5, dpsDropPct: 5 });
+    expect(SWIM_METRIC_DEFINITIONS.pacing.name).toBe("Regolarità e tenuta nelle ripetute");
+    expect(SWIM_METRIC_DEFINITIONS.pacing.source).toMatch(/Craig e Pendergast, 1979; Keskinen e Komi, 1993/);
+    expect(SWIM_METRIC_DEFINITIONS.pacing.conventions).toContain(
+      "Distanza per bracciata che cala più del 5% nel finale: la bracciata si accorcia nel finale (convenzione nostra).",
+    );
   });
 });
 
