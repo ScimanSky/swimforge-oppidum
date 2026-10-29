@@ -128,10 +128,19 @@ export const profileRouter = router({
                 }
             }
 
+            // Settings sends only its own preference keys: merge them into the stored ones so
+            // other keys (e.g. cssTest, saved by statistics.setCssTest) survive.
+            let mergedPreferences: Record<string, unknown> | undefined;
+            if (preferences) {
+                const current = await db.getSwimmerProfile(ctx.user.id);
+                const { preferencesObject } = await import("../swim_metrics");
+                mergedPreferences = { ...preferencesObject(current?.preferences), ...preferences };
+            }
+
             await db.updateSwimmerProfile(ctx.user.id, {
                 ...profilePayload,
                 notificationSettings,
-                preferences,
+                preferences: mergedPreferences,
                 privacySettings,
             });
             return { success: true };

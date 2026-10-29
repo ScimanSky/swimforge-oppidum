@@ -192,15 +192,36 @@ export const statisticsRouter = router({
             return await getPerformanceAnalysis(ctx.user.id, input.days);
         }),
 
-    // Get advanced metrics
-    getAdvanced: protectedProcedure
+    // Swim metrics (CSS, load and form, intensity, Stroke Index, pacing, volume) of the caller.
+    getMetrics: protectedProcedure.query(async ({ ctx }) => {
+        const { getSwimMetrics } = await import("../swim_metrics");
+        return await getSwimMetrics(ctx.user.id);
+    }),
+
+    // The caller's 400/200 CSS test, saved in the profile preferences.
+    setCssTest: protectedProcedure
         .input(z.object({
-            days: z.number().default(30),
+            t200Seconds: z.number(),
+            t400Seconds: z.number(),
+            date: z.string().max(10),
         }))
-        .query(async ({ ctx, input }) => {
-            const { getAdvancedMetrics } = await import("../db_statistics");
-            return await getAdvancedMetrics(ctx.user.id, input.days);
+        .mutation(async ({ ctx, input }) => {
+            const { updateCssTest, validateCssTest } = await import("../swim_metrics/css-test");
+            const problem = validateCssTest(input);
+            if (problem) throw new TRPCError({ code: "BAD_REQUEST", message: problem.message });
+            if (!(await updateCssTest(ctx.user.id, input))) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            }
+            return { success: true };
         }),
+
+    clearCssTest: protectedProcedure.mutation(async ({ ctx }) => {
+        const { updateCssTest } = await import("../swim_metrics/css-test");
+        if (!(await updateCssTest(ctx.user.id, null))) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+        }
+        return { success: true };
+    }),
 });
 
 // AI Coach
