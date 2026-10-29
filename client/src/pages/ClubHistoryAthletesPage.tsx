@@ -54,6 +54,21 @@ function isNewPersonalBest(row: any): boolean {
   return isNewRecordNote(row?.notes);
 }
 
+function summarizeAthleteResults(results: any[]) {
+  let pointsTotal = 0;
+  let newRecordsCount = 0;
+  for (const row of results) {
+    const points = Number(row?.points ?? NaN);
+    if (Number.isFinite(points)) pointsTotal += points;
+    if (isNewPersonalBest(row)) newRecordsCount += 1;
+  }
+  return {
+    resultsCount: results.length,
+    pointsTotal: pointsTotal.toFixed(1),
+    newRecordsCount,
+  };
+}
+
 export default function ClubHistoryAthletesPage() {
   const [match, params] = useRoute("/community/club/:clubId/history/athletes");
   const clubId = Number(params?.clubId);
@@ -149,20 +164,8 @@ export default function ClubHistoryAthletesPage() {
   const detail = athleteDetailQuery.data as any;
   const detailResults = (detail?.results as any[]) ?? [];
   const totalAthletes = Number((athletesQuery.data as any)?.total ?? athletes.length);
-  const athleteSummary = useMemo(() => {
-    let pointsTotal = 0;
-    let newRecordsCount = 0;
-    for (const row of detailResults) {
-      const points = Number(row?.points ?? NaN);
-      if (Number.isFinite(points)) pointsTotal += points;
-      if (isNewPersonalBest(row)) newRecordsCount += 1;
-    }
-    return {
-      resultsCount: detailResults.length,
-      pointsTotal: pointsTotal.toFixed(1),
-      newRecordsCount,
-    };
-  }, [detailResults]);
+  // A plain computation, not a hook: this runs after the early returns above.
+  const athleteSummary = summarizeAthleteResults(detailResults);
 
   const jumpToDetail = () => {
     if (typeof window === "undefined") return;

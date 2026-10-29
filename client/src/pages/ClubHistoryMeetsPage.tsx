@@ -54,6 +54,18 @@ function isNewPersonalBest(row: any): boolean {
   return isNewRecordNote(row?.notes);
 }
 
+function summarizeMeetResults(meetDetail: any, results: any[]) {
+  let newRecordsCount = 0;
+  for (const row of results) {
+    if (isNewPersonalBest(row)) newRecordsCount += 1;
+  }
+  return {
+    resultsCount: Number(meetDetail?.stats?.resultsCount ?? results.length),
+    athletesCount: Number(meetDetail?.stats?.athletesCount ?? 0),
+    newRecordsCount,
+  };
+}
+
 export default function ClubHistoryMeetsPage() {
   const [match, params] = useRoute("/community/club/:clubId/history/meets");
   const clubId = Number(params?.clubId);
@@ -167,17 +179,8 @@ export default function ClubHistoryMeetsPage() {
   const meetDetail = meetDetailQuery.data as any;
   const results = (resultsQuery.data as any[]) ?? [];
   const totalMeets = Number((meetsQuery.data as any)?.total ?? meets.length);
-  const meetSummary = useMemo(() => {
-    let newRecordsCount = 0;
-    for (const row of results) {
-      if (isNewPersonalBest(row)) newRecordsCount += 1;
-    }
-    return {
-      resultsCount: Number(meetDetail?.stats?.resultsCount ?? results.length),
-      athletesCount: Number(meetDetail?.stats?.athletesCount ?? 0),
-      newRecordsCount,
-    };
-  }, [meetDetail, results]);
+  // A plain computation, not a hook: this runs after the early returns above.
+  const meetSummary = summarizeMeetResults(meetDetail, results);
 
   const jumpToDetail = () => {
     if (typeof window === "undefined") return;
