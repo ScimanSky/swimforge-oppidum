@@ -277,11 +277,13 @@ export default function Goals() {
   const allActiveGoals = useMemo(() => {
     return [...customGoals]
   }, [customGoals])
-  const summaryMetrics = useMemo((): Array<MetricProps & { id: string }> => {
+  const summaryMetrics = useMemo((): Array<MetricProps & { id: string; detail?: string }> => {
     const xpGoal = activeGoals.find((goal) => goal.id === "xp")
     const distanceGoal = activeGoals.find((goal) => goal.id === "weekly-distance")
     const frequencyGoal = activeGoals.find((goal) => goal.id === "weekly-sessions")
     const nextLevel = profile?.xpLevel ? profile.xpLevel + 1 : 2
+    const nextLevelXp = profile?.nextLevelXp ?? 0
+    const sessionsTarget = frequencyGoal?.targetValue ?? 3
 
     return [
       {
@@ -289,19 +291,24 @@ export default function Goals() {
         value: formatInteger(xpGoal?.progress ?? 0),
         unit: "%",
         label: `Verso il livello ${nextLevel}`,
+        detail: nextLevelXp
+          ? `${formatInteger(profile?.totalXp ?? 0)} / ${formatInteger(nextLevelXp)} XP`
+          : undefined,
         tone: "xp",
       },
       {
         id: "distance",
         value: formatKm(weeklyDistanceKm * 1000),
         unit: "km",
-        label: `Settimana, obiettivo ${distanceGoal?.targetValue ?? 10} km`,
+        label: "Questa settimana",
+        detail: `Obiettivo ${distanceGoal?.targetValue ?? 10} km`,
       },
       {
         id: "sessions",
         value: formatInteger(weeklySessions),
         unit: weeklySessions === 1 ? "nuotata" : "nuotate",
-        label: `Settimana, obiettivo ${frequencyGoal?.targetValue ?? 3}`,
+        label: "Questa settimana",
+        detail: `Obiettivo ${sessionsTarget} ${sessionsTarget === 1 ? "nuotata" : "nuotate"}`,
       },
       {
         id: "custom",
@@ -309,7 +316,15 @@ export default function Goals() {
         label: "Obiettivi attivi",
       },
     ]
-  }, [activeGoals, allActiveGoals.length, profile?.xpLevel, weeklyDistanceKm, weeklySessions])
+  }, [
+    activeGoals,
+    allActiveGoals.length,
+    profile?.xpLevel,
+    profile?.nextLevelXp,
+    profile?.totalXp,
+    weeklyDistanceKm,
+    weeklySessions,
+  ])
 
   const addSuggestedGoal = (goal: any) => {
     const title = String(goal.title ?? "").trim()
@@ -472,8 +487,13 @@ export default function Goals() {
             Riepilogo
           </h2>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
-            {summaryMetrics.map(({ id, ...metric }) => (
-              <Metric key={id} size="responsive" {...metric} />
+            {summaryMetrics.map(({ id, detail, ...metric }) => (
+              <div key={id} className="min-w-0">
+                <Metric size="responsive" {...metric} />
+                {detail ? (
+                  <p className="mt-1 text-xs text-muted-foreground tabular-nums">{detail}</p>
+                ) : null}
+              </div>
             ))}
           </div>
         </section>

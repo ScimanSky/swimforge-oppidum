@@ -631,7 +631,7 @@ export default function Coach() {
       }
       setChatProvider((response.provider as "forge" | "gemini" | "rule_based" | undefined) ?? null)
       if (response.fallback && !fallbackToastShownRef.current) {
-        toast.warning("Coach in modalità base: risposte semplificate (controlla la configurazione AI server).")
+        toast.warning("Coach in modalità base: risposte semplificate (controlla la configurazione del server per l'IA).")
         fallbackToastShownRef.current = true
       }
       if (!response.fallback) {
@@ -901,7 +901,7 @@ export default function Coach() {
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold text-foreground">Archivio analisi</h3>
                     <Chip className="tabular-nums">
-                      {filteredArchiveEntries.length}/{sessionEntries.length}
+                      {filteredArchiveEntries.length} di {sessionEntries.length} analisi
                     </Chip>
                   </div>
 
@@ -987,7 +987,7 @@ export default function Coach() {
                     Risposte basate sui tuoi dati reali (nuotate, metriche e analisi).
                   </p>
                   {chatProvider === "gemini" && (
-                    <Chip className="mt-2">Provider attivo: Gemini</Chip>
+                    <Chip className="mt-2">Fornitore attivo: Gemini</Chip>
                   )}
                   {chatProvider === "rule_based" && (
                     <Chip className="mt-2">

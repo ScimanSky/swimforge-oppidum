@@ -63,6 +63,11 @@ describe("Obiettivi", () => {
     }
     const summary = screen.getByRole("region", { name: "Riepilogo" });
     expect(within(summary).getByText("Verso il livello 5")).toBeTruthy();
+    // XP context next to the percentage; short labels that fit a 360px column.
+    expect(within(summary).getByText("450 / 1.000 XP")).toBeTruthy();
+    expect(within(summary).getAllByText("Questa settimana")).toHaveLength(2);
+    expect(within(summary).getByText("Obiettivo 10 km")).toBeTruthy();
+    expect(within(summary).getByText("Obiettivo 3 nuotate")).toBeTruthy();
     expect(within(summary).getByText("Obiettivi attivi")).toBeTruthy();
     expect(screen.getByText(/Nessun obiettivo creato/)).toBeTruthy();
   });
@@ -103,12 +108,14 @@ describe("Obiettivi", () => {
   });
 
   it("crea un obiettivo dal dialogo", async () => {
+    // No per-keystroke delay: the default setTimeout per character times out under full-suite load.
+    const user = userEvent.setup({ delay: null });
     render(<Goals />);
-    await userEvent.click(screen.getByRole("button", { name: "Crea obiettivo" }));
-    await userEvent.type(screen.getByLabelText("Titolo"), "Delfino 200 m");
-    await userEvent.type(screen.getByLabelText("Valore obiettivo"), "200");
-    await userEvent.type(screen.getByLabelText("Unità"), "m");
-    await userEvent.click(screen.getByRole("button", { name: "Aggiungi obiettivo" }));
+    await user.click(screen.getByRole("button", { name: "Crea obiettivo" }));
+    await user.type(screen.getByLabelText("Titolo"), "Delfino 200 m");
+    await user.type(screen.getByLabelText("Valore obiettivo"), "200");
+    await user.type(screen.getByLabelText("Unità"), "m");
+    await user.click(screen.getByRole("button", { name: "Aggiungi obiettivo" }));
     expect(state.createCalls).toEqual([
       { title: "Delfino 200 m", category: "distance", targetValue: 200, unit: "m" },
     ]);

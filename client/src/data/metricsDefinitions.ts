@@ -2,7 +2,7 @@ export const metricsDefinitions = {
   sei: {
     title: "Indice di efficienza in acqua (SEI)",
     description:
-      "L'indice di efficienza del nuoto combina SWOLF, distanza per bracciata e pace in un unico punteggio che misura quanto sei efficiente in acqua. Un punteggio alto indica che nuoti velocemente usando meno energia.",
+      "L'indice di efficienza del nuoto combina SWOLF, distanza per bracciata e passo in un unico punteggio che misura quanto sei efficiente in acqua. Un punteggio alto indica che nuoti velocemente usando meno energia.",
     formula: `SEI = (swolf_score × 0.4) + (stroke_efficiency × 0.35) + (pace_score × 0.25)
 
 Dove:
@@ -31,7 +31,7 @@ Dove:
 
 Dove:
 • coefficiente_variazione = deviazione_standard / media
-• Calcolato su pace, SWOLF e numero bracciate`,
+• Calcolato su passo, SWOLF e numero bracciate`,
     interpretation: {
       excellent: "Ritmo molto costante, ottima gestione",
       good: "Buona consistenza, continua così",

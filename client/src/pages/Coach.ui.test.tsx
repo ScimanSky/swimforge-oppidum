@@ -130,6 +130,9 @@ describe("Coach AI", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Buona costanza" })).toBeTruthy();
     expect(screen.getByText(/1,5 km · 50 min/)).toBeTruthy();
 
+    await userEvent.click(screen.getByRole("button", { name: "Apri archivio" }));
+    expect(screen.getByText("1 di 1 analisi")).toBeTruthy();
+
     await userEvent.click(screen.getByRole("tab", { name: "Chat" }));
     expect(screen.getByRole("heading", { level: 2, name: "Chat con il coach" })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "Messaggio" })).toBeTruthy();
