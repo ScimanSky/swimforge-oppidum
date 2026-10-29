@@ -6,13 +6,14 @@ import { memoryLocation } from "wouter/memory-location";
 import OnboardingFlow from "./OnboardingFlow";
 import { setOnboardingCompletedLocally, setOnboardingIdentityLocally } from "@/lib/onboarding";
 
-vi.mock("@remotion/player", () => ({ Player: () => null }));
+vi.mock("@remotion/player", () => ({ Player: () => null, Thumbnail: () => null }));
 vi.mock("./OnboardingWelcomeComposition", () => ({
   OnboardingWelcomeComposition: () => null,
   ONBOARDING_WELCOME_DURATION_FRAMES: 30,
   ONBOARDING_WELCOME_FPS: 30,
   ONBOARDING_WELCOME_HEIGHT: 720,
   ONBOARDING_WELCOME_WIDTH: 1280,
+  ONBOARDING_WELCOME_STILL_FRAME: 12,
 }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {

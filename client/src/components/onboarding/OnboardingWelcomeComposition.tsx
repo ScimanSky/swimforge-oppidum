@@ -29,6 +29,8 @@ export const ONBOARDING_WELCOME_FPS = 30;
 export const ONBOARDING_WELCOME_DURATION_FRAMES = SCENE_DURATION * scenes.length;
 export const ONBOARDING_WELCOME_WIDTH = 1280;
 export const ONBOARDING_WELCOME_HEIGHT = 720;
+/** The still shown instead of the video with reduced motion: the first scene, settled. */
+export const ONBOARDING_WELCOME_STILL_FRAME = 60;
 
 function SceneCard({ title, subtitle, frameOffset }: { title: string; subtitle: string; frameOffset: number }) {
   const frame = useCurrentFrame() - frameOffset;

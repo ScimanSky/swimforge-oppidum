@@ -17,6 +17,7 @@ import {
   type OnboardingRole,
 } from "@/lib/onboarding";
 import { useHoldCelebrations } from "@/hooks/useCelebrationGate";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,6 +32,7 @@ import {
   ONBOARDING_WELCOME_DURATION_FRAMES,
   ONBOARDING_WELCOME_FPS,
   ONBOARDING_WELCOME_HEIGHT,
+  ONBOARDING_WELCOME_STILL_FRAME,
   ONBOARDING_WELCOME_WIDTH,
 } from "./OnboardingWelcomeComposition";
 import { OnboardingIdentitySetup } from "./OnboardingIdentitySetup";
@@ -47,6 +49,11 @@ type TourStep = {
 const OnboardingPlayer = lazy(async () => {
   const mod = await import("@remotion/player");
   return { default: mod.Player };
+});
+// With reduced motion: one still frame of the video, nothing plays by itself.
+const OnboardingStill = lazy(async () => {
+  const mod = await import("@remotion/player");
+  return { default: mod.Thumbnail };
 });
 
 const ATHLETE_TOUR_STEPS: TourStep[] = [
@@ -171,6 +178,7 @@ export default function OnboardingFlow() {
   const [resumePathAfterTour, setResumePathAfterTour] = useState<string | null>(null);
   const [onboardingRole, setOnboardingRole] = useState<OnboardingRole>("athlete");
   const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
+  const reduceMotion = usePrefersReducedMotion();
 
   const TOUR_STEPS = useMemo(
     () => (onboardingRole === "coach" ? COACH_TOUR_STEPS : ATHLETE_TOUR_STEPS),
@@ -325,7 +333,7 @@ export default function OnboardingFlow() {
       const topGuard = 96;
       const bottomGuard = 170;
       if (rect.top < topGuard || rect.bottom > window.innerHeight - bottomGuard) {
-        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        element.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
       }
     };
 
@@ -343,7 +351,7 @@ export default function OnboardingFlow() {
       window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("scroll", scheduleUpdate, true);
     };
-  }, [currentStep, stage, TOUR_STEPS]);
+  }, [currentStep, reduceMotion, stage, TOUR_STEPS]);
 
   const completeOnboarding = async () => {
     const targetAfterCompletion = resumePathAfterTour;
@@ -435,6 +443,21 @@ export default function OnboardingFlow() {
 
   const step = TOUR_STEPS[currentStep];
   const tooltip = getTooltipPosition(highlightRect);
+  // With reduced motion there is no video to wait for: the still is all there is.
+  const canStartTour = welcomeCompleted || reduceMotion;
+  const welcomeVideo = {
+    component: OnboardingWelcomeComposition,
+    durationInFrames: ONBOARDING_WELCOME_DURATION_FRAMES,
+    fps: ONBOARDING_WELCOME_FPS,
+    compositionHeight: ONBOARDING_WELCOME_HEIGHT,
+    compositionWidth: ONBOARDING_WELCOME_WIDTH,
+    inputProps: { userName: meQuery.data?.name ?? null },
+    style: {
+      width: "100%",
+      borderRadius: 16,
+      aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
+    },
+  };
 
   return (
     <>
@@ -455,22 +478,11 @@ export default function OnboardingFlow() {
                 />
               )}
             >
-              <OnboardingPlayer
-                component={OnboardingWelcomeComposition}
-                durationInFrames={ONBOARDING_WELCOME_DURATION_FRAMES}
-                fps={ONBOARDING_WELCOME_FPS}
-                compositionHeight={ONBOARDING_WELCOME_HEIGHT}
-                compositionWidth={ONBOARDING_WELCOME_WIDTH}
-                controls={false}
-                autoPlay
-                loop={false}
-                inputProps={{ userName: meQuery.data?.name ?? null }}
-                style={{
-                  width: "100%",
-                  borderRadius: 16,
-                  aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
-                }}
-              />
+              {reduceMotion ? (
+                <OnboardingStill {...welcomeVideo} frameToDisplay={ONBOARDING_WELCOME_STILL_FRAME} />
+              ) : (
+                <OnboardingPlayer {...welcomeVideo} controls={false} autoPlay loop={false} />
+              )}
             </Suspense>
           </div>
 
@@ -478,8 +490,8 @@ export default function OnboardingFlow() {
             <Button variant="ghost" onClick={() => void skipWelcome()}>
               Salta tour
             </Button>
-            <Button onClick={handleWelcomeContinue} disabled={!welcomeCompleted}>
-              {welcomeCompleted ? "Inizia tour interattivo" : "Attendi la fine dell'intro…"}
+            <Button onClick={handleWelcomeContinue} disabled={!canStartTour}>
+              {canStartTour ? "Inizia tour interattivo" : "Attendi la fine dell'intro…"}
             </Button>
           </div>
         </OnboardingDialog>
@@ -525,7 +537,7 @@ export default function OnboardingFlow() {
                       height: 160,
                     }
               }
-              transition={{ type: "spring", stiffness: 220, damping: 28, mass: 0.8 }}
+              transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 220, damping: 28, mass: 0.8 }}
               style={{ boxShadow: "0 0 0 9999px color-mix(in oklch, var(--background) 72%, transparent)" }}
             />
             <DialogPrimitive.Content
@@ -602,7 +614,7 @@ function OnboardingDialog({
           {...(description ? {} : { "aria-describedby": undefined })}
           onInteractOutside={(event) => event.preventDefault()}
           className={cn(
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed left-1/2 top-1/2 z-[120] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card outline-none",
+            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:data-[state=open]:zoom-in-100 fixed left-1/2 top-1/2 z-[120] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card outline-none",
             className,
           )}
         >

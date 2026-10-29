@@ -10,15 +10,27 @@ import { isOnboardingCompletedLocally, setOnboardingIdentityLocally } from "@/li
 const state = vi.hoisted(() => ({
   consentCalls: [] as unknown[],
   profileUpdates: [] as unknown[],
+  players: [] as Array<Record<string, unknown>>,
+  stills: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock("@remotion/player", () => ({ Player: () => null }));
+vi.mock("@remotion/player", () => ({
+  Player: (props: Record<string, unknown>) => {
+    state.players.push(props);
+    return null;
+  },
+  Thumbnail: (props: Record<string, unknown>) => {
+    state.stills.push(props);
+    return null;
+  },
+}));
 vi.mock("./OnboardingWelcomeComposition", () => ({
   OnboardingWelcomeComposition: () => null,
   ONBOARDING_WELCOME_DURATION_FRAMES: 30,
   ONBOARDING_WELCOME_FPS: 30,
   ONBOARDING_WELCOME_HEIGHT: 720,
   ONBOARDING_WELCOME_WIDTH: 1280,
+  ONBOARDING_WELCOME_STILL_FRAME: 12,
 }));
 // No animations in jsdom: steps swap at once.
 vi.mock("framer-motion", () => {
@@ -73,11 +85,37 @@ describe("OnboardingFlow (Corsia): dialoghi accessibili", () => {
     localStorage.clear();
     state.consentCalls = [];
     state.profileUpdates = [];
+    state.players = [];
+    state.stills = [];
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("il video di benvenuto parte da solo", async () => {
+    renderAt("/home");
+    await screen.findByRole("dialog", { name: "Benvenuto nel tour guidato" });
+    await vi.waitFor(() => expect(state.players.at(-1)).toMatchObject({ autoPlay: true }));
+    expect(state.stills).toEqual([]);
+  });
+
+  it("con il movimento ridotto: un fotogramma fermo al posto del video, e si parte subito", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    renderAt("/home");
+    await screen.findByRole("dialog", { name: "Benvenuto nel tour guidato" });
+
+    expect(screen.getByRole("button", { name: "Inizia tour interattivo" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Attendi la fine dell'intro…" })).toBeNull();
+    await vi.waitFor(() => expect(state.stills.at(-1)).toMatchObject({ frameToDisplay: 12 }));
+    expect(state.players).toEqual([]);
   });
 
   it("il benvenuto è un dialogo con titolo; si parte solo a fine intro", async () => {
