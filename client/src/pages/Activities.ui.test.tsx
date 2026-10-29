@@ -324,6 +324,17 @@ describe("Activities UI interactions", () => {
     expect(screen.getByRole("link", { name: "Dettaglio vasche" })).toHaveAttribute("href", "/track/102");
   });
 
+  it("distances below 1 km are in metres, on the card and in the panel", () => {
+    state.activitiesData = [swim({ distanceMeters: 800 })];
+
+    render(<Activities />);
+
+    expect(screen.getByRole("button", { name: "Pool Session" })).toHaveAccessibleDescription(
+      /800 m Distanza/
+    );
+    expect(screen.getByRole("region", { name: "Pool Session" })).toHaveTextContent("800 m Distanza");
+  });
+
   it("has no page title, level header or Open Water label", () => {
     state.activitiesData = [swim()];
 

@@ -213,6 +213,13 @@ describe("primitivi Corsia", () => {
     expect(screen.queryByText("—")).toBeNull();
   });
 
+  it("ActivityCard: sotto 1 km la distanza è in metri", () => {
+    render(
+      withRouter("/track", <ActivityCard activity={{ ...activity, distanceMeters: 800 }} />)
+    );
+    expect(screen.getByRole("link")).toHaveAccessibleDescription(/800 m Distanza/);
+  });
+
   it("ActivityCard: vasca senza lunghezza, data non valida, icona decorativa", () => {
     const { container } = render(
       withRouter(

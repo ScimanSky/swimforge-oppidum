@@ -36,10 +36,10 @@ import { summarizeWeek } from "@/lib/week-summary"
 import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
 import {
   NO_VALUE,
+  distanceParts,
   formatDistance,
   formatDurationParts,
   formatInteger,
-  formatKm,
   formatPaceValue,
   formatSessionDate,
   paceSecondsPer100m,
@@ -84,7 +84,7 @@ const getCalories = (activity: any) =>
 function sessionMetrics(activity: any): MetricProps[] {
   const metrics: MetricProps[] = []
   if (positiveNumber(activity.distanceMeters))
-    metrics.push({ value: formatKm(activity.distanceMeters), unit: "km", label: "Distanza" })
+    metrics.push({ ...distanceParts(activity.distanceMeters), label: "Distanza" })
   const duration = formatDurationParts(activity.durationSeconds)
   if (duration) metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" })
   const pace = paceSecondsPer100m(activity)

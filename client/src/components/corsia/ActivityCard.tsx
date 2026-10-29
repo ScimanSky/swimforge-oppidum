@@ -6,8 +6,8 @@ import { Metric, type MetricProps } from "./Metric";
 import { cn } from "@/lib/utils";
 import {
   NO_VALUE,
+  distanceParts,
   formatDurationParts,
-  formatKm,
   formatPaceValue,
   formatSessionDate,
   paceSecondsPer100m,
@@ -52,13 +52,12 @@ export function ActivityCard(props: ActivityCardProps) {
   const date = formatSessionDate(activity.activityDate);
   // Without a date the line is just the place, never «— · Vasca».
   const meta = date === NO_VALUE ? where : `${date} · ${where}`;
-  const distance = formatKm(activity.distanceMeters);
+  const distance = distanceParts(activity.distanceMeters);
   const duration = formatDurationParts(activity.durationSeconds);
   const pace = paceSecondsPer100m(activity);
   // A metric without data is not shown.
   const metrics: MetricProps[] = [];
-  if (distance !== NO_VALUE)
-    metrics.push({ value: distance, unit: "km", label: "Distanza" });
+  if (distance.unit) metrics.push({ ...distance, label: "Distanza" });
   if (duration)
     metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" });
   if (pace)

@@ -44,11 +44,22 @@ export const formatInteger = (value: number) =>
 export const formatKm = (meters: number) =>
   Number.isFinite(meters) ? kmFmt.format(Math.round(meters / 100) / 10) : NO_VALUE
 
-/** «3,2 km» or «800 m» (chosen after rounding: 999.6 → «1 km»); «—» without a positive value. */
-export const formatDistance = (meters?: number | null) => {
-  if (meters === null || meters === undefined || !Number.isFinite(meters) || meters <= 0) return NO_VALUE
+/**
+ * The app's one distance rule, split for `<Metric>`: { value: "3,2", unit: "km" } or
+ * { value: "800", unit: "m" } (chosen after rounding: 999.6 → 1 km); { value: "—" } without a
+ * positive value.
+ */
+export const distanceParts = (meters?: number | null): { value: string; unit?: string } => {
+  if (meters === null || meters === undefined || !Number.isFinite(meters) || meters <= 0)
+    return { value: NO_VALUE }
   const rounded = Math.round(meters)
-  return rounded >= 1000 ? `${formatKm(meters)} km` : `${rounded} m`
+  return rounded >= 1000 ? { value: formatKm(meters), unit: "km" } : { value: String(rounded), unit: "m" }
+}
+
+/** «3,2 km» or «800 m» (same rule as `distanceParts`); «—» without a positive value. */
+export const formatDistance = (meters?: number | null) => {
+  const { value, unit } = distanceParts(meters)
+  return unit ? `${value} ${unit}` : value
 }
 
 /** 3720 s → { value: "1:02", unit: "h" }; 3000 s → { value: "50", unit: "min" }; 1-29 s → 1 min; 0 → null. */
@@ -90,10 +101,9 @@ export const formatDuration = (seconds?: number | null) => {
 export const formatPace = (meters?: number | null, seconds?: number | null) => {
   if (!meters || !seconds || meters <= 0) return "—"
   const pace = seconds / (meters / 100)
-  if (!Number.isFinite(pace)) return "—"
-  const minutes = Math.floor(pace / 60)
-  const secs = Math.round(pace % 60)
-  return `${minutes}:${secs.toString().padStart(2, "0")}/100m`
+  if (!Number.isFinite(pace) || pace <= 0) return "—"
+  // Rounded before splitting: 119.6 s is «2:00», never «1:60».
+  return `${formatPaceValue(pace)}/100m`
 }
 
 export const formatTimeAgo = (dateString: string) => {

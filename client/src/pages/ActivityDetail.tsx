@@ -16,9 +16,10 @@ import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
 import {
   NO_VALUE,
+  distanceParts,
+  formatDistance,
   formatDurationParts,
   formatInteger,
-  formatKm,
   formatPaceValue,
   formatSessionDate,
   paceSecondsPer100m,
@@ -171,56 +172,31 @@ const buildPaginationItems = (currentPage: number, totalPages: number): Array<nu
   return pages
 }
 
-const formatDistance = (meters?: number | null) => {
-  if (!meters && meters !== 0) return "—"
-  if (meters === 0) return "0 m"
-  return meters >= 1000
-    ? `${(meters / 1000).toFixed(2).replace(".", ",")} km`
-    : `${Math.round(meters)} m`
-}
-
 const formatNumber = (value?: number | null, digits = 0) => {
   if (value === null || value === undefined) return "—"
   if (!Number.isFinite(value)) return "—"
   return digits > 0 ? Number(value).toFixed(digits).replace(".", ",") : String(Math.round(value))
 }
 
-const formatDuration = (seconds?: number | null) => {
-  if (!seconds && seconds !== 0) return "—"
-  if (seconds === 0) return "0 min"
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes} min`
-}
-
-const formatSplitDuration = (seconds?: number | null) => {
-  if (!seconds && seconds !== 0) return "—"
+/** «1:42» or «1:02:05»; rounded to whole seconds before splitting (119.6 s → «2:00», never «1:60»). */
+const formatSplitDuration = (value?: number | null) => {
+  if (!value && value !== 0) return "—"
+  if (!Number.isFinite(value)) return "—"
+  const seconds = Math.round(value)
   if (seconds === 0) return "0:00"
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.round(seconds % 60)
+  const secs = seconds % 60
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
   return `${minutes}:${secs.toString().padStart(2, "0")}`
 }
 
-const formatPace = (
-  secondsPer100m?: number | null,
-  distanceMeters?: number | null,
-  durationSeconds?: number | null,
-) => {
-  const pace =
-    secondsPer100m && secondsPer100m > 0
-      ? secondsPer100m
-      : distanceMeters && durationSeconds
-        ? durationSeconds / (distanceMeters / 100)
-        : null
-  if (!pace || !Number.isFinite(pace)) return "—"
-  const minutes = Math.floor(pace / 60)
-  const seconds = Math.round(pace % 60)
-  return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`
+/** «1:52 /100», as in the summary metrics; «—» without a valid pace (never another pace instead). */
+const formatPacePer100 = (secondsPer100m?: number | null) => {
+  const value = formatPaceValue(Number(secondsPer100m ?? 0))
+  return value === NO_VALUE ? NO_VALUE : `${value} /100`
 }
 
 const toNumber = (value: unknown) => {
@@ -311,10 +287,6 @@ const positiveNumber = (value: unknown) => {
   return Number.isFinite(number) && number > 0 ? number : null
 }
 
-/** «3,2» km from 1 km up, otherwise whole metres. */
-const distanceParts = (meters: number): { value: string; unit: string } =>
-  meters >= 1000 ? { value: formatKm(meters), unit: "km" } : { value: String(Math.round(meters)), unit: "m" }
-
 /** Session summary (3-column grid of `Sessione.png`, SWOLF added when present); a metric without data is not shown. */
 function sessionSummaryMetrics(activity: {
   distanceMeters?: number | null
@@ -327,7 +299,7 @@ function sessionSummaryMetrics(activity: {
 }): MetricProps[] {
   const metrics: MetricProps[] = []
   const distance = positiveNumber(activity.distanceMeters)
-  if (distance) metrics.push({ value: formatKm(distance), unit: "km", label: "Distanza" })
+  if (distance) metrics.push({ ...distanceParts(distance), label: "Distanza" })
   const duration = formatDurationParts(activity.durationSeconds)
   if (duration) metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" })
   const pace = paceSecondsPer100m(activity)
@@ -363,7 +335,7 @@ const segmentMetrics = (segment: {
   return metrics
 }
 
-/** «100 m · 1:42 · 1:42/100m · 142 bpm», skipping missing values. */
+/** «100 m · 1:42 · 1:42 /100 · 142 bpm», skipping missing values. */
 const segmentLine = (segment: {
   distance?: number | null
   duration?: number | null
@@ -373,7 +345,7 @@ const segmentLine = (segment: {
   [
     positiveNumber(segment.distance) ? formatDistance(segment.distance) : null,
     positiveNumber(segment.duration) ? formatSplitDuration(segment.duration) : null,
-    positiveNumber(segment.pace) ? formatPace(segment.pace) : null,
+    positiveNumber(segment.pace) ? formatPacePer100(segment.pace) : null,
     positiveNumber(segment.avgHr) ? `${Math.round(Number(segment.avgHr))} bpm` : null,
   ]
     .filter(Boolean)
@@ -856,6 +828,7 @@ export default function ActivityDetail() {
   const lapsTitleId = useId()
   const splitsTitleId = useId()
   const repeatsTitleId = useId()
+  const selectedMetricsTitleId = useId()
 
   const paceRows = useMemo(() => {
     const source =
@@ -1048,7 +1021,7 @@ export default function ActivityDetail() {
                             { label: "Cumulato", value: formatSplitDuration(selectedLap.cumulativeSeconds) },
                             {
                               label: "Passo migliore",
-                              value: selectedLap.bestPace ? formatPace(selectedLap.bestPace) : null,
+                              value: formatPacePer100(selectedLap.bestPace),
                             },
                             { label: "FC media", value: selectedLap.avgHr ? `${selectedLap.avgHr} bpm` : null },
                             { label: "FC massima", value: selectedLap.maxHr ? `${selectedLap.maxHr} bpm` : null },
@@ -1194,8 +1167,8 @@ export default function ActivityDetail() {
                                   <td className="px-2 py-2 text-right">{formatDistance(repeat.distance)}</td>
                                   <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.duration)}</td>
                                   <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.cumulativeSeconds)}</td>
-                                  <td className="px-2 py-2 text-right">{formatPace(repeat.pace, repeat.distance, repeat.duration)}</td>
-                                  <td className="px-2 py-2 text-right">{formatPace(repeat.bestPace, repeat.distance, repeat.duration)}</td>
+                                  <td className="px-2 py-2 text-right">{formatPacePer100(repeat.pace)}</td>
+                                  <td className="px-2 py-2 text-right">{formatPacePer100(repeat.bestPace)}</td>
                                   <td className="px-2 py-2 text-right">{formatNumber(repeat.swolf)}</td>
                                   <td className="px-2 py-2 text-right">{formatNumber(repeat.avgHr)}</td>
                                   <td className="px-2 py-2 text-right">{formatNumber(repeat.maxHr)}</td>
@@ -1228,8 +1201,8 @@ export default function ActivityDetail() {
                                       <td className="px-2 py-2 text-right">{formatDistance(length.distance)}</td>
                                       <td className="px-2 py-2 text-right">{formatSplitDuration(length.duration)}</td>
                                       <td className="px-2 py-2 text-right">{formatSplitDuration(length.cumulativeSeconds)}</td>
-                                      <td className="px-2 py-2 text-right">{formatPace(length.pace, length.distance, length.duration)}</td>
-                                      <td className="px-2 py-2 text-right">{formatPace(length.bestPace, length.distance, length.duration)}</td>
+                                      <td className="px-2 py-2 text-right">{formatPacePer100(length.pace)}</td>
+                                      <td className="px-2 py-2 text-right">{formatPacePer100(length.bestPace)}</td>
                                       <td className="px-2 py-2 text-right">{formatNumber(length.swolf)}</td>
                                       <td className="px-2 py-2 text-right">{formatNumber(length.avgHr)}</td>
                                       <td className="px-2 py-2 text-right">{formatNumber(length.maxHr)}</td>
@@ -1326,11 +1299,7 @@ export default function ActivityDetail() {
                                       },
                                       {
                                         label: "Passo migliore",
-                                        value: formatPace(
-                                          rowDetailSource?.bestPace,
-                                          rowDetailSource?.distance,
-                                          rowDetailSource?.duration,
-                                        ),
+                                        value: formatPacePer100(rowDetailSource?.bestPace),
                                       },
                                       {
                                         label: "FC media",
@@ -1365,9 +1334,14 @@ export default function ActivityDetail() {
                   )}
                 </section>
 
-                <section className="surface-panel hidden min-w-0 space-y-3 p-4 xl:block">
+                <section
+                  className="surface-panel hidden min-w-0 space-y-3 p-4 xl:block"
+                  aria-labelledby={selectedMetricsTitleId}
+                >
                   <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-base font-bold">Metriche selezionate</h4>
+                    <h4 id={selectedMetricsTitleId} className="text-base font-bold">
+                      Metriche selezionate
+                    </h4>
                     {selectedLength || selectedRepeat ? (
                       <span className="text-xs text-muted-foreground">
                         {selectedLength ? `Vasca ${selectedLength.label}` : `Ripetuta ${selectedRepeat?.repeatNumber}`}
@@ -1387,11 +1361,7 @@ export default function ActivityDetail() {
                         },
                         {
                           label: "Passo migliore",
-                          value: formatPace(
-                            selectedRepeatMetricSource.bestPace,
-                            selectedRepeatMetricSource.distance,
-                            selectedRepeatMetricSource.duration,
-                          ),
+                          value: formatPacePer100(selectedRepeatMetricSource.bestPace),
                         },
                         {
                           label: "FC media",

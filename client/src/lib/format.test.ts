@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  distanceParts,
   formatDayMonth,
   formatDistance,
   formatDurationParts,
   formatInteger,
   formatKm,
+  formatPace,
   formatPaceValue,
   formatSessionDate,
   formatWeekdayDayMonth,
@@ -98,6 +100,28 @@ describe("formatter Corsia", () => {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       expect(formatKm(value)).toBe("—");
       expect(formatInteger(value)).toBe("—");
+    }
+  });
+
+  it("passo: arrotonda i secondi totali prima di dividere (mai «1:60»)", () => {
+    expect(formatPaceValue(119.6)).toBe("2:00");
+    expect(formatPace(100, 119.6)).toBe("2:00/100m");
+    expect(formatPace(100, 112)).toBe("1:52/100m");
+    expect(formatPace(0, 112)).toBe("—");
+  });
+
+  it("distanceParts: stessa regola di formatDistance, in valore e unità", () => {
+    expect(distanceParts(3200)).toEqual({ value: "3,2", unit: "km" });
+    expect(distanceParts(1500)).toEqual({ value: "1,5", unit: "km" });
+    expect(distanceParts(800)).toEqual({ value: "800", unit: "m" });
+    expect(distanceParts(999.6)).toEqual({ value: "1", unit: "km" });
+    expect(distanceParts(999.4)).toEqual({ value: "999", unit: "m" });
+    for (const value of [0, -50, Number.NaN, Number.POSITIVE_INFINITY, null, undefined]) {
+      expect(distanceParts(value)).toEqual({ value: "—" });
+    }
+    for (const value of [3200, 800, 999.6, 0, null]) {
+      const parts = distanceParts(value);
+      expect(formatDistance(value)).toBe(parts.unit ? `${parts.value} ${parts.unit}` : parts.value);
     }
   });
 });

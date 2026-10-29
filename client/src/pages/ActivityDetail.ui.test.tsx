@@ -319,6 +319,65 @@ describe("ActivityDetail (Corsia)", () => {
     expect(screen.getAllByRole("button", { name: /Vasca 1\.2/ }).length).toBeGreaterThan(0);
   });
 
+  it("segments: one distance rule and the «/100» pace of the metrics, rounded on total seconds", () => {
+    state.activity = session({
+      garminLaps: [lap(11, 1, 100, 119.6), lap(12, 2, 1500, 1500), lap(13, 3, 0, 30)],
+      garminLengths: [],
+    });
+
+    render(<ActivityDetail />);
+
+    const laps = screen.getByRole("region", { name: "Giri" });
+    expect(within(laps).getByRole("button", { name: /^Giro 1/ })).toHaveTextContent(
+      "100 m · 2:00 · 2:00 /100"
+    );
+    expect(within(laps).getByRole("button", { name: /^Giro 2/ })).toHaveTextContent(
+      "1,5 km · 25:00 · 1:40 /100"
+    );
+    expect(screen.queryByText(/1:60|\/100m|1,50 km/)).not.toBeInTheDocument();
+  });
+
+  it("summary distance below 1 km is in metres", () => {
+    state.activity = session({ distanceMeters: 800 });
+
+    render(<ActivityDetail />);
+
+    expect(screen.getByTestId("session-metrics")).toHaveTextContent("800 m Distanza");
+  });
+
+  it("«Passo migliore» is never the average pace: «—» in the table, left out of the panel", async () => {
+    render(<ActivityDetail />);
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map(header => header.textContent);
+    const cell = (row: HTMLElement, column: string) =>
+      within(row).getAllByRole("cell")[headers.indexOf(column)];
+    const firstRepeat = within(table).getAllByRole("row")[1];
+    expect(cell(firstRepeat, "Distanza")).toHaveTextContent("100 m");
+    expect(cell(firstRepeat, "Passo medio")).toHaveTextContent("1:50 /100");
+    expect(cell(firstRepeat, "Passo migliore")).toHaveTextContent("—");
+
+    const panel = screen.getByRole("region", { name: "Metriche selezionate" });
+    expect(within(panel).queryByText("Passo migliore")).not.toBeInTheDocument();
+  });
+
+  it("«Passo migliore» from the top speed when present", async () => {
+    state.activity = session({
+      garminLaps: [{ ...lap(11, 1, 100, 110), maxSpeedMps: 1 }, lap(12, 2, 100, 100)],
+      garminLengths: [],
+    });
+
+    render(<ActivityDetail />);
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const panel = screen.getByRole("region", { name: "Metriche selezionate" });
+    expect(within(panel).getByText("Passo migliore")).toBeInTheDocument();
+    expect(within(panel).getByText("1:40 /100")).toBeInTheDocument();
+  });
+
   it("shows the not-found state", () => {
     state.activity = null;
 
