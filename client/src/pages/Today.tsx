@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
+  ChevronRight,
   Link2,
   RefreshCw,
   Sparkles,
@@ -192,13 +193,24 @@ export default function Today() {
         <Section title="Ultima nuotata">
           <ActivityCard activity={lastSwim} />
           {coachSummary ? (
-            <p className="flex items-start gap-2 text-sm text-muted-foreground">
-              <Sparkles className="mt-0.5 size-4 shrink-0 text-action-text" aria-hidden />
-              <span className="line-clamp-2">
-                <span className="sr-only">Coach AI: </span>
+            // The full analysis (title, summary, key points) lives in Coach AI → Analisi,
+            // which lists the latest sessions first: the card is a teaser that opens it.
+            <Link
+              href="/coach?tab=session-iq"
+              className="surface-panel block p-4 transition-colors hover:border-action-text/40"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-action-text">
+                <Sparkles className="size-4 shrink-0" aria-hidden />
+                Analisi del coach
+              </span>
+              <span className="mt-2 block text-sm text-muted-foreground line-clamp-3">
                 {coachSummary}
               </span>
-            </p>
+              <span className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-action-text">
+                Leggi tutto
+                <ChevronRight className="size-4" aria-hidden />
+              </span>
+            </Link>
           ) : null}
         </Section>
       </>

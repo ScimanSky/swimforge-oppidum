@@ -158,7 +158,10 @@ describe("Oggi", () => {
 
     state.insights = [{ activity_id: "2", summary: "Bracciata più lunga nel finale." }];
     renderToday();
-    expect(screen.getByText("Bracciata più lunga nel finale.")).toHaveClass("line-clamp-2");
+    expect(screen.getByText("Bracciata più lunga nel finale.")).toHaveClass("line-clamp-3");
+    // The teaser opens the full analysis in Coach AI → Analisi.
+    const coachLink = screen.getByRole("link", { name: /Analisi del coach.*Leggi tutto/ });
+    expect(coachLink).toHaveAttribute("href", "/coach?tab=session-iq");
   });
 
   it("striscia livello: «Livello 12» e «580 XP», link al profilo", () => {
