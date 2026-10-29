@@ -44,19 +44,50 @@ function SheetOverlay({
   )
 }
 
+type SheetSide = 'top' | 'right' | 'bottom' | 'left'
+
+const SAFE_AREA_BORDER = {
+  top: 'borderTop',
+  right: 'borderRight',
+  bottom: 'borderBottom',
+  left: 'borderLeft',
+} as const
+
+/** The screen edges a sheet touches: all but the one facing the content. */
+const TOUCHED_EDGES: Record<SheetSide, SheetSide[]> = {
+  top: ['top', 'left', 'right'],
+  right: ['top', 'right', 'bottom'],
+  bottom: ['bottom', 'left', 'right'],
+  left: ['top', 'left', 'bottom'],
+}
+
+/**
+ * Native app (edge-to-edge): a transparent border as wide as the system bar on each edge the
+ * sheet touches keeps its content and its close button clear of the bars, while the sheet
+ * background still fills them. A border, not padding: it does not scroll with `overflow-y-auto`
+ * content and callers' padding classes do not override it. 0 wide on the web.
+ */
+function safeAreaBorders(side: SheetSide): React.CSSProperties {
+  return Object.fromEntries(
+    TOUCHED_EDGES[side].map((edge) => [SAFE_AREA_BORDER[edge], `env(safe-area-inset-${edge}) solid transparent`]),
+  )
+}
+
 function SheetContent({
   className,
   children,
   side = 'right',
+  style,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
-  side?: 'top' | 'right' | 'bottom' | 'left'
+  side?: SheetSide
 }) {
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        style={{ ...safeAreaBorders(side), ...style }}
         className={cn(
           'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
           side === 'right' &&

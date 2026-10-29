@@ -86,6 +86,20 @@ describe("Pager", () => {
     expect(onScroll).not.toHaveBeenCalled();
   });
 
+  // App edge-to-edge: the fixed header is taller by the status bar (html scroll-padding-top).
+  it("conta anche lo scroll-padding della pagina sotto l'header", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onScroll = vi.fn();
+    document.documentElement.style.setProperty("scroll-padding-top", "46px");
+    try {
+      render(<Harness onScroll={onScroll} listTop={30} />);
+      await user.click(screen.getByRole("button", { name: "Avanti" }));
+      expect(onScroll).toHaveBeenCalledTimes(1);
+    } finally {
+      document.documentElement.style.removeProperty("scroll-padding-top");
+    }
+  });
+
   it("niente con una sola pagina", () => {
     const { container } = render(<Pager page={1} totalPages={1} onChange={() => {}} />);
     expect(container.innerHTML).toBe("");

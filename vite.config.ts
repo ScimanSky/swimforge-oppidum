@@ -150,9 +150,16 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
+const VIEWPORT_META = /(<meta\s+name="viewport"\s+content="[^"]*)"/;
+
 /**
- * In the `native` mode, writes dist/public/.native-build so that
- * scripts/prune-native-bundle.mjs can refuse to prune a web build.
+ * In the `native` mode:
+ * - writes dist/public/.native-build so that scripts/prune-native-bundle.mjs can refuse to
+ *   prune a web build;
+ * - adds `viewport-fit=cover` to the viewport meta tag: the Android app is edge-to-edge
+ *   (MainActivity, Capacitor SystemBars) and the WebView draws under the transparent system
+ *   bars, with env(safe-area-inset-*) set to their sizes (the shell pads its header and bottom
+ *   navigation with them). The web keeps its viewport, so env() stays 0 there.
  */
 function nativeBuildMarker(): Plugin {
   let isNative = false;
@@ -161,6 +168,11 @@ function nativeBuildMarker(): Plugin {
     apply: "build",
     configResolved(config) {
       isNative = config.mode === "native";
+    },
+    transformIndexHtml(html) {
+      if (!isNative) return html;
+      if (!VIEWPORT_META.test(html)) throw new Error("native build: viewport meta tag not found in index.html");
+      return html.replace(VIEWPORT_META, '$1, viewport-fit=cover"');
     },
     generateBundle() {
       if (!isNative) return;

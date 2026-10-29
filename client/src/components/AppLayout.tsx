@@ -31,10 +31,12 @@ export function AppLayout({
   }
 
   const wrappedChildren = withShell ? <div className="sf-page-root">{children}</div> : children;
+  // Without the shell, the page itself keeps clear of the native app's system bars (0 on the web).
+  const safeArea = withShell ? "" : "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]";
 
   return (
     <div
-      className={`relative min-h-screen bg-background text-foreground ${className} overflow-hidden`}
+      className={`relative min-h-screen bg-background text-foreground ${className} ${safeArea} overflow-hidden`}
     >
       <div className="relative z-10">
         {withShell ? <AppShell>{wrappedChildren}</AppShell> : wrappedChildren}

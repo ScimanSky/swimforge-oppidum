@@ -104,8 +104,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] flex relative">
-      <ThemeToggleButton className="absolute right-4 top-4 z-20" />
+    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] flex relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <ThemeToggleButton className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20" />
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-r border-border/50 bg-[linear-gradient(145deg,#0f1823_0%,#142433_46%,#0f1a26_100%)]">
         <div className="absolute inset-0 bg-[radial-gradient(74%_86%_at_12%_0%,rgba(22,163,208,0.34),transparent_70%),radial-gradient(58%_74%_at_82%_22%,rgba(34,211,238,0.22),transparent_74%)]" />

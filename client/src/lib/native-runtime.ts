@@ -1,7 +1,6 @@
 import { App } from "@capacitor/app";
-import type { PluginListenerHandle } from "@capacitor/core";
+import { SystemBars, SystemBarsStyle, type PluginListenerHandle } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
-import { StatusBar, Style } from "@capacitor/status-bar";
 import { resolveDeepLink } from "./deep-links";
 import { canGoBackInApp } from "./in-app-history";
 import { isPublicPath, normalizePath, TODAY_PATH } from "./navigation";
@@ -15,7 +14,6 @@ export type NativeRuntimeOptions = {
   onAuthCallback: (callback: NativeAuthCallback) => unknown;
 };
 
-export const NATIVE_THEME_COLORS = { dark: "#0A1520", light: "#F4F7F9" } as const;
 /** appUrlOpen may repeat the launch URL on a cold start: the same URL within this window is ignored. */
 const DUPLICATE_URL_WINDOW_MS = 2000;
 /**
@@ -50,11 +48,15 @@ export function backButtonAction(path: string, canGoBack: boolean): BackButtonAc
   return isPublicPath(path) ? "exit" : "home";
 }
 
-/** Status bar follows the app theme. No-op on the web. */
-export function syncNativeStatusBar(theme: "dark" | "light"): void {
+/**
+ * Icons of the status bar and of the navigation bar follow the app theme (light icons on the
+ * dark theme, dark icons on the light one), whatever the system night mode. The bars are
+ * transparent (edge-to-edge, MainActivity): their background is the page's own header and
+ * bottom navigation, padded with env(safe-area-inset-*). No-op on the web.
+ */
+export function syncNativeSystemBars(theme: "dark" | "light"): void {
   if (!isNativePlatform()) return;
-  StatusBar.setStyle({ style: theme === "dark" ? Style.Dark : Style.Light }).catch(() => {});
-  StatusBar.setBackgroundColor({ color: NATIVE_THEME_COLORS[theme] }).catch(() => {});
+  SystemBars.setStyle({ style: theme === "dark" ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});
 }
 
 /**

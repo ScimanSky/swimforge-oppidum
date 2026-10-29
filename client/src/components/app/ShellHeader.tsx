@@ -57,7 +57,9 @@ export function ShellHeader({ homePath, profileLabel, avatarUrl, isAdmin, isLogg
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-border bg-background">
+    // Native app (edge-to-edge): the header also fills the area under the status bar; the
+    // safe-area insets are 0 on the web.
+    <header className="fixed inset-x-0 top-0 z-50 h-[calc(4rem+env(safe-area-inset-top))] border-b border-border bg-background pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="flex h-full items-center gap-2 px-4 md:px-6">
         {/* Desktop: brand above the rail (224px + gap + gutter = rail width + gutter). */}
         <Link
