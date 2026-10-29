@@ -1,4 +1,4 @@
-import { COOKIE_NAME, CSRF_COOKIE_NAME, NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
+import { COOKIE_NAME, CSRF_COOKIE_NAME, CSRF_ERR_MSG, NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
@@ -34,7 +34,7 @@ const csrfProtection = t.middleware(async (opts) => {
   const csrfHeaderRaw = opts.ctx.req.headers["x-csrf-token"];
   const csrfHeader = Array.isArray(csrfHeaderRaw) ? csrfHeaderRaw[0] : csrfHeaderRaw;
   if (!csrfCookie || !csrfHeader || csrfHeader !== csrfCookie) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "CSRF validation failed" });
+    throw new TRPCError({ code: "FORBIDDEN", message: CSRF_ERR_MSG });
   }
   return opts.next();
 });

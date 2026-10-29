@@ -39,7 +39,7 @@ vi.mock("@/components/social/FeedPost", () => ({
   ),
 }));
 
-const trpcError = (code: string) => Object.assign(new Error(code), { data: { code } });
+const trpcError = (code: string, message = code) => Object.assign(new Error(message), { data: { code } });
 
 function renderPost(path = "/post/5") {
   const location = memoryLocation({ path, record: true });
@@ -85,6 +85,13 @@ describe("PostDetail (Corsia)", () => {
     renderPost();
     expect(screen.getByText("Questo post non è visibile per te.")).toBeInTheDocument();
     expect(screen.queryByText("FORBIDDEN")).toBeNull();
+  });
+
+  it("a club post for members only says why, in the server's words", () => {
+    state.error = trpcError("FORBIDDEN", "Devi iscriverti al club per visualizzare i contenuti.");
+    renderPost();
+    expect(screen.getByText("Devi iscriverti al club per visualizzare i contenuti.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Torna al feed" })).toHaveAttribute("href", "/home");
   });
 
   it("an invalid id is «non trovato» without asking the server", () => {

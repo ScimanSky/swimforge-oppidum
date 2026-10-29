@@ -4,6 +4,7 @@ import { LoadError, LoadingSkeleton, Notice } from "@/components/corsia/LoadStat
 import FeedPost from "@/components/social/FeedPost";
 import type { FeedPostRecord } from "@/components/social/feed-types";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 
 /** `/post/:id` (notifications, shared links): one feed post; the shell header has «Post» and the back button. */
 export default function PostDetail() {
@@ -35,7 +36,10 @@ export default function PostDetail() {
       code === "NOT_FOUND" ? (
         notFound
       ) : code === "FORBIDDEN" ? (
-        <Notice backHref="/home" backLabel="Torna al feed">Questo post non è visibile per te.</Notice>
+        // The server's reason when it gives one (a club post: «Devi iscriverti al club…»).
+        <Notice backHref="/home" backLabel="Torna al feed">
+          {errorToastMessage(postQuery.error, "Questo post non è visibile per te.")}
+        </Notice>
       ) : (
         <LoadError onRetry={() => void postQuery.refetch()} />
       );
