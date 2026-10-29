@@ -243,7 +243,7 @@ export const communityRouter = router({
                   p.created_at,
                   p.updated_at,
                   u.name AS user_name,
-                  u.email AS user_email,
+                  sp.username AS user_username,
                   sp.avatar_url AS user_avatar,
                   (
                     SELECT c.name

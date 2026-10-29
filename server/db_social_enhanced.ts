@@ -460,7 +460,7 @@ export async function getConversation(params: {
       dm.created_at AS "createdAt",
       u.id AS "userId",
       u.name AS "userName",
-      u.email AS "userEmail",
+      sp.username AS "userUsername",
       sp.avatar_url AS "profilePicture"
     FROM direct_messages dm
     JOIN users u ON u.id = dm.sender_id
@@ -477,7 +477,7 @@ export async function getConversation(params: {
   const messages = result.rows.map((row: any) => {
     const senderDisplayName =
       (typeof row.userName === "string" && row.userName.trim().length > 0 ? row.userName.trim() : null) ||
-      (typeof row.userEmail === "string" && row.userEmail.includes("@") ? row.userEmail.split("@")[0] : null) ||
+      (typeof row.userUsername === "string" && row.userUsername.trim().length > 0 ? row.userUsername.trim() : null) ||
       `Utente #${row.userId}`
 
     return {
@@ -579,7 +579,7 @@ export async function getRecentConversations(userId: number, limit: number = 20)
           .select({
             id: users.id,
             name: users.name,
-            email: users.email,
+            username: swimmerProfiles.username,
             profilePicture: swimmerProfiles.avatarUrl,
           })
           .from(users)
@@ -592,7 +592,7 @@ export async function getRecentConversations(userId: number, limit: number = 20)
       Number(row.id),
       {
         name: row.name,
-        email: row.email,
+        username: row.username,
         profilePicture: row.profilePicture,
       },
     ]),
@@ -605,7 +605,7 @@ export async function getRecentConversations(userId: number, limit: number = 20)
       const user = usersById.get(otherUserId)
       const displayName =
         user?.name?.trim() ||
-        (typeof user?.email === "string" && user.email.includes("@") ? user.email.split("@")[0] : null) ||
+        user?.username?.trim() ||
         `Utente #${otherUserId}`
 
       return {

@@ -622,12 +622,14 @@ export async function listClubMeetEntries(params: {
     .where(eq(clubMeetEvents.meetId, meet.id))
     .orderBy(clubMeetEvents.programOrder, desc(clubMeetEntries.updatedAt));
 
+  const isStaff = isStaffRole(role.role);
   return {
     role,
-    isStaff: isStaffRole(role.role),
+    isStaff,
     meet,
     events,
-    entries,
+    // Athletes' emails are for club staff only (meet roster export).
+    entries: isStaff ? entries : entries.map((row) => ({ ...row, user: { ...row.user, email: null } })),
   };
 }
 
@@ -1007,7 +1009,7 @@ async function importMeetResultsRows(params: {
         athleteEmailRaw: String(row.athleteEmailRaw ?? ""),
       });
 
-      const athleteName = String(row.athleteNameRaw ?? "").trim() || user?.name?.trim() || user?.email || "Atleta";
+      const athleteName = String(row.athleteNameRaw ?? "").trim() || user?.name?.trim() || "Atleta";
       const athleteEmail = String(row.athleteEmailRaw ?? "").trim() || user?.email || null;
       const finalTimeCs = Number.isFinite(row.finalTimeCsRaw)
         ? Number(row.finalTimeCsRaw)
@@ -1138,11 +1140,19 @@ export async function listMeetResults(params: {
     .where(eq(clubMeetResults.meetId, meet.id))
     .orderBy(clubMeetEvents.programOrder, clubMeetResults.rank, clubMeetResults.athleteName);
 
+  const isStaff = isStaffRole(role.role);
   return {
     role,
-    isStaff: isStaffRole(role.role),
+    isStaff,
     meet,
-    rows,
+    // Athletes' emails are for club staff only.
+    rows: isStaff
+      ? rows
+      : rows.map((row) => ({
+          ...row,
+          result: { ...row.result, athleteEmail: null },
+          user: row.user ? { ...row.user, email: null } : row.user,
+        })),
   };
 }
 
@@ -1175,7 +1185,6 @@ export async function getMeetStats(params: {
       COALESCE(r.user_id, -r.id) AS athlete_key,
       COALESCE(u.id, NULL) AS user_id,
       COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(sp.username), ''), r.athlete_name) AS athlete_name,
-      COALESCE(u.email, r.athlete_email) AS athlete_email,
       COUNT(*)::int AS races_count,
       SUM(COALESCE(r.points, 0))::float AS points_total,
       SUM(CASE WHEN r.rank = 1 THEN 1 ELSE 0 END)::int AS gold,
@@ -1186,7 +1195,7 @@ export async function getMeetStats(params: {
     LEFT JOIN users u ON u.id = r.user_id
     LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
     WHERE r.meet_id = ${meet.id}
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3
     ORDER BY points_total DESC, gold DESC, silver DESC, bronze DESC, athlete_name ASC
   `);
 

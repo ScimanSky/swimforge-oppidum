@@ -25,7 +25,7 @@ export interface FeedPostRecord {
   activity_is_open_water?: boolean | null
   comment_count?: number | string
   user_name?: string | null
-  user_email?: string | null
+  user_username?: string | null
   user_avatar?: string | null
   user_club_name?: string | null
   user_level?: number | null
@@ -36,7 +36,7 @@ export interface FeedPostRecord {
 export interface FeedCommentRecord {
   id: number
   user_name?: string | null
-  user_email?: string | null
+  user_username?: string | null
   user_avatar?: string | null
   content: string
 }

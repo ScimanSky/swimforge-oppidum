@@ -28,7 +28,7 @@ interface FeedPostHeaderProps {
     user_id: number
     activity_id?: number | null
     user_name?: string | null
-    user_email?: string | null
+    user_username?: string | null
     user_avatar?: string | null
     user_club_name?: string | null
     activity_source?: string | null
@@ -43,7 +43,7 @@ interface FeedPostHeaderProps {
 }
 
 export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFollowing }: FeedPostHeaderProps) {
-  const baseName = post.user_name || post.user_email?.split("@")[0] || "Nuotatore"
+  const baseName = post.user_name || post.user_username || "Nuotatore"
   const isActivityPost =
     Boolean(post.activity_id) ||
     Boolean(post.activity_source) ||
