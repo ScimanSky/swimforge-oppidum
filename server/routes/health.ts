@@ -4,8 +4,32 @@ import { getDb } from "../db";
 import { redis } from "../lib/cache";
 import { getRedisPolicy } from "../lib/redis-policy";
 import { logger } from "../middleware/logger";
+import { withRedisTimeout, withTimeout } from "../lib/with-timeout";
 
 export const healthRouter = Router();
+
+/** Budget for the database probe in /health and /ready. */
+const DB_PROBE_TIMEOUT_MS = 3000;
+
+/** Returns true when the database answers SELECT 1, false when it is not initialized. */
+async function probeDatabase(): Promise<boolean> {
+  return withTimeout(
+    (async () => {
+      const db = await getDb();
+      if (!db) return false;
+      await db.execute(sql`SELECT 1`);
+      return true;
+    })(),
+    DB_PROBE_TIMEOUT_MS,
+    "database probe"
+  );
+}
+
+// Liveness: the process is up and the event loop answers. Touches no dependency,
+// so a slow Redis or database can never make the container look dead.
+healthRouter.get("/healthz", (_req, res) => {
+  res.status(200).json({ ok: true });
+});
 
 type HealthChecks = {
   database: boolean;
@@ -37,9 +61,7 @@ async function runHealthChecks(): Promise<{ checks: HealthChecks; details: Recor
   const details: Record<string, any> = {};
 
   try {
-    const db = await getDb();
-    if (db) {
-      await db.execute(sql`SELECT 1`);
+    if (await probeDatabase()) {
       checks.database = true;
     } else {
       details.database = { message: "db not initialized" };
@@ -55,7 +77,7 @@ async function runHealthChecks(): Promise<{ checks: HealthChecks; details: Recor
 
   try {
     if (redis.isOpen) {
-      await redis.ping();
+      await withRedisTimeout(() => redis.ping(), "PING");
       checks.redis = true;
     } else {
       details.redis = { message: "redis not connected" };
@@ -87,7 +109,7 @@ async function runHealthChecks(): Promise<{ checks: HealthChecks; details: Recor
     // Lazy import to avoid forcing Supabase env in all environments.
     const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
     const admin = getSupabaseAdminClient();
-    const result = await admin.storage.listBuckets();
+    const result = await withTimeout(admin.storage.listBuckets(), 3000, "storage probe");
     if (!result.error) {
       checks.storage = true;
     } else {
@@ -168,30 +190,17 @@ healthRouter.get("/health/deep", async (_req, res) => {
 healthRouter.get("/ready", async (_req, res) => {
   const redisPolicy = getRedisPolicy();
 
-  let dbOk = false;
-  try {
-    const db = await getDb();
-    if (db) {
-      await db.execute(sql`SELECT 1`);
-      dbOk = true;
-    }
-  } catch {
-    dbOk = false;
-  }
-
-  let redisOk = true;
-  if (redisPolicy.redisConfigured) {
-    try {
-      if (redis.isOpen) {
-        await redis.ping();
-        redisOk = true;
-      } else {
-        redisOk = false;
-      }
-    } catch {
-      redisOk = false;
-    }
-  }
+  // Probe both dependencies in parallel so the answer comes within one budget.
+  const dbProbe = probeDatabase().catch(() => false);
+  const redisProbe: Promise<boolean> = !redisPolicy.redisConfigured
+    ? Promise.resolve(true)
+    : redis.isOpen
+      ? withRedisTimeout(() => redis.ping(), "PING").then(
+          () => true,
+          () => false
+        )
+      : Promise.resolve(false);
+  const [dbOk, redisOk] = await Promise.all([dbProbe, redisProbe]);
 
   const ready = dbOk && (!redisPolicy.redisRequiredForReady || redisOk);
   res.status(ready ? 200 : 503).json({
