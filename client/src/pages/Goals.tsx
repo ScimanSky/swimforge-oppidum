@@ -28,8 +28,6 @@ import {
   Clock,
   Waves,
   Zap,
-  CheckCircle2,
-  Circle,
   Calendar,
   Trophy,
   Flag,
@@ -49,6 +47,15 @@ const formatGoalValue = (value: unknown) => {
 }
 
 const LEGACY_CUSTOM_GOALS_KEY = "swimforge:customGoals"
+const WEEKLY_TARGET_KM = 10
+const WEEKLY_SESSIONS_TARGET = 3
+
+/** «2,5» or «2.5» → 2.5; null when blank; NaN when not a number. */
+const parseTargetValue = (raw: string) => {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  return Number(trimmed.replace(",", "."))
+}
 
 type GoalPayload = { title: string; category: string; targetValue: number | null; unit: string | null }
 
@@ -130,9 +137,6 @@ export default function Goals() {
       targetValue: row.targetValue ?? "—",
       unit: row.unit ?? "valore",
       progress: row.targetValue ? Math.min(100, Math.round((row.currentValue / row.targetValue) * 100)) : 0,
-      deadline: "Da iniziare",
-      status: "behind",
-      milestones: [] as { title: string; completed: boolean }[],
     }))
   }, [goalsQuery.data])
 
@@ -149,87 +153,9 @@ export default function Goals() {
 
   const swolfAvg = performanceQuery.data?.swolfAvg ?? null
 
-  const activeGoals = useMemo(() => {
-    const goals = [] as any[]
-    const nextLevelXp = profile?.nextLevelXp ?? 0
-    const currentXp = profile?.totalXp ?? 0
-    const xpProgress = nextLevelXp ? Math.min(100, (currentXp / nextLevelXp) * 100) : 0
-
-    goals.push({
-      id: "xp",
-      title: `Raggiungere il livello ${profile?.xpLevel ? profile.xpLevel + 1 : 2}`,
-      category: "milestone",
-      currentValue: currentXp,
-      targetValue: nextLevelXp || "—",
-      unit: "XP",
-      progress: xpProgress,
-      deadline: "In corso",
-      status: xpProgress >= 60 ? "on-track" : "behind",
-      milestones: [
-        { title: "50% del prossimo livello", completed: xpProgress >= 50 },
-        { title: "75% del prossimo livello", completed: xpProgress >= 75 },
-        { title: "Livello raggiunto", completed: xpProgress >= 100 },
-      ],
-    })
-
-    const weeklyTargetKm = 10
-    const weeklyProgress = Math.min(100, (weeklyDistanceKm / weeklyTargetKm) * 100)
-    goals.push({
-      id: "weekly-distance",
-      title: `Nuotare ${weeklyTargetKm} km a settimana`,
-      category: "distance",
-      currentValue: weeklyDistanceKm.toFixed(1),
-      targetValue: weeklyTargetKm,
-      unit: "km/settimana",
-      progress: weeklyProgress,
-      deadline: "In corso",
-      status: weeklyProgress >= 60 ? "on-track" : "behind",
-      milestones: [
-        { title: "5 km/settimana", completed: weeklyDistanceKm >= 5 },
-        { title: "8 km/settimana", completed: weeklyDistanceKm >= 8 },
-        { title: `${weeklyTargetKm} km/settimana`, completed: weeklyDistanceKm >= weeklyTargetKm },
-      ],
-    })
-
-    const swolfTarget = 40
-    if (swolfAvg) {
-      const swolfProgress = Math.min(100, (swolfTarget / swolfAvg) * 100)
-      goals.push({
-        id: "swolf",
-        title: `Migliorare lo SWOLF a ${swolfTarget}`,
-        category: "efficiency",
-        currentValue: swolfAvg,
-        targetValue: swolfTarget,
-        unit: "SWOLF",
-        progress: swolfProgress,
-        deadline: "In corso",
-        status: swolfProgress >= 60 ? "on-track" : "behind",
-        milestones: [
-          { title: `SWOLF ≤ ${swolfTarget + 4}`, completed: swolfAvg <= swolfTarget + 4 },
-          { title: `SWOLF ≤ ${swolfTarget + 2}`, completed: swolfAvg <= swolfTarget + 2 },
-          { title: `SWOLF ≤ ${swolfTarget}`, completed: swolfAvg <= swolfTarget },
-        ],
-      })
-    }
-
-    goals.push({
-      id: "weekly-sessions",
-      title: "Allenarsi 3 volte a settimana",
-      category: "frequency",
-      currentValue: weeklySessions,
-      targetValue: 3,
-      unit: "sessioni/sett",
-      progress: Math.min(100, (weeklySessions / 3) * 100),
-      deadline: "In corso",
-      status: weeklySessions >= 3 ? "on-track" : "behind",
-      milestones: [
-        { title: "2 sessioni", completed: weeklySessions >= 2 },
-        { title: "3 sessioni", completed: weeklySessions >= 3 },
-      ],
-    })
-
-    return goals
-  }, [profile, weeklyDistanceKm, swolfAvg, weeklySessions])
+  const nextLevelXp = profile?.nextLevelXp ?? 0
+  const currentXp = profile?.totalXp ?? 0
+  const xpProgress = nextLevelXp ? Math.min(100, (currentXp / nextLevelXp) * 100) : 0
 
   const completedGoals = useMemo(() => {
     const badges = userBadgesQuery.data ?? []
@@ -278,21 +204,16 @@ export default function Goals() {
     return [...customGoals]
   }, [customGoals])
   const summaryMetrics = useMemo((): Array<MetricProps & { id: string; detail?: string }> => {
-    const xpGoal = activeGoals.find((goal) => goal.id === "xp")
-    const distanceGoal = activeGoals.find((goal) => goal.id === "weekly-distance")
-    const frequencyGoal = activeGoals.find((goal) => goal.id === "weekly-sessions")
     const nextLevel = profile?.xpLevel ? profile.xpLevel + 1 : 2
-    const nextLevelXp = profile?.nextLevelXp ?? 0
-    const sessionsTarget = frequencyGoal?.targetValue ?? 3
 
     return [
       {
         id: "xp",
-        value: formatInteger(xpGoal?.progress ?? 0),
+        value: formatInteger(xpProgress),
         unit: "%",
         label: `Verso il livello ${nextLevel}`,
         detail: nextLevelXp
-          ? `${formatInteger(profile?.totalXp ?? 0)} / ${formatInteger(nextLevelXp)} XP`
+          ? `${formatInteger(currentXp)} / ${formatInteger(nextLevelXp)} XP`
           : undefined,
         tone: "xp",
       },
@@ -300,15 +221,15 @@ export default function Goals() {
         id: "distance",
         value: formatKm(weeklyDistanceKm * 1000),
         unit: "km",
-        label: "Questa settimana",
-        detail: `Obiettivo ${distanceGoal?.targetValue ?? 10} km`,
+        label: "Ultimi 7 giorni",
+        detail: `Obiettivo ${WEEKLY_TARGET_KM} km`,
       },
       {
         id: "sessions",
         value: formatInteger(weeklySessions),
         unit: weeklySessions === 1 ? "nuotata" : "nuotate",
-        label: "Questa settimana",
-        detail: `Obiettivo ${sessionsTarget} ${sessionsTarget === 1 ? "nuotata" : "nuotate"}`,
+        label: "Ultimi 7 giorni",
+        detail: `Obiettivo ${WEEKLY_SESSIONS_TARGET} nuotate`,
       },
       {
         id: "custom",
@@ -317,13 +238,13 @@ export default function Goals() {
       },
     ]
   }, [
-    activeGoals,
     allActiveGoals.length,
+    currentXp,
+    nextLevelXp,
     profile?.xpLevel,
-    profile?.nextLevelXp,
-    profile?.totalXp,
     weeklyDistanceKm,
     weeklySessions,
+    xpProgress,
   ])
 
   const addSuggestedGoal = (goal: any) => {
@@ -352,12 +273,16 @@ export default function Goals() {
       toast.error("Inserisci un titolo per l'obiettivo")
       return
     }
-    const targetValue = Number(customDraft.targetValue)
+    const targetValue = parseTargetValue(customDraft.targetValue)
+    if (targetValue !== null && !Number.isFinite(targetValue)) {
+      toast.error("Inserisci un numero valido, ad esempio 2,5")
+      return
+    }
     createGoalMutation.mutate(
       {
         title: customDraft.title.trim(),
         category: customDraft.category,
-        targetValue: Number.isFinite(targetValue) && targetValue > 0 ? targetValue : null,
+        targetValue: targetValue !== null && targetValue > 0 ? targetValue : null,
         unit: customDraft.unit.trim() || null,
       },
       {
@@ -558,6 +483,7 @@ export default function Goals() {
                       </label>
                       <Input
                         id={`${formId}-create-target`}
+                        inputMode="decimal"
                         value={customDraft.targetValue}
                         onChange={(event) =>
                           setCustomDraft((prev) => ({ ...prev, targetValue: event.target.value }))
@@ -620,9 +546,8 @@ export default function Goals() {
             <ul className="space-y-3">
               {allActiveGoals.map((goal) => {
                 const Icon = categoryIcons[goal.category] || Target
-                const isCustom = customGoals.some((item) => item.id === goal.id)
                 const hasTarget = typeof goal.targetValue === "number"
-                const onTrack = goal.status === "on-track"
+                const reached = hasTarget && goal.progress >= 100
                 return (
                   <li key={goal.id} className="surface-panel p-4">
                     <div className="flex items-start gap-3">
@@ -633,42 +558,27 @@ export default function Goals() {
                         <h3 className="break-words text-base font-bold text-foreground">{goal.title}</h3>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">
                           <Chip>{categoryLabels[goal.category] ?? goal.category}</Chip>
-                          <Chip tone={onTrack ? "success" : "neutral"}>
-                            {onTrack ? "In linea" : "Indietro"}
-                          </Chip>
-                          <span className="text-xs text-muted-foreground">{goal.deadline}</span>
+                          {reached ? <Chip tone="success">Raggiunto</Chip> : null}
                         </div>
                       </div>
                       <div className="flex shrink-0 gap-1">
-                        {isCustom ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditGoal(goal)}
-                            aria-label="Modifica obiettivo"
-                          >
-                            <Edit className="size-4" />
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="icon" disabled aria-label="Modifica obiettivo">
-                            <Edit className="size-4" />
-                          </Button>
-                        )}
-                        {isCustom ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeCustomGoal(goal.id)}
-                            disabled={removeGoalMutation.isPending}
-                            aria-label="Elimina obiettivo"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="icon" disabled aria-label="Elimina obiettivo">
-                            <Trash2 className="size-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditGoal(goal)}
+                          aria-label="Modifica obiettivo"
+                        >
+                          <Edit className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeCustomGoal(goal.id)}
+                          disabled={removeGoalMutation.isPending}
+                          aria-label="Elimina obiettivo"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
                       </div>
                     </div>
 
@@ -699,24 +609,6 @@ export default function Goals() {
                         />
                       ) : null}
                     </div>
-
-                    {goal.milestones.length > 0 && (
-                      <div className="mt-4 border-t border-border pt-4">
-                        <h4 className="mb-2 text-sm font-semibold text-foreground">Tappe</h4>
-                        <ul className="grid gap-2 sm:grid-cols-2">
-                          {goal.milestones.map((milestone: { completed: boolean; title: string }, index: number) => (
-                            <li key={index} className="flex items-center gap-2">
-                              {milestone.completed ? (
-                                <CheckCircle2 className="size-4 text-success" aria-label="Raggiunta" />
-                              ) : (
-                                <Circle className="size-4 text-muted-foreground" aria-label="Da raggiungere" />
-                              )}
-                              <span className="text-sm text-muted-foreground">{milestone.title}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
                   </li>
                 )
               })}

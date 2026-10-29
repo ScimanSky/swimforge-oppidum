@@ -47,6 +47,14 @@ export const formatWeekdayDayMonth = (value: DateInput | null | undefined) => {
 export const formatInteger = (value: number) =>
   Number.isFinite(value) ? integerFmt.format(Math.round(value)) : NO_VALUE
 
+/** Rounded integer with its sign (typographic minus): 12 → «+12», −3.6 → «−4», 0 → «0»; null if not a number. */
+export const formatSignedInteger = (value: number | null | undefined) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null
+  const rounded = Math.round(value)
+  if (rounded === 0) return "0"
+  return rounded > 0 ? `+${formatInteger(rounded)}` : `−${formatInteger(-rounded)}`
+}
+
 /** Kilometres with Italian decimal comma, no unit: 3200 → «3,2»; «—» if not finite. */
 export const formatKm = (meters: number) =>
   Number.isFinite(meters) ? kmFmt.format(Math.round(meters / 100) / 10) : NO_VALUE

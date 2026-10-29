@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import {
   LineChart,
@@ -26,6 +27,7 @@ import {
   formatDayMonthYear,
   formatInteger,
   formatPaceValue,
+  formatSignedInteger,
 } from "@/lib/format";
 
 const PERIOD_OPTIONS = [
@@ -155,33 +157,28 @@ function ScoreSection({
 const scoreValue = (value: number | null | undefined) =>
   value !== null && value !== undefined && Number.isFinite(value) ? formatInteger(value) : null;
 
-/** Signed rounded percentage: «+12», «−4», «0». */
-const signedValue = (value: number | null) => {
-  if (value === null || !Number.isFinite(value)) return null;
-  const rounded = Math.round(value);
-  if (rounded === 0) return "0";
-  return rounded > 0 ? `+${formatInteger(rounded)}` : `−${formatInteger(-rounded)}`;
-};
-
 const HR_ZONE_NAMES = ["Recupero", "Aerobica", "Soglia", "Anaerobica", "Massima"] as const;
 
 export default function Statistics() {
   const [period, setPeriod] = useState(30);
+  // Controlled, so the open section survives the loading state of a new period.
+  const [openSection, setOpenSection] = useState("timeline");
+  // Keep showing the previous period while the new one loads.
+  const queryOptions = { staleTime: 5 * 60 * 1000, placeholderData: keepPreviousData };
 
   const { data: timeline, isLoading: timelineLoading } = trpc.statistics.getTimeline.useQuery(
     { days: period },
-    { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
+    queryOptions
   );
   const { data: performance, isLoading: performanceLoading } = trpc.statistics.getPerformance.useQuery(
     { days: period },
-    { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
+    queryOptions
   );
-	  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
-	    { days: period },
-	    { 
-	      staleTime: 5 * 60 * 1000, // Server-side insights remain cached; keep client cache short.
-	    }
-	  );
+  // Server-side insights remain cached; keep the client cache short.
+  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
+    { days: period },
+    queryOptions
+  );
 
   const isLoading = timelineLoading || performanceLoading || advancedLoading;
 
@@ -234,11 +231,11 @@ export default function Statistics() {
   const trendScore: { value: string | null; unit?: string } = !trend
     ? { value: null }
     : typeof trend.signedPercentage === "number"
-      ? { value: signedValue(trend.signedPercentage), unit: "%" }
+      ? { value: formatSignedInteger(trend.signedPercentage), unit: "%" }
       : trend.direction === "stable"
         ? { value: "Stabile" }
         : {
-            value: signedValue(trend.direction === "down" ? -trend.percentage : trend.percentage),
+            value: formatSignedInteger(trend.direction === "down" ? -trend.percentage : trend.percentage),
             unit: "%",
           };
 
@@ -267,7 +264,13 @@ export default function Statistics() {
             <p className="text-sm text-muted-foreground">Caricamento statistiche…</p>
           </div>
         ) : (
-          <Accordion type="single" collapsible defaultValue="timeline" className="space-y-3">
+          <Accordion
+            type="single"
+            collapsible
+            value={openSection}
+            onValueChange={setOpenSection}
+            className="space-y-3"
+          >
             <AccordionItem value="timeline" className="border-0">
               <AccordionTrigger headingLevel={2} className={accordionTrigger}>
                 <span className="inline-flex items-center gap-2">
@@ -378,19 +381,21 @@ export default function Statistics() {
                   </section>
                 )}
 
-                {performance && (
+                {performance && (performance.caloriesTotal > 0 || performance.swolfAvg) ? (
                   <section className="surface-panel grid grid-cols-2 gap-x-4 gap-y-5 p-4">
-                    <div>
-                      <Metric
-                        value={formatInteger(performance.caloriesTotal)}
-                        unit="kcal"
-                        label="Calorie totali"
-                        size="responsive"
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Media {formatInteger(performance.avgCaloriesPerSession)} kcal a nuotata
-                      </p>
-                    </div>
+                    {performance.caloriesTotal > 0 ? (
+                      <div>
+                        <Metric
+                          value={formatInteger(performance.caloriesTotal)}
+                          unit="kcal"
+                          label="Calorie totali"
+                          size="responsive"
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Media {formatInteger(performance.avgCaloriesPerSession)} kcal a nuotata
+                        </p>
+                      </div>
+                    ) : null}
                     {performance.swolfAvg ? (
                       <div>
                         <Metric
@@ -402,7 +407,7 @@ export default function Statistics() {
                       </div>
                     ) : null}
                   </section>
-                )}
+                ) : null}
               </AccordionContent>
             </AccordionItem>
 
@@ -482,7 +487,7 @@ export default function Statistics() {
                       },
                       {
                         label: "Carico progressivo",
-                        value: signedValue(progressiveOverloadValue),
+                        value: formatSignedInteger(progressiveOverloadValue),
                         unit: "%",
                         info: metricsDefinitions.poi,
                       },
@@ -500,7 +505,7 @@ export default function Statistics() {
                       <p className="mt-2 text-sm text-muted-foreground">
                         Al ritmo attuale raggiungerai{" "}
                         <span className="font-bold text-foreground tabular-nums">
-                          {advanced.predictions.targetKm} km
+                          {formatKmNumber(advanced.predictions.targetKm)} km
                         </span>{" "}
                         entro il{" "}
                         <span className="font-bold text-foreground">
@@ -508,7 +513,9 @@ export default function Statistics() {
                         </span>
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                        {advanced.predictions.daysRemaining} giorni rimasti
+                        {advanced.predictions.daysRemaining === 1
+                          ? "1 giorno rimasto"
+                          : `${formatInteger(advanced.predictions.daysRemaining)} giorni rimasti`}
                       </p>
                     </section>
                   )}

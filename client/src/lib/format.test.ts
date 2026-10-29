@@ -10,6 +10,7 @@ import {
   formatPace,
   formatPaceValue,
   formatSessionDate,
+  formatSignedInteger,
   formatWeekdayDayMonth,
   paceSecondsPer100m,
 } from "./format";
@@ -17,6 +18,14 @@ import {
 const monday = new Date(2026, 9, 26, 10, 47); // lun 26 ott 2026, ora locale
 
 describe("formatter Corsia", () => {
+  it("intero con segno: «+12», «−4», «0»; null senza numero", () => {
+    expect(formatSignedInteger(12.4)).toBe("+12");
+    expect(formatSignedInteger(-3.6)).toBe("−4");
+    expect(formatSignedInteger(-0.2)).toBe("0");
+    expect(formatSignedInteger(-1250)).toBe("−1.250");
+    expect(formatSignedInteger(null)).toBeNull();
+    expect(formatSignedInteger(Number.NaN)).toBeNull();
+  });
   it("data sessione", () =>
     expect(formatSessionDate(monday)).toBe("lun 26 ott · 10:47"));
   it("giorno e mese", () => expect(formatDayMonth(monday)).toBe("26 ott"));

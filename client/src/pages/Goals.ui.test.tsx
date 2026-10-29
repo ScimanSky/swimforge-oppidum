@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import Goals from "./Goals";
 
 const state = vi.hoisted(() => ({
@@ -53,6 +54,7 @@ describe("Obiettivi", () => {
     state.createCalls.length = 0;
     state.removeCalls.length = 0;
     localStorage.clear();
+    vi.mocked(toast.error).mockClear();
   });
 
   it("non ripete il titolo della pagina e mostra le sezioni", () => {
@@ -65,7 +67,7 @@ describe("Obiettivi", () => {
     expect(within(summary).getByText("Verso il livello 5")).toBeTruthy();
     // XP context next to the percentage; short labels that fit a 360px column.
     expect(within(summary).getByText("450 / 1.000 XP")).toBeTruthy();
-    expect(within(summary).getAllByText("Questa settimana")).toHaveLength(2);
+    expect(within(summary).getAllByText("Ultimi 7 giorni")).toHaveLength(2);
     expect(within(summary).getByText("Obiettivo 10 km")).toBeTruthy();
     expect(within(summary).getByText("Obiettivo 3 nuotate")).toBeTruthy();
     expect(within(summary).getByText("Obiettivi attivi")).toBeTruthy();
@@ -102,9 +104,40 @@ describe("Obiettivi", () => {
     expect(within(goal).getByText("6 / 12 km")).toBeTruthy();
     expect(within(goal).getByRole("progressbar", { name: "Progresso: 12 km a settimana" })).toBeTruthy();
     expect(within(goal).getByText("Completamento")).toBeTruthy();
+    // No placeholder status or deadline chips; nothing to edit or delete is ever disabled.
+    for (const text of ["Indietro", "In linea", "Da iniziare", "Raggiunto", "Tappe"]) {
+      expect(within(goal).queryByText(text)).toBeNull();
+    }
+    expect(within(goal).getByRole("button", { name: "Modifica obiettivo" })).toBeEnabled();
 
     await userEvent.click(within(goal).getByRole("button", { name: "Elimina obiettivo" }));
     expect(state.removeCalls).toEqual([{ id: 9 }]);
+  });
+
+  it("segna come raggiunto un obiettivo completato", () => {
+    state.goals = [
+      { id: 3, title: "100 vasche", category: "milestone", currentValue: 100, targetValue: 100, unit: "vasche" },
+    ];
+    render(<Goals />);
+    const goal = screen.getByRole("heading", { level: 3, name: "100 vasche" }).closest("li")!;
+    expect(within(goal).getByText("Raggiunto")).toBeTruthy();
+  });
+
+  it("accetta la virgola nel valore obiettivo e rifiuta un valore non numerico", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<Goals />);
+    await user.click(screen.getByRole("button", { name: "Crea obiettivo" }));
+    await user.type(screen.getByLabelText("Titolo"), "Dorso");
+    await user.type(screen.getByLabelText("Valore obiettivo"), "abc");
+    await user.click(screen.getByRole("button", { name: "Aggiungi obiettivo" }));
+    expect(state.createCalls).toEqual([]);
+    expect(toast.error).toHaveBeenCalledWith("Inserisci un numero valido, ad esempio 2,5");
+
+    await user.clear(screen.getByLabelText("Valore obiettivo"));
+    await user.type(screen.getByLabelText("Valore obiettivo"), "2,5");
+    await user.type(screen.getByLabelText("Unità"), "km");
+    await user.click(screen.getByRole("button", { name: "Aggiungi obiettivo" }));
+    expect(state.createCalls).toEqual([{ title: "Dorso", category: "distance", targetValue: 2.5, unit: "km" }]);
   });
 
   it("crea un obiettivo dal dialogo", async () => {

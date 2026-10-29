@@ -17,6 +17,7 @@ import {
   formatDistance as formatDistanceValue,
   formatDurationParts,
   formatInteger,
+  formatSignedInteger,
   NO_VALUE,
 } from "@/lib/format"
 import { toast } from "sonner"
@@ -79,6 +80,15 @@ const sessionMeta = (entry: any) =>
   ]
     .filter(Boolean)
     .join(" · ")
+
+/** Score 0-100 as an integer; null without a number (the metric is then not shown). */
+const formatScore = (value?: number | null) =>
+  value !== null && value !== undefined && Number.isFinite(value) ? formatInteger(value) : null
+
+const insightNumberFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 })
+/** Number quoted in an insight, Italian style: 4.5% → «4,5 %», -3 → «−3». */
+const formatInsightNumber = (value: number, percent: boolean) =>
+  `${value < 0 ? "−" : ""}${insightNumberFmt.format(Math.abs(value))}${percent ? " %" : ""}`
 
 const getExerciseDetails = (exercise: WorkoutExercise) =>
   [
@@ -289,11 +299,11 @@ export default function Coach() {
     const insights = advanced?.insights ?? []
     if (!insights.length) return []
     return insights.map((text, index) => {
-      const metricMatch = text.match(/(-?\d+(?:\.\d+)?%?)/)
+      const metricMatch = text.match(/(-?\d+(?:\.\d+)?)(%?)/)
       return {
         title: `Consiglio ${index + 1}`,
         description: text.replace(/\*\*/g, ""),
-        metric: metricMatch?.[1] ?? null,
+        metric: metricMatch ? formatInsightNumber(Number(metricMatch[1]), metricMatch[2] === "%") : null,
       }
     })
   }, [advanced?.insights])
@@ -326,17 +336,19 @@ export default function Coach() {
   // Advanced scores with a value only: a metric without data is not shown.
   const advancedMetrics = useMemo(
     () =>
+      // RRS is already the «Recupero» metric above; POI is a signed percentage.
       [
-        { key: "SEI", value: advanced?.swimmingEfficiencyIndex },
-        { key: "TCI", value: advanced?.technicalConsistencyIndex },
-        { key: "SER", value: advanced?.strokeEfficiencyRating },
-        { key: "ACS", value: advanced?.aerobicCapacityScore },
-        { key: "RRS", value: advanced?.recoveryReadinessScore },
-        { key: "POI", value: advanced?.progressiveOverloadIndex },
-      ].filter(
-        (metric): metric is { key: string; value: number } =>
-          metric.value !== null && metric.value !== undefined && Number.isFinite(metric.value)
-      ),
+        { key: "SEI", value: formatScore(advanced?.swimmingEfficiencyIndex) },
+        { key: "TCI", value: formatScore(advanced?.technicalConsistencyIndex) },
+        { key: "SER", value: formatScore(advanced?.strokeEfficiencyRating) },
+        { key: "ACS", value: formatScore(advanced?.aerobicCapacityScore) },
+        {
+          key: "POI",
+          value:
+            advanced?.poiBaseline === false ? null : formatSignedInteger(advanced?.progressiveOverloadIndex),
+          unit: "%",
+        },
+      ].filter((metric): metric is { key: string; value: string; unit?: string } => metric.value !== null),
     [advanced]
   )
 
@@ -444,7 +456,13 @@ export default function Coach() {
                   {advancedMetrics.length > 0 ? (
                     <div className="mt-4 grid grid-cols-3 gap-x-4 gap-y-4 border-t border-border pt-4 sm:grid-cols-6">
                       {advancedMetrics.map((metric) => (
-                        <Metric key={metric.key} value={formatInteger(metric.value)} label={metric.key} size="sm" />
+                        <Metric
+                          key={metric.key}
+                          value={metric.value}
+                          unit={metric.unit}
+                          label={metric.key}
+                          size="sm"
+                        />
                       ))}
                     </div>
                   ) : null}

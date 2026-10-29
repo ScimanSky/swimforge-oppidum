@@ -88,12 +88,13 @@ describe("Coach AI", () => {
       consistencyScore: 48,
       recoveryReadinessScore: null,
       streak: { current: 2, record: 6 },
+      poiBaseline: true,
       swimmingEfficiencyIndex: 55,
       technicalConsistencyIndex: null,
       strokeEfficiencyRating: 47,
       aerobicCapacityScore: null,
       progressiveOverloadIndex: null,
-      insights: ["Il passo è migliorato del **4%**", "Aggiungi una nuotata"],
+      insights: ["Il passo è migliorato del **4.5%**", "Aggiungi una nuotata"],
     };
     state.workouts = { pool: workout("Aerobico in vasca"), dryland: undefined, canGenerate: true };
     state.insights = [
@@ -124,8 +125,19 @@ describe("Coach AI", () => {
     expect(within(scores).queryByText("TCI")).toBeNull();
 
     expect(screen.getByRole("heading", { level: 2, name: "Consiglio 1" })).toBeTruthy();
+    expect(screen.getByText("4,5 %")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Consiglio 2" }));
     expect(screen.getByText("Aggiungi una nuotata")).toBeTruthy();
+  });
+
+  it("recupero una volta sola e carico progressivo con segno", () => {
+    state.advanced = { ...state.advanced, recoveryReadinessScore: 70, progressiveOverloadIndex: -12 };
+    render(<Coach />);
+    const scores = screen.getByRole("region", { name: "Punteggi" });
+    expect(within(scores).getByText("Recupero")).toBeTruthy();
+    expect(within(scores).queryByText("RRS")).toBeNull();
+    const poi = within(scores).getByText("POI").parentElement!;
+    expect(poi.textContent).toContain("−12 %");
   });
 
   it("apre la scheda dal parametro tab e genera gli allenamenti", async () => {

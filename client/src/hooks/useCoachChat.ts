@@ -142,7 +142,7 @@ export function useCoachChat(userId: number | null | undefined) {
       setProvider((response.provider as ChatProvider | undefined) ?? null);
       if (response.fallback && !fallbackToastShownRef.current) {
         toast.warning(
-          "Coach in modalità base: risposte semplificate (controlla la configurazione del server per l'IA)."
+          "Coach in modalità base: risposte semplificate (controlla la configurazione del server per l'AI)."
         );
         fallbackToastShownRef.current = true;
       }

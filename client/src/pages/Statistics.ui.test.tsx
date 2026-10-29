@@ -8,9 +8,10 @@ const state = vi.hoisted(() => ({
   periods: [] as number[],
   advanced: undefined as any,
   timeline: [] as any[],
+  performance: undefined as any,
 }));
 
-const performance = {
+const basePerformance = {
   hrZones: { zone1: 10, zone2: 50, zone3: 30, zone4: 10, zone5: 0 },
   paceDistribution: [{ range: "1:30-1:45", count: 3 }],
   caloriesTotal: 4210,
@@ -27,7 +28,7 @@ vi.mock("@/lib/trpc", () => ({
           return { data: state.timeline, isLoading: state.loading };
         },
       },
-      getPerformance: { useQuery: () => ({ data: performance, isLoading: false }) },
+      getPerformance: { useQuery: () => ({ data: state.performance, isLoading: false }) },
       getAdvanced: { useQuery: () => ({ data: state.advanced, isLoading: false }) },
     },
   },
@@ -49,6 +50,7 @@ describe("Statistiche", () => {
     state.loading = false;
     state.periods.length = 0;
     state.timeline = [];
+    state.performance = { ...basePerformance };
     state.advanced = {
       performanceIndex: 72.4,
       consistencyScore: null,
@@ -166,6 +168,30 @@ describe("Statistiche", () => {
     expect(screen.queryByText("Dati insufficienti")).toBeNull();
     expect(screen.queryByText("Prestazione")).toBeNull();
     expect(screen.queryByRole("button", { name: /Come si calcola/ })).toBeNull();
+  });
+
+  it("cambiando periodo resta aperta la sezione scelta", async () => {
+    const user = userEvent.setup({ delay: null });
+    const { rerender } = render(<Statistics />);
+    await user.click(screen.getByRole("button", { name: "Analisi avanzate" }));
+    expect(screen.getByRole("button", { name: "Analisi avanzate" }).getAttribute("aria-expanded")).toBe("true");
+    state.loading = true;
+    await user.click(screen.getByRole("button", { name: "90 giorni" }));
+    state.loading = false;
+    rerender(<Statistics />);
+    expect(screen.getByRole("button", { name: "Analisi avanzate" }).getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("senza calorie non mostra lo zero; previsioni in italiano", async () => {
+    state.performance = { ...basePerformance, caloriesTotal: 0, avgCaloriesPerSession: 0 };
+    state.advanced.predictions = { targetKm: 12500.5, estimatedDate: "2026-11-30", daysRemaining: 1 };
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Analisi prestazioni" }));
+    expect(screen.queryByText("Calorie totali")).toBeNull();
+    expect(screen.getByText("SWOLF medio")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
+    expect(screen.getByText("12.500,5 km")).toBeTruthy();
+    expect(screen.getByText("1 giorno rimasto")).toBeTruthy();
   });
 
   it("mostra lo stato di caricamento", () => {
