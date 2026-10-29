@@ -16,7 +16,8 @@ stesso flusso del resto del progetto:
 ## Note del proprietario
 - **4.** Sostituire la «Bozza IA» con «Condividi l'ultima nuotata».
 - **17.** L'importazione dei risultati delle gare master (nuotosardegna) deve restare; il resto
-  del codice spento può sparire. Va chiarito dove mostrare i risultati: profilo, club o entrambi.
+  del codice spento può sparire. I risultati vanno mostrati sia nel profilo dell'atleta («Gare»,
+  tempi ufficiali accanto ai record di allenamento) sia nella pagina del club (deciso il 29/10).
 - **18.** Il Club AI può generare un'immagine a settimana.
 - **20.** Servono dal proprietario il titolare del trattamento e i contatti per privacy e assistenza.
 - **21.** Togliere Strava.
