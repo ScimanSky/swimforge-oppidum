@@ -152,10 +152,25 @@ describe("syncGarminActivities auto-sync timestamp", () => {
 
 describe("invalidateAfterGarminSync", () => {
   const deleted: unknown[] = [];
+  const updated: unknown[] = [];
   beforeEach(() => {
     vi.clearAllMocks();
     deleted.length = 0;
+    updated.length = 0;
+    // Cached insights generated 7 hours ago: past the 6-hour minimum, so they expire now.
+    const generatedAt = new Date(Date.now() - 7 * 3600_000);
     h.getDb.mockResolvedValue({
+      select: () => ({
+        from: () => ({
+          where: () => ({ limit: async () => [{ generatedAt, expiresAt: new Date(generatedAt.getTime() + 24 * 3600_000) }] }),
+        }),
+      }),
+      update: (table: unknown) => ({
+        set: () => {
+          updated.push(table);
+          return { where: async () => undefined };
+        },
+      }),
       delete: (table: unknown) => {
         deleted.push(table);
         return { where: async () => undefined };
@@ -167,14 +182,16 @@ describe("invalidateAfterGarminSync", () => {
     [{ syncedCount: 2, existingSwimsChanged: false }, true],
     [{ syncedCount: 0, existingSwimsChanged: true }, true],
     [{ syncedCount: 0, existingSwimsChanged: false }, false],
-  ] as const)("%o → drops metrics and insights: %s", async (changes, dropped) => {
+  ] as const)("%o → drops metrics and marks the insights stale: %s", async (changes, dropped) => {
     await invalidateAfterGarminSync(7, changes);
+    // The insights are kept (served until 6 hours after their generation), never deleted.
+    expect(deleted).toEqual([]);
     if (dropped) {
       expect(h.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v4:7:\d{4}-\d{2}-\d{2}$/));
-      expect(deleted).toEqual([aiInsightsCache]);
+      expect(updated).toEqual([aiInsightsCache]);
     } else {
       expect(h.deleteCached).not.toHaveBeenCalled();
-      expect(deleted).toEqual([]);
+      expect(updated).toEqual([]);
     }
   });
 });

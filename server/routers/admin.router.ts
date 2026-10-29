@@ -200,7 +200,9 @@ export const statisticsRouter = router({
         return await getSwimMetrics(ctx.user.id);
     }),
 
-    // AI insights of the Coach page, from the caller's swim metrics (cached 24 hours).
+    // AI insights of the Coach page, from the caller's swim metrics (cached 24 hours, regenerated
+    // at most every 6 hours after new swims and 4 times an hour; the client sends it outside the
+    // batch, so the page never waits for Gemini).
     getInsights: protectedProcedure.query(async ({ ctx }) => {
         const { getSwimMetrics } = await import("../swim_metrics");
         const { generateAIInsights } = await import("../ai_insights");
@@ -257,9 +259,13 @@ export const aiCoachRouter = router({
             return await getExistingWorkouts(ctx.user.id);
         }),
 
-    // Generate both pool + dryland workouts (7-day cooldown)
+    // Generate both pool + dryland workouts (7-day cooldown, at most 5 requests an hour per user)
     generateWorkouts: protectedProcedure
         .mutation(async ({ ctx }) => {
+            const { aiWorkoutsRateLimit, AI_RATE_LIMIT_MESSAGE } = await import("../lib/ai-rate-limit");
+            if (!(await aiWorkoutsRateLimit.consume(ctx.user.id))) {
+                throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: AI_RATE_LIMIT_MESSAGE });
+            }
             const { generateBothWorkouts } = await import("../ai_coach");
             try {
                 return await generateBothWorkouts(ctx.user.id);

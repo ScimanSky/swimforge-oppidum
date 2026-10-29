@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { aiInsightsCache, swimmerProfiles } from "../../drizzle/schema";
+import { swimmerProfiles } from "../../drizzle/schema";
 
 const m = vi.hoisted(() => {
   const state = { profileExists: true, updates: [] as Array<{ table: unknown; values: any }> };
@@ -80,7 +80,7 @@ describe("updatePaceZones", () => {
     m.state.profileExists = true;
   });
 
-  it("merges preferences.paceZones (bounds and date) in one UPDATE, then drops the metrics and the insights", async () => {
+  it("merges preferences.paceZones (bounds and date) in one UPDATE, then drops the metrics (not the insights)", async () => {
     expect(await updatePaceZones(42, OWNER, NOW)).toBe(true);
     expect(m.db.select).not.toHaveBeenCalled();
     expect(m.state.updates).toHaveLength(1);
@@ -89,7 +89,8 @@ describe("updatePaceZones", () => {
     expect(sql).toContain("||");
     expect(params).toEqual([JSON.stringify({ paceZones: { bounds: OWNER, updatedAt: "2026-10-29T10:00:00.000Z" } })]);
     expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v4:42:2026-10-29");
-    expect(m.db.delete).toHaveBeenCalledWith(aiInsightsCache);
+    // The Coach page insights stay (they expire on their own): a zone edit never costs a Gemini call.
+    expect(m.db.delete).not.toHaveBeenCalled();
   });
 
   it("removes only the manual zones", async () => {
@@ -98,6 +99,7 @@ describe("updatePaceZones", () => {
     expect(sql).toMatch(/- \$\d+::text/);
     expect(params).toEqual(["{}", "paceZones"]);
     expect(m.deleteCached).toHaveBeenCalled();
+    expect(m.db.delete).not.toHaveBeenCalled();
   });
 
   it("without a profile nothing is invalidated", async () => {

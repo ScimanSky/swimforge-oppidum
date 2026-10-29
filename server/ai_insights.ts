@@ -1,9 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiInsightsCache, swimmingActivities } from "../drizzle/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
+import { aiInsightsRateLimit } from "./lib/ai-rate-limit";
 import type { SwimMetrics } from "@shared/swimMetrics";
 import {
   SWIM_METRICS_COACH_RULES,
@@ -112,18 +113,55 @@ function parseInsightsFromAiText(text: string): string[] {
   return picked.slice(0, 8);
 }
 
+type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type CachedInsights = { insights: string[]; generatedAt?: Date | null; expiresAt: Date };
+
+/** The cached insights live 24 hours. */
+const INSIGHTS_TTL_MS = 24 * 60 * 60 * 1000;
 /**
- * Drops the user's cached Coach page insights (their swims or CSS changed). Best effort: a
- * failure is logged, never thrown.
+ * New swims make the insights stale, but they are regenerated at most once every 6 hours: until
+ * then the last ones are served (each regeneration is a Gemini call).
  */
-export async function clearAIInsightsCache(userId: number): Promise<void> {
+export const INSIGHTS_MIN_REGENERATION_MS = 6 * 60 * 60 * 1000;
+/** The Gemini call gives up after this: the last insights (or none) are served instead. */
+export const INSIGHTS_GEMINI_TIMEOUT_MS = 25_000;
+
+/** Insights of a user who never swam (analysis and direction, no workouts). */
+const ONBOARDING_INSIGHTS = [
+  "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
+  "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",
+  "🏊 Tecnica: All'inizio i miglioramenti piu' rapidi arrivano dalla tecnica. Concentrarti su scivolamento e controllo del ritmo ti dara' vantaggi immediati.",
+  "💪 Intensita': Prima base, poi intensita'. Quando avrai qualche sessione registrata, potremo capire se e quando alzare il ritmo.",
+  "⚡ Efficienza: Anche a bassa intensita' puoi migliorare l'efficienza. Piccoli progressi sessione dopo sessione fanno una grande differenza nel tempo.",
+  "🎯 Obiettivi: Imposta un obiettivo semplice e misurabile (frequenza settimanale). Una volta che i dati arrivano, potremo renderlo piu' ambizioso.",
+];
+
+const isOnboardingInsights = (insights: string[]) => insights[0] === ONBOARDING_INSIGHTS[0];
+
+/**
+ * New swims or laps: the user's Coach page insights become stale, but stay served until 6 hours
+ * have passed since they were generated (expiry moved to that moment, or to now when it has
+ * already passed). Best effort: a failure is logged, never thrown.
+ */
+export async function markAIInsightsStale(userId: number, now: Date = new Date()): Promise<void> {
   try {
     const db = await getDb();
     if (!db) return;
-    await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
+    const rows = await db
+      .select({ generatedAt: aiInsightsCache.generatedAt, expiresAt: aiInsightsCache.expiresAt })
+      .from(aiInsightsCache)
+      .where(eq(aiInsightsCache.userId, userId))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return;
+    const regenerateFrom = new Date(
+      Math.max(now.getTime(), new Date(row.generatedAt).getTime() + INSIGHTS_MIN_REGENERATION_MS),
+    );
+    if (regenerateFrom.getTime() >= new Date(row.expiresAt).getTime()) return;
+    await db.update(aiInsightsCache).set({ expiresAt: regenerateFrom }).where(eq(aiInsightsCache.userId, userId));
   } catch (error) {
-    log.warn("[AI Insights] Could not clear the cached insights", {
-      event: "ai_insights:cache_clear_failed",
+    log.warn("[AI Insights] Could not mark the cached insights stale", {
+      event: "ai_insights:mark_stale_failed",
       userId,
       message: error instanceof Error ? error.message : String(error),
     });
@@ -131,7 +169,7 @@ export async function clearAIInsightsCache(userId: number): Promise<void> {
 }
 
 /** True when the user has at least one swim, ever (not only in the metrics' 90 days). */
-async function hasAnySwim(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, userId: number): Promise<boolean> {
+async function hasAnySwim(db: Db, userId: number): Promise<boolean> {
   const rows = await db
     .select({ id: swimmingActivities.id })
     .from(swimmingActivities)
@@ -140,10 +178,80 @@ async function hasAnySwim(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, us
   return rows.length > 0;
 }
 
-/** 6-8 insights for the Coach page from the swim metrics (cached 24 hours). */
+/** The user's cached insights of the 90-day metrics, expired or not; null when none or unreadable. */
+async function readCachedInsights(db: Db, userId: number): Promise<CachedInsights | null> {
+  try {
+    const rows = await db
+      .select()
+      .from(aiInsightsCache)
+      .where(and(eq(aiInsightsCache.userId, userId), eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)))
+      .limit(1);
+    return rows[0] ?? null;
+  } catch (error) {
+    log.warn("[AI Insights] Cache check failed, proceeding without it", {
+      event: "ai_insights:cache_check_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/** Replaces the user's cached insights (valid 24 hours from `now`). Best effort. */
+async function saveInsights(db: Db, userId: number, insights: string[], now: Date, kind: "onboarding" | "ai"): Promise<void> {
+  try {
+    await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
+    await db.insert(aiInsightsCache).values({
+      userId,
+      insights,
+      periodDays: INSIGHTS_PERIOD_DAYS,
+      generatedAt: now,
+      expiresAt: new Date(now.getTime() + INSIGHTS_TTL_MS),
+    });
+    log.debug("[AI Insights] Cached insights", {
+      event: kind === "onboarding" ? "ai_insights:onboarding_cache_saved" : "ai_insights:cache_saved",
+      userId,
+      count: insights.length,
+    });
+  } catch (cacheError) {
+    log.warn("[AI Insights] Cache table not available, skipping cache save", {
+      event: kind === "onboarding" ? "ai_insights:onboarding_cache_save_skipped" : "ai_insights:cache_save_skipped",
+      userId,
+      message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+    });
+  }
+}
+
+/** One Gemini answer, given up (and the request aborted) after INSIGHTS_GEMINI_TIMEOUT_MS. */
+async function generateInsightsText(client: GoogleGenerativeAI, prompt: string): Promise<string> {
+  const model = client.getGenerativeModel({ model: GEMINI_MODEL });
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      model.generateContent(prompt, { signal: controller.signal }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`Gemini API timeout after ${INSIGHTS_GEMINI_TIMEOUT_MS}ms`));
+          controller.abort();
+        }, INSIGHTS_GEMINI_TIMEOUT_MS);
+      }),
+    ]);
+    return result.response.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * 6-8 insights for the Coach page from the swim metrics, cached 24 hours. When Gemini fails,
+ * times out, is not configured or the user is over the hourly limit, the last cached insights are
+ * served (expired or not), otherwise none (the page shows its own message).
+ */
 export async function generateAIInsights(
   metrics: SwimMetrics,
-  userId: number
+  userId: number,
+  now: Date = new Date(),
 ): Promise<string[]> {
   const db = await getDb();
   if (!db) {
@@ -153,126 +261,100 @@ export async function generateAIInsights(
   // New users (no swim ever) shouldn't trigger AI generation/parsing noise: onboarding insights
   // (analysis + direction, no workouts). Someone back after a break gets real insights.
   if (metrics.sessions.length === 0 && !(await hasAnySwim(db, userId))) {
-    const insights = [
-      "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
-      "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",
-      "🏊 Tecnica: All'inizio i miglioramenti piu' rapidi arrivano dalla tecnica. Concentrarti su scivolamento e controllo del ritmo ti dara' vantaggi immediati.",
-      "💪 Intensita': Prima base, poi intensita'. Quando avrai qualche sessione registrata, potremo capire se e quando alzare il ritmo.",
-      "⚡ Efficienza: Anche a bassa intensita' puoi migliorare l'efficienza. Piccoli progressi sessione dopo sessione fanno una grande differenza nel tempo.",
-      "🎯 Obiettivi: Imposta un obiettivo semplice e misurabile (frequenza settimanale). Una volta che i dati arrivano, potremo renderlo piu' ambizioso.",
-    ];
-
-    // Cache these insights so the UI stays stable and we avoid repeated generation attempts.
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-    try {
-      await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
-      await db.insert(aiInsightsCache).values({
-        userId,
-        insights,
-        periodDays: INSIGHTS_PERIOD_DAYS,
-        expiresAt,
-      });
-      log.debug("[AI Insights] Cached onboarding insights (no activities yet)", {
-        event: "ai_insights:onboarding_cache_saved",
-        userId,
-      });
-    } catch (cacheError) {
-      log.debug("[AI Insights] Skipping onboarding cache save", {
-        event: "ai_insights:onboarding_cache_save_skipped",
-        userId,
-        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-      });
-    }
-
-    return insights;
+    // Cached so the UI stays stable and we avoid repeated generation attempts.
+    await saveInsights(db, userId, ONBOARDING_INSIGHTS, now, "onboarding");
+    return [...ONBOARDING_INSIGHTS];
   }
 
-  // 🔥 PRIORITY: Check cache FIRST (before API call)
-  try {
-    const cached = await db
-      .select()
-      .from(aiInsightsCache)
-      .where(
-        and(
-          eq(aiInsightsCache.userId, userId),
-          eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS),
-          gt(aiInsightsCache.expiresAt, new Date()) // Not expired
-        )
-      )
-      .limit(1);
-
-    if (cached.length > 0 && cached[0].insights.length > 0) {
-      if (cached[0].insights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
-        log.debug("[AI Insights] Using valid cached insights", {
-          event: "ai_insights:cache_hit",
-          userId,
-          expiresAt: cached[0].expiresAt,
-          count: cached[0].insights.length,
-        });
-        return cached[0].insights;
-      }
-
-      log.warn("[AI Insights] Cache hit with incomplete insights, forcing regeneration", {
-        event: "ai_insights:cache_hit_incomplete",
+  // Cache first. The onboarding insights of a user who swims now are never served from it.
+  const cached = await readCachedInsights(db, userId);
+  const lastInsights = cached?.insights ?? [];
+  if (cached && new Date(cached.expiresAt).getTime() > now.getTime() && lastInsights.length > 0 && !isOnboardingInsights(lastInsights)) {
+    if (lastInsights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
+      log.debug("[AI Insights] Using valid cached insights", {
+        event: "ai_insights:cache_hit",
         userId,
-        count: cached[0].insights.length,
+        expiresAt: cached.expiresAt,
+        count: lastInsights.length,
       });
+      return lastInsights;
     }
-    
+    log.warn("[AI Insights] Cache hit with incomplete insights, forcing regeneration", {
+      event: "ai_insights:cache_hit_incomplete",
+      userId,
+      count: lastInsights.length,
+    });
+  } else {
     log.debug("[AI Insights] No valid cache found, generating new insights", {
       event: "ai_insights:cache_miss",
       userId,
     });
-  } catch (cacheError) {
-    log.warn("[AI Insights] Cache check failed, proceeding with generation", {
-      event: "ai_insights:cache_check_failed",
-      userId,
-      message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-    });
   }
 
   const client = getGeminiClient();
-  
-  // If no API key, try to use ANY cache as fallback (even expired)
   if (!client) {
-    log.warn("[AI Insights] No Gemini API key configured, trying ANY cache fallback", {
+    log.warn("[AI Insights] No Gemini API key configured, serving the last insights", {
       event: "ai_insights:no_api_key",
       userId,
+      cached: lastInsights.length,
     });
-    try {
-      const anyCached = await db
-        .select()
-        .from(aiInsightsCache)
-        .where(
-          and(
-            eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)
-          )
-        )
-        .limit(1);
+    return lastInsights;
+  }
 
-      if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
-        log.debug("[AI Insights] Using ANY cached insights (no API key)", {
-          event: "ai_insights:any_cache_hit",
-          userId,
-        });
-        return anyCached[0].insights;
-      }
-    } catch (cacheError) {
-      log.warn("[AI Insights] Cache table not available", {
-        event: "ai_insights:cache_table_unavailable",
-        userId,
-        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-      });
-    }
-    return [];
+  if (!(await aiInsightsRateLimit.consume(userId))) {
+    log.warn("[AI Insights] Hourly generation limit reached, serving the last insights", {
+      event: "ai_insights:rate_limited",
+      userId,
+      cached: lastInsights.length,
+    });
+    return lastInsights;
   }
 
   try {
-    const model = client.getGenerativeModel({ model: GEMINI_MODEL });
+    const text = await generateInsightsText(client, buildInsightsPrompt(metrics));
 
-    const prompt = `Sei un analista di performance di nuoto esperto. Analizza le metriche di questo nuotatore e genera 6-8 insights analitici in italiano, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO, CATEGORIZZATI per argomento.
+    log.debug("[AI Insights] Raw response from Gemini (first 500 chars)", {
+      event: "ai_insights:raw_response",
+      userId,
+      preview: text.substring(0, 500),
+    });
+
+    const insights = parseInsightsFromAiText(text);
+
+    log.debug("[AI Insights] Parsed insights from response", {
+      event: "ai_insights:parsed",
+      userId,
+      count: insights.length,
+    });
+
+    if (insights.length > 0) {
+      const finalInsights = insights.slice(0, 8);
+      await saveInsights(db, userId, finalInsights, now, "ai");
+      return finalInsights;
+    }
+
+    // Nothing parsed: the last complete insights, if any.
+    log.warn("[AI Insights] Failed to parse AI response, trying cache fallback", {
+      event: "ai_insights:parse_failed",
+      userId,
+      preview: text.substring(0, 500),
+    });
+    return lastInsights.length >= MIN_INSIGHTS_FOR_VALID_CACHE ? lastInsights : [];
+  } catch (error) {
+    log.error("[AI Insights] Error generating AI insights", {
+      event: "ai_insights:generate_error",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cached: lastInsights.length,
+    });
+    // The last insights even if expired (or none).
+    return lastInsights;
+  }
+}
+
+function buildInsightsPrompt(metrics: SwimMetrics): string {
+  return `Sei un analista di performance di nuoto esperto. Analizza le metriche di questo nuotatore e genera 6-8 insights analitici in italiano, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO, CATEGORIZZATI per argomento.
 
 ⚠️ IMPORTANTE: NON fornire allenamenti specifici o workout dettagliati (quello è il ruolo dell'AI Coach). Focus su ANALISI e DIREZIONE GENERALE.
 
@@ -329,138 +411,4 @@ ESEMPI CATTIVI (DA EVITARE):
 ❌ "Nella prossima sessione fai 4x100 in B2" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
 
 Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
-
-    log.debug("[AI Insights] Raw response from Gemini (first 500 chars)", {
-      event: "ai_insights:raw_response",
-      userId,
-      preview: text.substring(0, 500),
-    });
-
-    const insights = parseInsightsFromAiText(text);
-
-    log.debug("[AI Insights] Parsed insights from response", {
-      event: "ai_insights:parsed",
-      userId,
-      count: insights.length,
-    });
-    if (insights.length === 0) {
-      log.warn("[AI Insights] No insights matched regex", {
-        event: "ai_insights:regex_no_match",
-        userId,
-        preview: text.substring(0, 500),
-      });
-    }
-
-    // Return first 8 insights and save to cache
-    if (insights.length > 0) {
-      const finalInsights = insights.slice(0, 8);
-      
-      // Save to cache (expires in 24 hours as per user preference)
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
-      
-      try {
-        // Delete old cache
-        await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
-        
-        // Insert new cache
-        await db.insert(aiInsightsCache).values({
-          userId,
-          insights: finalInsights,
-          periodDays: INSIGHTS_PERIOD_DAYS,
-          expiresAt,
-        });
-        
-        log.debug("[AI Insights] Cached insights", {
-          event: "ai_insights:cache_saved",
-          userId,
-          count: finalInsights.length,
-        });
-      } catch (cacheError) {
-        log.warn("[AI Insights] Cache table not available yet, skipping cache save", {
-          event: "ai_insights:cache_save_skipped",
-          userId,
-          message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-        });
-      }
-      
-      return finalInsights;
-    }
-
-    // If parsing fails, try to use cache as fallback
-    log.warn("[AI Insights] Failed to parse AI response, trying cache fallback", {
-      event: "ai_insights:parse_failed",
-      userId,
-    });
-    try {
-      const cached = await db
-        .select()
-        .from(aiInsightsCache)
-        .where(
-          and(
-            eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)
-          )
-        )
-        .limit(1);
-
-      if (cached.length > 0 && cached[0].insights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
-        log.debug("[AI Insights] Using cached insights (parsing failed)", {
-          event: "ai_insights:parse_failed_cache_hit",
-          userId,
-          count: cached[0].insights.length,
-        });
-        return cached[0].insights;
-      }
-    } catch (cacheError) {
-      log.warn("[AI Insights] Cache table not available for fallback", {
-        event: "ai_insights:cache_fallback_unavailable",
-        userId,
-        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-      });
-    }
-    
-    return [];
-  } catch (error) {
-    log.error("[AI Insights] Error generating AI insights", {
-      event: "ai_insights:generate_error",
-      userId,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    
-    // Try to return cached insights even if expired
-    try {
-      const anyCached = await db
-        .select()
-        .from(aiInsightsCache)
-        .where(
-          and(
-            eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)
-          )
-        )
-        .limit(1);
-      
-      if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
-        log.warn("[AI Insights] Using expired cache due to error", {
-          event: "ai_insights:expired_cache_fallback",
-          userId,
-        });
-        return anyCached[0].insights;
-      }
-    } catch (fallbackError) {
-      log.warn("[AI Insights] Cache table not available for fallback", {
-        event: "ai_insights:expired_cache_fallback_unavailable",
-        userId,
-        message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-      });
-    }
-    
-    return [];
-  }
 }

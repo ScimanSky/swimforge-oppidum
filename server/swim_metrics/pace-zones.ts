@@ -11,7 +11,7 @@ import {
   type PaceZoneBounds,
 } from "@shared/swimMetrics";
 import { mergeSwimmerPreferences } from "../lib/preferences";
-import { invalidateSwimMetrics } from "./index";
+import { dropCachedSwimMetrics } from "./index";
 
 export const PACE_ZONES_RANGE_MESSAGE = "Scrivi un passo tra 1:00 e 4:00 per 100 m.";
 
@@ -59,7 +59,7 @@ export type PaceZonesInput = Record<PaceZoneBoundaryKey, number>;
 
 /**
  * Saves (or with null removes) the manual bounds with one SQL merge of preferences.paceZones,
- * keeping every other preference key, and drops the cached metrics and Coach insights. False
+ * keeping every other preference key, and drops the cached metrics (not the Coach insights). False
  * when the user has no profile.
  */
 export async function updatePaceZones(
@@ -71,6 +71,6 @@ export async function updatePaceZones(
     ? await mergeSwimmerPreferences(userId, { paceZones: { bounds, updatedAt: now.toISOString() } })
     : await mergeSwimmerPreferences(userId, {}, ["paceZones"]);
   if (!saved) return false;
-  await invalidateSwimMetrics(userId, now);
+  await dropCachedSwimMetrics(userId, now);
   return true;
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { aiInsightsCache, swimmerProfiles } from "../../drizzle/schema";
+import { swimmerProfiles } from "../../drizzle/schema";
 
 const m = vi.hoisted(() => {
   const state = { profileExists: true, updates: [] as Array<{ table: unknown; values: any }> };
@@ -103,13 +103,14 @@ describe("updateCssTest", () => {
     expect(sql).toContain("||");
     expect(params).toEqual([JSON.stringify({ cssTest: test })]);
     expect(m.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v4:42:\d{4}-\d{2}-\d{2}$/));
-    // The Coach page insights were written from the old CSS: their cache rows go too.
-    expect(m.db.delete).toHaveBeenCalledWith(aiInsightsCache);
+    // The Coach page insights stay (they expire on their own): a CSS edit never costs a Gemini call.
+    expect(m.db.delete).not.toHaveBeenCalled();
   });
 
   it("removes only the test", async () => {
     expect(await updateCssTest(42, null)).toBe(true);
-    expect(m.db.delete).toHaveBeenCalledWith(aiInsightsCache);
+    expect(m.deleteCached).toHaveBeenCalled();
+    expect(m.db.delete).not.toHaveBeenCalled();
     const { sql, params } = render(m.state.updates[0].values.preferences);
     expect(sql).toMatch(/- \$\d+::text/);
     expect(params).toEqual(["{}", "cssTest"]);

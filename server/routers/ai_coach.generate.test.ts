@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../_core/context";
 
-const { generateBothWorkoutsMock } = vi.hoisted(() => ({
+const { generateBothWorkoutsMock, consumeMock } = vi.hoisted(() => ({
   generateBothWorkoutsMock: vi.fn(),
+  consumeMock: vi.fn(async () => true),
 }));
 
 vi.mock("../ai_coach", () => ({
   generateBothWorkouts: generateBothWorkoutsMock,
+}));
+vi.mock("../lib/ai-rate-limit", () => ({
+  aiWorkoutsRateLimit: { consume: consumeMock },
+  AI_RATE_LIMIT_MESSAGE: "Troppe richieste al coach AI. Riprova tra un'ora.",
 }));
 
 import { aiCoachRouter } from "./admin.router";
@@ -39,6 +44,7 @@ function createAuthContext(): TrpcContext {
 describe("aiCoach.generateWorkouts preconditions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    consumeMock.mockResolvedValue(true);
   });
 
   it("returns workouts payload on success", async () => {
@@ -87,5 +93,17 @@ describe("aiCoach.generateWorkouts preconditions", () => {
     await expect(caller.generateWorkouts()).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
     });
+  });
+
+  it("over 5 requests an hour: TOO_MANY_REQUESTS in Italian, without generating", async () => {
+    consumeMock.mockResolvedValue(false);
+    const caller = aiCoachRouter.createCaller(createAuthContext());
+
+    await expect(caller.generateWorkouts()).rejects.toMatchObject({
+      code: "TOO_MANY_REQUESTS",
+      message: "Troppe richieste al coach AI. Riprova tra un'ora.",
+    });
+    expect(consumeMock).toHaveBeenCalledWith(42);
+    expect(generateBothWorkoutsMock).not.toHaveBeenCalled();
   });
 });

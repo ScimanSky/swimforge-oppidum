@@ -17,6 +17,13 @@ const m = vi.hoisted(() => {
       db.deleted.push(table);
       return { where: async () => undefined };
     }),
+    updated: [] as Array<{ table: unknown; values: Record<string, unknown> }>,
+    update: vi.fn((table: unknown) => ({
+      set: (values: Record<string, unknown>) => {
+        db.updated.push({ table, values });
+        return { where: async () => undefined };
+      },
+    })),
     select: vi.fn((selection: Record<string, unknown>) => {
       let table: unknown;
       const index = state.selections.length;
@@ -57,7 +64,14 @@ vi.mock("../lib/cache", async () => {
 });
 
 import { aiInsightsCache } from "../../drizzle/schema";
-import { getSwimMetrics, invalidateSwimMetrics, loadStrokeIndexProgress, parseCssTest, parsePaceZones } from "./index";
+import {
+  dropCachedSwimMetrics,
+  getSwimMetrics,
+  invalidateSwimMetrics,
+  loadStrokeIndexProgress,
+  parseCssTest,
+  parsePaceZones,
+} from "./index";
 
 let lapId = 0;
 function laps(activityId: number, specs: Array<[number, number, string | null, number | null, number | null]>) {
@@ -164,11 +178,28 @@ describe("getSwimMetrics", () => {
     expect(m.getOrSetCached).toHaveBeenLastCalledWith("swim-metrics:v4:42:2026-10-30", expect.any(Function), 3600);
   });
 
-  it("invalidation drops today's cached metrics and the AI insights rows", async () => {
+  it("new swims drop today's cached metrics and mark the AI insights stale (kept, not deleted)", async () => {
     m.db.deleted.length = 0;
+    m.db.updated.length = 0;
+    // Insights generated 7 hours ago: past the 6-hour minimum, they expire now.
+    m.state.rowsFor = (table) =>
+      table === aiInsightsCache
+        ? [{ generatedAt: new Date(NOW.getTime() - 7 * 3600_000), expiresAt: new Date(NOW.getTime() + 17 * 3600_000) }]
+        : [];
     await invalidateSwimMetrics(42, NOW);
     expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v4:42:2026-10-29");
-    expect(m.db.deleted).toEqual([aiInsightsCache]);
+    expect(m.db.deleted).toEqual([]);
+    expect(m.db.updated).toEqual([{ table: aiInsightsCache, values: { expiresAt: NOW } }]);
+  });
+
+  it("the CSS test and the manual zones drop only today's cached metrics, never the AI insights", async () => {
+    m.db.deleted.length = 0;
+    m.db.updated.length = 0;
+    await dropCachedSwimMetrics(42, NOW);
+    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v4:42:2026-10-29");
+    expect(m.state.tables).toEqual([]);
+    expect(m.db.deleted).toEqual([]);
+    expect(m.db.updated).toEqual([]);
   });
 
   it("reads swims, laps, profile, CSS laps and swims per week with independent queries in parallel", async () => {

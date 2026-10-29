@@ -9,7 +9,7 @@ import type { SwimMetrics } from "@shared/swimMetrics";
 import { addDaysToKey, arePaceZoneBoundsValid, dayKey } from "@shared/swimMetrics";
 import { garminActivityLaps, swimmerProfiles, swimmingActivities } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { clearAIInsightsCache } from "../ai_insights";
+import { markAIInsightsStale } from "../ai_insights";
 import { cacheKeys, deleteCached, getOrSetCached } from "../lib/cache";
 import { computeSwimMetrics, HISTORY_DAYS, type CssTest, type ManualPaceZones, type SwimMetricsInput } from "./compute";
 import type { CssLap } from "./css";
@@ -255,12 +255,17 @@ export async function getSwimMetrics(userId: number, now: Date = new Date()): Pr
 }
 
 /**
- * Drop today's cached metrics and the Coach page insights written from them (new swims or laps,
- * CSS test or manual zones saved or removed).
+ * Drop today's cached metrics only: the CSS test or the manual zones were saved or removed. The
+ * Coach page insights stay until they expire, so these edits never cost a Gemini call by themselves.
+ */
+export async function dropCachedSwimMetrics(userId: number, now: Date = new Date()): Promise<void> {
+  await deleteCached(cacheKeys.swimMetrics(String(userId), dayKey(now)));
+}
+
+/**
+ * New swims or laps: drop today's cached metrics and mark the Coach page insights written from
+ * them stale (regenerated at most once every 6 hours, see markAIInsightsStale).
  */
 export async function invalidateSwimMetrics(userId: number, now: Date = new Date()): Promise<void> {
-  await Promise.all([
-    deleteCached(cacheKeys.swimMetrics(String(userId), dayKey(now))),
-    clearAIInsightsCache(userId),
-  ]);
+  await Promise.all([dropCachedSwimMetrics(userId, now), markAIInsightsStale(userId, now)]);
 }
