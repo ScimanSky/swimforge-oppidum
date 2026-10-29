@@ -1,15 +1,23 @@
 /**
- * Club Members Tab - Lista membri del club + moderazione
+ * Club members (shown in the members sheet): list, roles and moderation for staff.
  */
 
-import { Surface, SurfaceContent } from "@/components/ui/surface";
+import { useId } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { Chip } from "@/components/corsia/Chip";
 import { Crown, Shield, User } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { toast } from "sonner";
+
+const ROLES: Record<string, { label: string; icon: typeof User }> = {
+  owner: { label: "Proprietario", icon: Crown },
+  admin: { label: "Admin", icon: Shield },
+  moderator: { label: "Moderatore", icon: Shield },
+  member: { label: "Membro", icon: User },
+};
 
 interface ClubMembersTabProps {
   clubId: number;
@@ -18,6 +26,8 @@ interface ClubMembersTabProps {
 }
 
 export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembersTabProps) {
+  const requestsTitleId = useId();
+  const bannedTitleId = useId();
   const utils = trpc.useUtils();
   const membersQuery = trpc.community.clubs.members.useQuery({ clubId });
   const requestsQuery = trpc.community.clubs.requests.useQuery(
@@ -78,222 +88,183 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
     onError: (error) => toast.error(error.message || "Impossibile rifiutare la richiesta"),
   });
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "owner":
-        return <Crown className="h-4 w-4" />;
-      case "admin":
-      case "moderator":
-        return <Shield className="h-4 w-4" />;
-      default:
-        return <User className="h-4 w-4" />;
-    }
-  };
+  const displayName = (member: any) =>
+    member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`;
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case "owner":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
-      case "admin":
-        return "bg-red-500/10 text-red-500 border-red-500/20";
-      case "moderator":
-        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      default:
-        return "";
-    }
-  };
+  const memberAvatar = (member: any, size: string) => (
+    <Link href={`/u/${member.user_id}`} aria-label={`Profilo di ${displayName(member)}`} className="shrink-0">
+      <Avatar className={size}>
+        <AvatarImage src={member.user_avatar || undefined} alt="" />
+        <AvatarFallback className="text-sm font-semibold">
+          {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
+        </AvatarFallback>
+      </Avatar>
+    </Link>
+  );
+
+  const memberCount = membersQuery.data?.length || 0;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Membri del Club</h2>
-        <p className="text-muted-foreground">
-          {membersQuery.data?.length || 0} membri attivi
+    <div className="space-y-6">
+      <section aria-label="Membri del club">
+        <p className="text-sm text-muted-foreground tabular-nums">
+          {memberCount === 1 ? "1 membro attivo" : `${memberCount} membri attivi`}
         </p>
-      </div>
 
-      {membersQuery.isLoading ? (
-        <Surface>
-          <SurfaceContent className="p-8 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </SurfaceContent>
-        </Surface>
-      ) : membersQuery.error ? (
-        <Surface>
-          <SurfaceContent className="p-4 text-sm text-muted-foreground">
+        {membersQuery.isLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner aria-label="Caricamento" className="size-6 text-muted-foreground" />
+          </div>
+        ) : membersQuery.error ? (
+          <p className="mt-3 text-sm text-muted-foreground">
             {membersQuery.error.message || "Impossibile caricare i membri"}
-          </SurfaceContent>
-        </Surface>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {membersQuery.data?.map((member: any) => (
-            <Surface key={member.user_id}>
-              <SurfaceContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Link href={`/u/${member.user_id}`}>
-                    <Avatar className="h-12 w-12 cursor-pointer">
-                      <AvatarImage src={member.user_avatar || undefined} />
-                      <AvatarFallback>
-                        {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <Link href={`/u/${member.user_id}`} className="font-semibold truncate block hover:underline">
-                      {member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`}
-                    </Link>
-                    {member.user_email && (
-                      <p className="text-sm text-muted-foreground truncate">{member.user_email}</p>
-                    )}
-                    {member.role && (
-                      <Badge
-                        variant="outline"
-                        className={`mt-1 capitalize ${getRoleColor(member.role)}`}
-                      >
-                        {getRoleIcon(member.role)}
-                        <span className="ml-1">{member.role}</span>
-                      </Badge>
-                    )}
+          </p>
+        ) : (
+          <ul className="mt-2">
+            {membersQuery.data?.map((member: any) => {
+              const role = ROLES[member.role as string];
+              return (
+                <li key={member.user_id} className="border-t border-border py-3 first:border-t-0">
+                  <div className="flex items-center gap-3">
+                    {memberAvatar(member, "size-11")}
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/u/${member.user_id}`} className="block truncate font-semibold hover:underline">
+                        {displayName(member)}
+                      </Link>
+                      {member.user_email && (
+                        <p className="truncate text-sm text-muted-foreground">{member.user_email}</p>
+                      )}
+                    </div>
+                    {member.role ? (
+                      <Chip tone={member.role === "member" ? "neutral" : "action"}>
+                        {role ? <role.icon className="size-3.5" aria-hidden /> : null}
+                        {role?.label ?? member.role}
+                      </Chip>
+                    ) : null}
                   </div>
-                </div>
 
-                {(isOwner || (isStaff && member.role !== "owner")) && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {isOwner && member.role !== "owner" && (
-                      <select
-                        value={member.role}
-                        onChange={(e) =>
-                          updateRoleMutation.mutate({
-                            clubId,
-                            userId: member.user_id,
-                            role: e.target.value as "member" | "moderator" | "admin",
-                          })
-                        }
-                        className="h-8 rounded-md border border-border/70 bg-background px-2 text-xs"
-                        disabled={updateRoleMutation.isPending}
-                      >
-                        <option value="member">Membro</option>
-                        <option value="moderator">Moderatore</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    )}
+                  {(isOwner || (isStaff && member.role !== "owner")) && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 pl-14">
+                      {isOwner && member.role !== "owner" && (
+                        <select
+                          aria-label={`Ruolo di ${displayName(member)}`}
+                          value={member.role}
+                          onChange={(e) =>
+                            updateRoleMutation.mutate({
+                              clubId,
+                              userId: member.user_id,
+                              role: e.target.value as "member" | "moderator" | "admin",
+                            })
+                          }
+                          className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+                          disabled={updateRoleMutation.isPending}
+                        >
+                          <option value="member">Membro</option>
+                          <option value="moderator">Moderatore</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      )}
 
-                    {isStaff && member.role !== "owner" && (
-                      <Button
-                        variant="outline-neon"
-                        size="sm"
-                        className="h-8"
-                        onClick={() => banMemberMutation.mutate({ clubId, userId: member.user_id })}
-                        disabled={banMemberMutation.isPending}
-                      >
-                        Banna
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </SurfaceContent>
-            </Surface>
-          ))}
-        </div>
-      )}
+                      {isStaff && member.role !== "owner" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => banMemberMutation.mutate({ clubId, userId: member.user_id })}
+                          disabled={banMemberMutation.isPending}
+                        >
+                          Banna
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {isStaff ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Surface>
-            <SurfaceContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Richieste in attesa</h3>
-                <span className="text-xs text-muted-foreground">{requestsQuery.data?.length ?? 0}</span>
-              </div>
-              {requestsQuery.isLoading ? (
-                <p className="text-sm text-muted-foreground">Caricamento...</p>
-              ) : requestsQuery.error ? (
-                <p className="text-sm text-muted-foreground">{requestsQuery.error.message}</p>
-              ) : requestsQuery.data && requestsQuery.data.length > 0 ? (
-                <div className="space-y-2">
-                  {requestsQuery.data.map((member: any) => (
-                    <div key={`request-${member.user_id}`} className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
-                      <Link href={`/u/${member.user_id}`}>
-                        <Avatar className="h-8 w-8 cursor-pointer">
-                          <AvatarImage src={member.user_avatar || undefined} />
-                          <AvatarFallback>
-                            {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Link>
-                      <div className="flex-1 min-w-0 text-sm truncate">
-                        {member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`}
-                      </div>
-                      <Button
-                        size="sm"
-                        className="h-7"
-                        variant="neon"
-                        onClick={() => approveRequestMutation.mutate({ clubId, userId: member.user_id })}
-                        disabled={approveRequestMutation.isPending}
-                      >
-                        Approva
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-7"
-                        variant="outline-neon"
-                        onClick={() => rejectRequestMutation.mutate({ clubId, userId: member.user_id })}
-                        disabled={rejectRequestMutation.isPending}
-                      >
-                        Rifiuta
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Nessuna richiesta in attesa.</p>
-              )}
-            </SurfaceContent>
-          </Surface>
+        <>
+          <section aria-labelledby={requestsTitleId} className="border-t border-border pt-4">
+            <div className="flex items-center justify-between">
+              <h3 id={requestsTitleId} className="text-[17px] font-bold">
+                Richieste in attesa
+              </h3>
+              <span className="text-sm text-muted-foreground tabular-nums">{requestsQuery.data?.length ?? 0}</span>
+            </div>
+            {requestsQuery.isLoading ? (
+              <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
+            ) : requestsQuery.error ? (
+              <p className="mt-2 text-sm text-muted-foreground">{requestsQuery.error.message}</p>
+            ) : requestsQuery.data && requestsQuery.data.length > 0 ? (
+              <ul className="mt-2">
+                {requestsQuery.data.map((member: any) => (
+                  <li
+                    key={`request-${member.user_id}`}
+                    className="flex items-center gap-2 border-t border-border py-2 first:border-t-0"
+                  >
+                    {memberAvatar(member, "size-8")}
+                    <div className="min-w-0 flex-1 truncate text-sm">{displayName(member)}</div>
+                    <Button
+                      size="sm"
+                      onClick={() => approveRequestMutation.mutate({ clubId, userId: member.user_id })}
+                      disabled={approveRequestMutation.isPending}
+                    >
+                      Approva
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => rejectRequestMutation.mutate({ clubId, userId: member.user_id })}
+                      disabled={rejectRequestMutation.isPending}
+                    >
+                      Rifiuta
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Nessuna richiesta in attesa.</p>
+            )}
+          </section>
 
-          <Surface>
-            <SurfaceContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Membri bannati</h3>
-                <span className="text-xs text-muted-foreground">{bannedQuery.data?.length ?? 0}</span>
-              </div>
-              {bannedQuery.isLoading ? (
-                <p className="text-sm text-muted-foreground">Caricamento...</p>
-              ) : bannedQuery.error ? (
-                <p className="text-sm text-muted-foreground">{bannedQuery.error.message}</p>
-              ) : bannedQuery.data && bannedQuery.data.length > 0 ? (
-                <div className="space-y-2">
-                  {bannedQuery.data.map((member: any) => (
-                    <div key={`banned-${member.user_id}`} className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
-                      <Link href={`/u/${member.user_id}`}>
-                        <Avatar className="h-8 w-8 cursor-pointer">
-                          <AvatarImage src={member.user_avatar || undefined} />
-                          <AvatarFallback>
-                            {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Link>
-                      <div className="flex-1 min-w-0 text-sm truncate">
-                        {member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`}
-                      </div>
-                      <Button
-                        size="sm"
-                        className="h-7"
-                        variant="outline-neon"
-                        onClick={() => unbanMemberMutation.mutate({ clubId, userId: member.user_id })}
-                        disabled={unbanMemberMutation.isPending}
-                      >
-                        Sblocca
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Nessun membro bannato.</p>
-              )}
-            </SurfaceContent>
-          </Surface>
-        </div>
+          <section aria-labelledby={bannedTitleId} className="border-t border-border pt-4">
+            <div className="flex items-center justify-between">
+              <h3 id={bannedTitleId} className="text-[17px] font-bold">
+                Membri bannati
+              </h3>
+              <span className="text-sm text-muted-foreground tabular-nums">{bannedQuery.data?.length ?? 0}</span>
+            </div>
+            {bannedQuery.isLoading ? (
+              <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
+            ) : bannedQuery.error ? (
+              <p className="mt-2 text-sm text-muted-foreground">{bannedQuery.error.message}</p>
+            ) : bannedQuery.data && bannedQuery.data.length > 0 ? (
+              <ul className="mt-2">
+                {bannedQuery.data.map((member: any) => (
+                  <li
+                    key={`banned-${member.user_id}`}
+                    className="flex items-center gap-2 border-t border-border py-2 first:border-t-0"
+                  >
+                    {memberAvatar(member, "size-8")}
+                    <div className="min-w-0 flex-1 truncate text-sm">{displayName(member)}</div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => unbanMemberMutation.mutate({ clubId, userId: member.user_id })}
+                      disabled={unbanMemberMutation.isPending}
+                    >
+                      Sblocca
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Nessun membro bannato.</p>
+            )}
+          </section>
+        </>
       ) : null}
     </div>
   );
