@@ -5,9 +5,10 @@
 import { useId } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { Chip } from "@/components/corsia/Chip";
+import { LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Crown, Shield, User } from "lucide-react";
+import { formatInteger } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -91,8 +92,10 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
   const displayName = (member: any) =>
     member.user_name || member.user_username || `Utente #${member.user_id}`;
 
+  // A second way to the profile for the pointer: hidden from the keyboard and screen readers,
+  // where the name link next to it is the one stop per member.
   const memberAvatar = (member: any, size: string) => (
-    <Link href={`/u/${member.user_id}`} aria-label={`Profilo di ${displayName(member)}`} className="shrink-0">
+    <Link href={`/u/${member.user_id}`} tabIndex={-1} aria-hidden className="shrink-0">
       <Avatar className={size}>
         <AvatarImage src={member.user_avatar || undefined} alt="" />
         <AvatarFallback className="text-sm font-semibold">
@@ -102,19 +105,26 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
     </Link>
   );
 
-  const memberCount = membersQuery.data?.length || 0;
+  const memberName = (member: any, className: string) => (
+    <Link href={`/u/${member.user_id}`} className={`block min-w-0 truncate hover:underline ${className}`}>
+      {displayName(member)}
+    </Link>
+  );
+
+  const memberCount = membersQuery.data?.length ?? 0;
 
   return (
     <div className="space-y-6">
       <section aria-label="Membri del club">
-        <p className="text-sm text-muted-foreground tabular-nums">
-          {memberCount === 1 ? "1 membro attivo" : `${memberCount} membri attivi`}
-        </p>
+        {/* Only once loaded: never «0 membri attivi» while loading or after an error. */}
+        {membersQuery.data ? (
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {memberCount === 1 ? "1 membro attivo" : `${formatInteger(memberCount)} membri attivi`}
+          </p>
+        ) : null}
 
         {membersQuery.isLoading ? (
-          <div className="flex justify-center py-8">
-            <Spinner aria-label="Caricamento" className="size-6 text-muted-foreground" />
-          </div>
+          <LoadingSkeleton label="Caricamento dei membri…" count={3} className="mt-2 space-y-2" itemClassName="h-14 w-full rounded-xl" />
         ) : membersQuery.error ? (
           <p className="mt-3 text-sm text-muted-foreground">
             {membersQuery.error.message || "Impossibile caricare i membri"}
@@ -128,12 +138,11 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                   <div className="flex items-center gap-3">
                     {memberAvatar(member, "size-11")}
                     <div className="min-w-0 flex-1">
-                      <Link href={`/u/${member.user_id}`} className="block truncate font-semibold hover:underline">
-                        {displayName(member)}
-                      </Link>
-                      {member.user_username && (
+                      {memberName(member, "font-semibold")}
+                      {/* Without a name the username is already the title: no «ada» then «@ada». */}
+                      {member.user_name && member.user_username ? (
                         <p className="truncate text-sm text-muted-foreground">@{member.user_username}</p>
-                      )}
+                      ) : null}
                     </div>
                     {member.role ? (
                       <Chip tone={member.role === "member" ? "neutral" : "action"}>
@@ -191,7 +200,9 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
               <h3 id={requestsTitleId} className="text-[17px] font-bold">
                 Richieste in attesa
               </h3>
-              <span className="text-sm text-muted-foreground tabular-nums">{requestsQuery.data?.length ?? 0}</span>
+              {requestsQuery.data ? (
+                <span className="text-sm text-muted-foreground tabular-nums">{requestsQuery.data.length}</span>
+              ) : null}
             </div>
             {requestsQuery.isLoading ? (
               <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
@@ -205,7 +216,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                     className="flex items-center gap-2 border-t border-border py-2 first:border-t-0"
                   >
                     {memberAvatar(member, "size-8")}
-                    <div className="min-w-0 flex-1 truncate text-sm">{displayName(member)}</div>
+                    {memberName(member, "flex-1 text-sm")}
                     <Button
                       size="sm"
                       onClick={() => approveRequestMutation.mutate({ clubId, userId: member.user_id })}
@@ -234,7 +245,9 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
               <h3 id={bannedTitleId} className="text-[17px] font-bold">
                 Membri bannati
               </h3>
-              <span className="text-sm text-muted-foreground tabular-nums">{bannedQuery.data?.length ?? 0}</span>
+              {bannedQuery.data ? (
+                <span className="text-sm text-muted-foreground tabular-nums">{bannedQuery.data.length}</span>
+              ) : null}
             </div>
             {bannedQuery.isLoading ? (
               <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
@@ -248,7 +261,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                     className="flex items-center gap-2 border-t border-border py-2 first:border-t-0"
                   >
                     {memberAvatar(member, "size-8")}
-                    <div className="min-w-0 flex-1 truncate text-sm">{displayName(member)}</div>
+                    {memberName(member, "flex-1 text-sm")}
                     <Button
                       size="sm"
                       variant="outline"
