@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
+import { ChoiceGroup, type ChoiceOption } from "@/components/corsia/ChoiceGroup";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -943,13 +944,17 @@ async function uploadToImageKit(
 
 /* ---- Settings Form ---- */
 
-// Stored theme colours (server enum) shown with the Corsia token each one now maps to.
-const THEME_COLORS = [
-  { value: "cyan", label: "Azzurro", color: "var(--action-text)" },
-  { value: "lime", label: "Verde", color: "var(--success)" },
-  { value: "coral", label: "Corallo", color: "var(--danger)" },
-  { value: "violet", label: "Grigio", color: "var(--muted-foreground)" },
-] as const;
+// Stored theme colours (server enum). Corsia no longer tints the club page with them: they
+// set the accent of the AI-generated logo and cover.
+type ThemeColor = "cyan" | "lime" | "coral" | "violet";
+const THEME_COLORS: ReadonlyArray<ChoiceOption<ThemeColor>> = [
+  { value: "cyan", label: "Azzurro" },
+  { value: "lime", label: "Verde" },
+  { value: "coral", label: "Corallo" },
+  { value: "violet", label: "Viola" },
+];
+const toThemeColor = (value: unknown): ThemeColor =>
+  THEME_COLORS.find((option) => option.value === value)?.value ?? "cyan";
 
 function ClubSettingsForm({
   club,
@@ -965,12 +970,13 @@ function ClubSettingsForm({
   onSaved: () => void;
 }) {
   const [, setLocation] = useLocation();
+  const themeLabelId = useId();
   const [name, setName] = useState(club.name);
   const [description, setDescription] = useState(club.description ?? "");
   const [rules, setRules] = useState(club.rules ?? "");
   const [tagline, setTagline] = useState(club.tagline ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(club.website_url ?? "");
-  const [themeColor, setThemeColor] = useState(club.theme_color ?? "cyan");
+  const [themeColor, setThemeColor] = useState<ThemeColor>(() => toThemeColor(club.theme_color));
   const [visibility, setVisibility] = useState(club.visibility ?? "public");
   const [logoPreview, setLogoPreview] = useState<string | null>(club.logo_url ?? null);
   const [coverPreview, setCoverPreview] = useState<string | null>(club.cover_image_url ?? null);
@@ -1085,7 +1091,7 @@ function ClubSettingsForm({
         rules,
         tagline,
         websiteUrl: websiteUrl.trim() || null,
-        themeColor: themeColor as any,
+        themeColor,
         visibility: visibility as any,
         ...(logoUrl !== undefined ? { logoUrl } : {}),
         ...(coverImageUrl !== undefined ? { coverImageUrl } : {}),
@@ -1249,22 +1255,18 @@ function ClubSettingsForm({
         <Textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={2} placeholder="Regole del club..." />
       </div>
 
-      {/* Theme Color */}
+      {/* Theme colour: only the AI logo and cover use it. */}
       <div>
-        <label className="text-sm font-medium">Colore tema</label>
-        <div className="mt-2 flex gap-3">
-          {THEME_COLORS.map(({ value, label, color }) => (
-            <button
-              key={value}
-              type="button"
-              aria-label={label}
-              aria-pressed={themeColor === value}
-              className={`size-10 rounded-full transition-opacity ${themeColor === value ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : "opacity-60 hover:opacity-100"}`}
-              style={{ backgroundColor: color }}
-              onClick={() => setThemeColor(value)}
-            />
-          ))}
-        </div>
+        <p id={themeLabelId} className="text-sm font-medium">
+          Colore per logo e copertina AI
+        </p>
+        <ChoiceGroup
+          aria-labelledby={themeLabelId}
+          options={THEME_COLORS}
+          value={themeColor}
+          onChange={setThemeColor}
+          className="mt-2 grid grid-cols-2"
+        />
       </div>
 
       {/* Visibility */}

@@ -7,25 +7,37 @@ import ClubDetailEnhanced from "./ClubDetailEnhanced";
 
 const state = vi.hoisted(() => ({
   club: null as any,
+  clubError: null as any,
   stats: null as any,
+  statsError: null as any,
   announcements: [] as any[],
   events: [] as any[],
   joinCalls: [] as any[],
   leaveCalls: [] as any[],
+  updateCalls: [] as any[],
+  // `enabled` option of the last call of each query, by name.
+  enabled: {} as Record<string, unknown>,
+  refetch: vi.fn(),
 }));
 
 const helpers = vi.hoisted(() => {
-  const query = (data: () => unknown) => ({
-    useQuery: () => ({
-      data: data(),
-      isLoading: false,
-      refetch: () => undefined,
-    }),
+  // Like TanStack Query: a disabled query has no data and stays pending.
+  const query = (name: string, data: () => unknown, error: () => unknown = () => null) => ({
+    useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+      state.enabled[name] = options?.enabled;
+      const base = { isLoading: false, refetch: state.refetch };
+      if (options?.enabled === false) return { ...base, data: undefined, isPending: true, isError: false, error: null };
+      const failure = error();
+      if (failure) return { ...base, data: undefined, isPending: false, isError: true, error: failure };
+      return { ...base, data: data(), isPending: false, isError: false, error: null };
+    },
   });
   const mutation = (calls?: any[]) => ({
     useMutation: () => ({
       mutate: (vars: any) => calls?.push(vars),
-      mutateAsync: async () => undefined,
+      mutateAsync: async (vars: any) => {
+        calls?.push(vars);
+      },
       isPending: false,
     }),
   });
@@ -38,16 +50,19 @@ vi.mock("@/lib/trpc", () => {
     trpc: {
       community: {
         clubs: {
-          get: query(() => state.club),
-          weeklyStats: query(() => state.stats),
-          announcements: { list: query(() => state.announcements) },
-          meets: { list: query(() => undefined), create: mutation() },
-          history: { config: { get: query(() => undefined) } },
-          events: { list: query(() => state.events), create: mutation() },
-          invites: query(() => []),
+          get: query("get", () => state.club, () => state.clubError),
+          weeklyStats: query("weeklyStats", () => state.stats, () => state.statsError),
+          announcements: { list: query("announcements", () => state.announcements) },
+          meets: { list: query("meets", () => undefined), create: mutation() },
+          history: { config: { get: query("history", () => undefined) } },
+          events: { list: query("events", () => state.events), create: mutation() },
+          invites: query("invites", () => []),
           join: mutation(state.joinCalls),
           leave: mutation(state.leaveCalls),
           createInvite: mutation(),
+          update: mutation(state.updateCalls),
+          delete: mutation(),
+          media: { imageKitAuth: mutation(), generateBrandAsset: mutation() },
         },
       },
       useUtils: () => ({}),
@@ -55,7 +70,8 @@ vi.mock("@/lib/trpc", () => {
   };
 });
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: any) => <div>{children}</div>,
 }));
@@ -92,6 +108,12 @@ describe("ClubDetailEnhanced (Corsia)", () => {
   afterEach(cleanup);
   beforeEach(() => {
     state.club = { ...baseClub };
+    state.clubError = null;
+    state.statsError = null;
+    state.updateCalls.length = 0;
+    state.enabled = {};
+    state.refetch.mockClear();
+    toast.error.mockClear();
     state.stats = {
       posts_this_week: 5,
       active_members: 9,
@@ -219,5 +241,25 @@ describe("ClubDetailEnhanced (Corsia)", () => {
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Lascia club" })).toBeTruthy();
     expect(screen.getByText("Feed del club")).toBeTruthy();
+  });
+
+  it("impostazioni: il colore serve a logo e copertina AI; «violet» è «Viola»", async () => {
+    state.club = { ...baseClub, is_member: true, member_role: "owner", theme_color: "violet" };
+    renderClub();
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByRole("button", { name: "Impostazioni del club" }));
+    const colours = screen.getByRole("radiogroup", { name: "Colore per logo e copertina AI" });
+    expect(within(colours).getAllByRole("radio").map((radio) => radio.closest("label")!.textContent)).toEqual([
+      "Azzurro",
+      "Verde",
+      "Corallo",
+      "Viola",
+    ]);
+    expect(within(colours).getByRole("radio", { name: "Viola" })).toBeChecked();
+    expect(screen.queryByText("Grigio")).toBeNull();
+    await user.click(within(colours).getByRole("radio", { name: "Verde" }));
+    expect(within(colours).getByRole("radio", { name: "Verde" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Salva modifiche" }));
+    expect(state.updateCalls).toEqual([expect.objectContaining({ clubId: 7, themeColor: "lime" })]);
   });
 });
