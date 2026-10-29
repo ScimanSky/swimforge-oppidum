@@ -3,6 +3,7 @@ import { challenges, challengeParticipants } from "../drizzle/schema_challenges"
 import { users, swimmerProfiles } from "../drizzle/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { logger } from "./middleware/logger";
+import { challengeRankingOrderBy } from "./db_challenges";
 
 const log = logger.child({ component: "db_challenges_getById" });
 
@@ -70,7 +71,7 @@ export async function getChallengeById(challengeId: number) {
     LEFT JOIN profile_badges pb ON sp.profile_badge_id = pb.id
     LEFT JOIN profile_badges pb_default ON pb_default.level = 1
     WHERE cp.challenge_id = ${challengeId}
-    ORDER BY cp.current_progress DESC
+    ORDER BY ${challengeRankingOrderBy(challenge.objective, "cp")}
   `);
 
   const participants = participantsResult.rows as any[];

@@ -235,11 +235,16 @@ export default function ClubDetailEnhanced() {
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
   );
+  const isMemberFromClubQuery = Boolean((clubQuery.data as any | undefined)?.is_member);
+  // The server shows a club's weekly stats to everyone only for public clubs, otherwise to members.
+  const canReadClubStats =
+    isMemberFromClubQuery ||
+    ((clubQuery.data as any | undefined)?.visibility === "public" &&
+      !(clubQuery.data as any | undefined)?.is_private);
   const statsQuery = trpc.community.clubs.weeklyStats.useQuery(
     { clubId },
-    { enabled: match && Number.isFinite(clubId) }
+    { enabled: match && Number.isFinite(clubId) && canReadClubStats }
   );
-  const isMemberFromClubQuery = Boolean((clubQuery.data as any | undefined)?.is_member);
   const announcementsQuery = trpc.community.clubs.announcements.list.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) && isMemberFromClubQuery }
