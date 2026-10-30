@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react"
 import { ImagePlus, X } from "lucide-react"
 import { toast } from "sonner"
+import { CLUB_POST_CONTENT_MAX_LENGTH, POST_CONTENT_MAX_LENGTH } from "@shared/const"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useCloseOnBack } from "@/hooks/useCloseOnBack"
 import { uploadActivityShareMedia } from "@/lib/activity-share-media-upload"
-import { pickedMentionIds, type MentionUser } from "@/lib/mentions"
+import { pickedMentionIds, taggedUsersNotInText, type MentionUser } from "@/lib/mentions"
 import { isVideoUrl, MAX_POST_MEDIA_ITEMS, validatePostMediaFile, type PostMediaKind } from "@/lib/post-media"
 import { trpc } from "@/lib/trpc"
+import { errorToastMessage } from "@/lib/trpc-errors"
 import { MentionTextarea } from "./MentionTextarea"
 
 export type EditPostRef = { postId: number } | { activityId: number }
@@ -23,7 +26,11 @@ interface EditPostSheetProps {
   postRef: EditPostRef
 }
 
-/** Edit text and photos of one's own post: feed, club or shared swim. */
+/**
+ * Edit text and photos of one's own post: feed, club or shared swim. People tagged apart by a
+ * post from before «@» mentions (not written in its text) stay as chips the author can remove.
+ * The Android back button closes the sheet.
+ */
 export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProps) {
   const utils = trpc.useUtils()
   const postQuery = trpc.community.ownPost.useQuery(postRef, { enabled: open, retry: false })
@@ -34,17 +41,27 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
 
   const [content, setContent] = useState("")
   const [mentions, setMentions] = useState<MentionUser[]>([])
+  /** Tagged apart by an older post (not in its text): kept unless removed here. */
+  const [taggedApart, setTaggedApart] = useState<MentionUser[]>([])
   const [media, setMedia] = useState<MediaItem[]>([])
   const [loadedPostId, setLoadedPostId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const mediaInputRef = useRef<HTMLInputElement>(null)
 
   const post = postQuery.data
   // Fill the form once per opening, when the post arrives.
   useEffect(() => {
     if (!open || !post || loadedPostId === post.id) return
+    const tagged = post.taggedUsers ?? []
     setContent(post.content ?? "")
-    setMentions(post.taggedUsers ?? [])
+    setMentions(tagged)
+    setTaggedApart(
+      taggedUsersNotInText(
+        post.content,
+        tagged.map((user) => ({ user_id: user.userId, name: user.name, username: user.username }))
+      ).map((user) => ({ userId: user.user_id, name: user.name ?? null, username: user.username ?? null }))
+    )
     setMedia(post.mediaUrls.map((url, index) => ({ id: `saved-${index}`, source: "saved", url })))
     setLoadedPostId(post.id)
   }, [open, post, loadedPostId])
@@ -55,6 +72,7 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
     })
     setContent("")
     setMentions([])
+    setTaggedApart([])
     setMedia([])
     setLoadedPostId(null)
   }
@@ -63,6 +81,8 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
     if (!next) reset()
     onOpenChange(next)
   }
+
+  useCloseOnBack(open, () => close(false), "swimforgeEditPostOpen")
 
   const pickMedia = (files: FileList | null) => {
     if (!files?.length) return
@@ -100,7 +120,9 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
   }
 
   const save = async () => {
-    if (!post) return
+    // One save at a time: the uploads take a while and the button may be tapped again.
+    if (!post || savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     try {
       const mediaUrls: string[] = []
@@ -120,11 +142,15 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
           })
         )
       }
+      const mentioned = pickedMentionIds(content, mentions)
       await updatePost.mutateAsync({
         postId: post.id,
         content: content.trim() || null,
         mediaUrls,
-        taggedUserIds: pickedMentionIds(content, mentions),
+        taggedUserIds: [
+          ...mentioned,
+          ...taggedApart.map((user) => user.userId).filter((id) => !mentioned.includes(id)),
+        ],
       })
       await Promise.all([
         utils.community.feed.invalidate(),
@@ -135,8 +161,9 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
       toast.success("Post aggiornato.")
       close(false)
     } catch (error) {
-      toast.error(error instanceof Error && error.message ? error.message : "Non riesco a salvare il post.")
+      toast.error(errorToastMessage(error, "Non riesco a salvare il post."))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -161,10 +188,37 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
               onValueChange={setContent}
               mentions={mentions}
               onMentionsChange={setMentions}
-              maxLength={2000}
+              maxLength={post.clubId != null ? CLUB_POST_CONTENT_MAX_LENGTH : POST_CONTENT_MAX_LENGTH}
               rows={5}
               className="min-h-[120px] resize-none"
             />
+
+            {taggedApart.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">Persone taggate nel post</p>
+                <ul className="flex flex-wrap gap-2" aria-label="Persone taggate nel post">
+                  {taggedApart.map((user) => {
+                    const label = user.name?.trim() || user.username?.trim() || "Nuotatore"
+                    return (
+                      <li
+                        key={user.userId}
+                        className="flex items-center gap-1 rounded-full border border-border bg-raised py-1 pl-3 pr-1 text-sm"
+                      >
+                        {label}
+                        <button
+                          type="button"
+                          onClick={() => setTaggedApart((prev) => prev.filter((item) => item.userId !== user.userId))}
+                          className="flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                          aria-label={`Togli ${label} dal post`}
+                        >
+                          <X className="size-3.5" aria-hidden />
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-between gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => mediaInputRef.current?.click()}>
