@@ -197,13 +197,24 @@ Configura due monitor separati:
    - expected status: `200`
    - severità: warning/non-blocking
 
-## 11) Cron jobs (VM)
-```cron
-*/10 * * * * curl -fsS -X POST "https://<your-domain>/api/cron/complete-challenges" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
-0 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/evaluate-skill-level" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
-30 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-social-retention" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
-*/15 6-8 * * 1,3,5 curl -fsS -X POST "https://<your-domain>/api/cron/club-ai/tick" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
+## 11) Cron jobs (cron-job.org)
+I job sono configurati su **cron-job.org**, non nel crontab della VM: ognuno è una richiesta `POST` all'endpoint con l'header `Authorization: Bearer <CRON_SECRET>` (lo stesso valore di `CRON_SECRET` in `.env.oracle`).
+
+| Endpoint | Frequenza |
+|---|---|
+| `POST https://<your-domain>/api/cron/complete-challenges` | ogni 10 minuti |
+| `POST https://<your-domain>/api/cron/evaluate-skill-level` | ogni notte (02:00) |
+| `POST https://<your-domain>/api/cron/cleanup-social-retention` | ogni notte (02:30) |
+| `POST https://<your-domain>/api/cron/club-ai/tick` | ogni 15 minuti, 6-8, lun/mer/ven |
+
+Equivalente da riga di comando, per una prova a mano:
+```bash
+curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-social-retention" -H "Authorization: Bearer <CRON_SECRET>"
 ```
+
+Note `cleanup-social-retention`:
+- cancella i messaggi diretti più vecchi di 365 giorni (1 anno) e le notifiche più vecchie di 90 giorni, come dice la Privacy Policy;
+- `DM_RETENTION_DAYS` e `NOTIFICATION_RETENTION_DAYS` (o `dmRetentionDays` e `notificationRetentionDays` nel body o nella query) cambiano i giorni: se li cambi, aggiorna anche la Privacy Policy.
 
 Note `club-ai/tick`:
 - richiede `CLUB_AI_AUTOMATION_ENABLED=true`

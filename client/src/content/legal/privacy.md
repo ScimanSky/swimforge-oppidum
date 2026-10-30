@@ -211,7 +211,7 @@ In questi casi il trasferimento avviene, ove applicabile, sulla base della decis
 ## 9. Per quanto tempo conserviamo i dati
 
 - **In generale:** finché il tuo account esiste. Profilo, nuotate, post, commenti e dati dei club non hanno una scadenza automatica.
-- **Messaggi diretti:** cancellati automaticamente dopo 60 giorni.
+- **Messaggi diretti:** cancellati automaticamente dopo 1 anno.
 - **Notifiche nell'app:** cancellate automaticamente dopo 90 giorni.
 - **Post:** puoi eliminare un tuo post entro 24 ore dalla pubblicazione. Il post sparisce dall'app ma resta nascosto nel database fino all'eliminazione dell'account. Per i post più vecchi e per i commenti scrivici.
 - **Cache:** copie temporanee che scadono da sole entro 24 ore.

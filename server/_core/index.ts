@@ -21,6 +21,7 @@ import { accountExportRouter } from "../routes/account_export";
 // Security middleware
 import { requestLogger, errorHandler, logger } from "../middleware/logger";
 import { applySecurityMiddleware, applyRateLimiting } from "../middleware/security";
+import { socialRetentionSettings } from "../lib/social-retention";
 import { rollbar, captureError } from "../middleware/rollbar-init";
 import { initPush } from "../push";
 
@@ -251,19 +252,11 @@ async function startServer() {
   app.post("/api/cron/cleanup-social-retention", async (req, res) => {
     if (!authorizeCronRequest(req, res)) return;
 
-    const notificationRetentionDaysRaw = Number(
-      req.body?.notificationRetentionDays ?? req.query?.notificationRetentionDays ?? process.env.NOTIFICATION_RETENTION_DAYS ?? 90
+    // Direct messages 1 year, notifications 90 days (privacy policy); body, query and env override.
+    const { notificationRetentionDays, dmRetentionDays, limit } = socialRetentionSettings(
+      req.body as Record<string, unknown> | undefined,
+      req.query as Record<string, unknown>,
     );
-    const dmRetentionDaysRaw = Number(
-      req.body?.dmRetentionDays ?? req.query?.dmRetentionDays ?? process.env.DM_RETENTION_DAYS ?? 60
-    );
-    const limitRaw = Number(
-      req.body?.limit ?? req.query?.limit ?? process.env.SOCIAL_RETENTION_BATCH_LIMIT ?? 1000
-    );
-
-    const notificationRetentionDays = Number.isFinite(notificationRetentionDaysRaw) ? notificationRetentionDaysRaw : 90;
-    const dmRetentionDays = Number.isFinite(dmRetentionDaysRaw) ? dmRetentionDaysRaw : 60;
-    const limit = Number.isFinite(limitRaw) ? limitRaw : 1000;
 
     try {
       const result = await cleanupSocialRetention({
