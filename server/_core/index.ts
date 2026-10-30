@@ -5,7 +5,6 @@ import type { NextFunction, Request, Response } from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -17,10 +16,12 @@ import { connectRedis } from "../lib/cache";
 import { assertAuthEnv } from "./env";
 import { healthRouter } from "../routes/health";
 import { linkPreviewRouter } from "../routes/link_preview";
+import { accountExportRouter } from "../routes/account_export";
 
 // Security middleware
 import { requestLogger, errorHandler, logger } from "../middleware/logger";
 import { applySecurityMiddleware, applyRateLimiting } from "../middleware/security";
+import { socialRetentionSettings } from "../lib/social-retention";
 import { rollbar, captureError } from "../middleware/rollbar-init";
 import { initPush } from "../push";
 
@@ -201,9 +202,6 @@ async function startServer() {
   app.use(express.json({ limit: requestBodyLimit }));
   app.use(express.urlencoded({ limit: requestBodyLimit, extended: true }));
 
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
-
   // Cron endpoint for external scheduler (Render/cron-job.org)
   app.post("/api/cron/complete-challenges", async (req, res) => {
     if (!authorizeCronRequest(req, res)) return;
@@ -254,19 +252,11 @@ async function startServer() {
   app.post("/api/cron/cleanup-social-retention", async (req, res) => {
     if (!authorizeCronRequest(req, res)) return;
 
-    const notificationRetentionDaysRaw = Number(
-      req.body?.notificationRetentionDays ?? req.query?.notificationRetentionDays ?? process.env.NOTIFICATION_RETENTION_DAYS ?? 90
+    // Direct messages 1 year, notifications 90 days (privacy policy); body, query and env override.
+    const { notificationRetentionDays, dmRetentionDays, limit } = socialRetentionSettings(
+      req.body as Record<string, unknown> | undefined,
+      req.query as Record<string, unknown>,
     );
-    const dmRetentionDaysRaw = Number(
-      req.body?.dmRetentionDays ?? req.query?.dmRetentionDays ?? process.env.DM_RETENTION_DAYS ?? 60
-    );
-    const limitRaw = Number(
-      req.body?.limit ?? req.query?.limit ?? process.env.SOCIAL_RETENTION_BATCH_LIMIT ?? 1000
-    );
-
-    const notificationRetentionDays = Number.isFinite(notificationRetentionDaysRaw) ? notificationRetentionDaysRaw : 90;
-    const dmRetentionDays = Number.isFinite(dmRetentionDaysRaw) ? dmRetentionDaysRaw : 60;
-    const limit = Number.isFinite(limitRaw) ? limitRaw : 1000;
 
     try {
       const result = await cleanupSocialRetention({
@@ -368,6 +358,9 @@ async function startServer() {
 
   // Link previews: authenticated, SSRF-guarded fetches of external pages and images.
   app.use(linkPreviewRouter);
+
+  // The caller's data export (GDPR portability), streamed as a JSON download.
+  app.use(accountExportRouter);
 
   // tRPC API
   app.use(

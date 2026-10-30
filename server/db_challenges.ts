@@ -38,7 +38,8 @@ export interface Challenge {
   id: number;
   name: string;
   description: string | null;
-  creatorId: number;
+  /** Null once the creator's account is deleted: the challenge stays. */
+  creatorId: number | null;
   type: ChallengeType;
   objective: ChallengeObjective;
   duration: ChallengeDuration;

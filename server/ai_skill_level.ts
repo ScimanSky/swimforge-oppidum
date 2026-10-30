@@ -2,6 +2,7 @@ import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { updateUserProfileBadgeByLevel } from "./db_profile_badges";
+import { hasHealthDataConsent } from "./consent";
 
 type IntensityBand = "low" | "medium" | "high";
 type SwimmingActivityRow = typeof swimmingActivities.$inferSelect;
@@ -80,7 +81,12 @@ function getAvgSwolf(activity: SwimmingActivityRow): number | null {
   return activity.avgSwolf ?? rawSwolf ?? null;
 }
 
-function detectIntensity(activity: SwimmingActivityRow): IntensityBand {
+/**
+ * The intensity of a swim from its training effect or heart-rate zones: health data, read only
+ * with the health-data consent (without it every swim counts as medium).
+ */
+export function detectIntensity(activity: SwimmingActivityRow, healthDataAllowed: boolean): IntensityBand {
+  if (!healthDataAllowed) return "medium";
   const raw = extractRawActivity(activity.rawData);
   const te = toNumber(raw?.["aerobicTrainingEffect"]) ?? activity.trainingEffect ?? null;
   if (te !== null && te !== undefined) {
@@ -172,6 +178,7 @@ export async function evaluateUserSkillLevel(userId: number) {
 
   if (!activities.length) return null;
 
+  const healthDataAllowed = await hasHealthDataConsent(userId);
   const fastestSamples: number[] = [];
   const intensities: IntensityBand[] = [];
   const swolfSamples: number[] = [];
@@ -179,7 +186,7 @@ export async function evaluateUserSkillLevel(userId: number) {
   activities.forEach((activity) => {
     const fastest = getFastest100(activity);
     if (fastest) fastestSamples.push(fastest);
-    intensities.push(detectIntensity(activity));
+    intensities.push(detectIntensity(activity, healthDataAllowed));
     const swolf = getAvgSwolf(activity);
     if (swolf) swolfSamples.push(swolf);
   });

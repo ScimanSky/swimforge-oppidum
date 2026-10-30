@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { authErrorMessage, isPlausibleEmail } from "@/lib/auth-errors";
-import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
+import { afterSyncPath, syncSupabaseSession } from "@/lib/auth-sync";
 import { startNativeGoogleLogin } from "@/lib/native-auth";
 import { homePathForPlatform } from "@/lib/navigation";
 import { isNativePlatform } from "@/lib/platform";
@@ -81,14 +81,14 @@ export default function Login() {
     }
 
     try {
-      const { isNewUser } = await syncSupabaseSession(
+      const outcome = await syncSupabaseSession(
         data.session,
         (input) => utils.client.auth.syncSupabaseUser.mutate(input),
         { email },
       );
-      toast.success("Login effettuato con successo!");
+      if (!outcome.needsLegalAcceptance) toast.success("Login effettuato con successo!");
       setTimeout(() => {
-        window.location.href = postLoginPath(isNewUser);
+        window.location.href = afterSyncPath(outcome);
       }, 100);
     } catch (syncError) {
       // The server's messages for this step are English: the Italian fallback instead.

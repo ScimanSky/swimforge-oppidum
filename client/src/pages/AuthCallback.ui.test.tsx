@@ -26,6 +26,10 @@ vi.mock("@/lib/trpc", () => ({
 // A hash as the target: jsdom follows it (it cannot load another document), so the redirect shows.
 vi.mock("@/lib/auth-sync", () => ({
   postLoginPath: (isNew: boolean) => (isNew ? "#onboarding" : "#home"),
+  afterSyncPath: (o: { isNewUser: boolean; needsLegalAcceptance?: boolean }) =>
+    o.needsLegalAcceptance ? "#consenso" : o.isNewUser ? "#onboarding" : "#home",
+  LEGAL_ACCEPTANCE: { terms: true, privacy: true, minimumAge: true },
+  LEGAL_ACCEPTANCE_METADATA_KEY: "swimforge_legal_acceptance",
   syncSupabaseSession: state.sync,
 }));
 vi.mock("@/components/AppLayout", () => ({ AppLayout: ({ children }: any) => <div>{children}</div> }));
@@ -65,6 +69,13 @@ describe("AuthCallback (Corsia)", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Accesso completato" })).toBeInTheDocument();
     expect(state.sync).toHaveBeenCalledWith(session, expect.any(Function));
     await vi.waitFor(() => expect(window.location.hash).toBe("#home"), { timeout: 2000 });
+  });
+
+  it("primo accesso con Google senza Termini accettati: va al passo di accettazione", async () => {
+    state.sync.mockResolvedValue({ isNewUser: true, needsLegalAcceptance: true });
+    const location = renderCallback("?code=abc");
+    await vi.waitFor(() => expect(location.history.at(-1)).toBe("#consenso"));
+    expect(screen.queryByRole("heading", { level: 1, name: "Accesso completato" })).toBeNull();
   });
 
   it("link di conferma aperto in un altro browser: email confermata, vai al login", async () => {

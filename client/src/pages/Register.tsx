@@ -16,7 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { authErrorMessage, isPlausibleEmail, MIN_PASSWORD_LENGTH } from "@/lib/auth-errors";
-import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
+import {
+  LEGAL_ACCEPTANCE,
+  LEGAL_ACCEPTANCE_METADATA_KEY,
+  afterSyncPath,
+  syncSupabaseSession,
+} from "@/lib/auth-sync";
 import { startNativeGoogleLogin } from "@/lib/native-auth";
 import { homePathForPlatform } from "@/lib/navigation";
 import { isNativePlatform } from "@/lib/platform";
@@ -34,7 +39,7 @@ const features = [
 const GOOGLE_ERROR = "Errore durante l'accesso con Google";
 const SIGNUP_FAILED = "Registrazione non riuscita. Riprova.";
 
-type Field = "firstName" | "lastName" | "email" | "password" | "terms";
+type Field = "firstName" | "lastName" | "email" | "password" | "terms" | "age";
 
 export default function Register() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -43,6 +48,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [confirmedAge, setConfirmedAge] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -55,6 +61,7 @@ export default function Register() {
     password: useId(),
     passwordHint: useId(),
     terms: useId(),
+    age: useId(),
   };
   const utils = trpc.useUtils();
 
@@ -86,6 +93,7 @@ export default function Register() {
             ? `La password deve avere almeno ${MIN_PASSWORD_LENGTH} caratteri.`
             : undefined,
         terms: acceptedTerms ? undefined : "Accetta i Termini di Servizio e la Privacy Policy per continuare.",
+        age: confirmedAge ? undefined : "Per usare SwimForge devi avere almeno 14 anni.",
       },
       [
         ["firstName", ids.firstName],
@@ -93,6 +101,7 @@ export default function Register() {
         ["email", ids.email],
         ["password", ids.password],
         ["terms", ids.terms],
+        ["age", ids.age],
       ]
     );
     if (!valid) return;
@@ -108,6 +117,9 @@ export default function Register() {
         data: {
           full_name: fullName || undefined,
           name: fullName || undefined,
+          // The checkboxes ticked here, recorded by the server at the first sign-in (also after
+          // the confirmation email).
+          [LEGAL_ACCEPTANCE_METADATA_KEY]: { ...LEGAL_ACCEPTANCE, acceptedAt: new Date().toISOString() },
         },
       },
     });
@@ -120,14 +132,15 @@ export default function Register() {
 
     if (data.session) {
       try {
-        const { isNewUser } = await syncSupabaseSession(
+        const outcome = await syncSupabaseSession(
           data.session,
           (input) => utils.client.auth.syncSupabaseUser.mutate(input),
           { email: address, name: fullName || null },
+          LEGAL_ACCEPTANCE,
         );
         toast.success("Registrazione completata!");
         setTimeout(() => {
-          window.location.href = postLoginPath(isNewUser);
+          window.location.href = afterSyncPath(outcome);
         }, 100);
       } catch (syncError) {
         // The server's messages for this step are English: the Italian fallback instead.
@@ -310,6 +323,25 @@ export default function Register() {
             </label>
           </div>
           <FieldError fieldId={ids.terms} error={errors.terms} />
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex min-h-11 items-start gap-3">
+            <Checkbox
+              id={ids.age}
+              className="mt-0.5"
+              checked={confirmedAge}
+              onCheckedChange={(value) => {
+                setConfirmedAge(Boolean(value));
+                clear("age");
+              }}
+              {...fieldAria(ids.age, errors.age)}
+            />
+            <label htmlFor={ids.age} className="text-sm text-muted-foreground">
+              Dichiaro di avere almeno 14 anni
+            </label>
+          </div>
+          <FieldError fieldId={ids.age} error={errors.age} />
         </div>
 
         <FormError error={formError} />

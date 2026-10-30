@@ -54,6 +54,18 @@ describe("completeNativeAuthCallback", () => {
     expect(onSignedIn).toHaveBeenCalledWith("/home");
   });
 
+  it("first Google sign-in in the app: no session yet, goes to the acceptance step", async () => {
+    mocks.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+    const onSignedIn = vi.fn();
+    await completeNativeAuthCallback(
+      { code: "abc", error: null },
+      { syncUser: async () => ({ needsLegalAcceptance: true, isNewUser: true }), onSignedIn },
+    );
+    expect(onSignedIn).toHaveBeenCalledWith("/auth/consenso");
+    expect(mocks.setNativeSessionToken).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+
   it("sends new users to the onboarding", async () => {
     mocks.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
     const onSignedIn = vi.fn();

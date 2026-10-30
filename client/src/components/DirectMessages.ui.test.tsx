@@ -533,7 +533,7 @@ describe("DirectMessages (Corsia)", () => {
       await userEvent.click(trigger);
 
       const dialog = screen.getByRole("dialog", { name: "Ada Rossi" });
-      expect(dialog).toHaveAccessibleDescription(/eliminati automaticamente dal server dopo \d+ giorni/);
+      expect(dialog).toHaveAccessibleDescription("I messaggi vengono eliminati automaticamente dal server dopo 1 anno.");
       // Focus starts in the message field, not on the (focusable) message log above it.
       await waitFor(() => expect(within(dialog).getByRole("textbox", { name: "Messaggio" })).toHaveFocus());
       expect(within(dialog).getByRole("log", { name: "Messaggi con Ada Rossi" })).toHaveTextContent("Ci sei domani?");

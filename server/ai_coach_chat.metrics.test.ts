@@ -13,6 +13,7 @@ vi.mock("./db", () => ({ getSwimmerProfile: h.getSwimmerProfile, getActivities: 
 vi.mock("./swim_metrics", () => ({ getSwimMetrics: h.getSwimMetrics }));
 vi.mock("./ai_coach", () => ({ getExistingWorkouts: vi.fn(async () => null) }));
 vi.mock("./ai_activity_insights", () => ({ listActivityInsights: vi.fn(async () => []) }));
+vi.mock("./consent", () => ({ hasHealthDataConsent: vi.fn(async () => true) }));
 
 import { generateCoachChatReply } from "./ai_coach_chat";
 import { paceZoneCoachRules } from "./swim_metrics/coach-context";

@@ -48,6 +48,6 @@ After a fix is released and users have reasonable patch time, public disclosure 
 
 ## Security Notes
 For legal/privacy commitments, see:
-- `PRIVACY_POLICY.md`
-- `COOKIE_POLICY.md`
-- `TERMS_OF_SERVICE.md`
+- `client/src/content/legal/privacy.md` (published at /privacy)
+- `client/src/content/legal/cookies.md` (published at /cookies)
+- `client/src/content/legal/terms.md` (published at /terms)

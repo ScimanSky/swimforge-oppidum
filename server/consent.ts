@@ -12,20 +12,27 @@ export const CONSENT_TYPES = [
   "marketing_communications",
   "cookie_analytics",
   "product_onboarding_tour",
+  "age_confirmation",
 ] as const;
 
 export type ConsentType = (typeof CONSENT_TYPES)[number];
 
 export const CONSENT_VERSION: Record<ConsentType, string> = {
-  terms_acceptance: "v1.1",
-  privacy_policy: "v1.1",
+  // Texts of 30 October 2026. Recorded with each new acceptance only: hasRequiredLegalConsents does
+  // not look at the version, so nobody who accepted an earlier one is asked again (or locked out).
+  terms_acceptance: "v1.2",
+  privacy_policy: "v1.2",
   health_data_processing: "v1.0",
   garmin_sync: "v1.0",
   strava_sync: "v1.0",
   marketing_communications: "v1.0",
   cookie_analytics: "v1.0",
   product_onboarding_tour: "v1.0",
+  age_confirmation: "v1.0",
 };
+
+/** Accepted at registration, never withdrawn from the app: Termini, Privacy and «almeno 14 anni». */
+export const REGISTRATION_CONSENTS = ["terms_acceptance", "privacy_policy", "age_confirmation"] as const;
 
 export type ConsentState = {
   id: number;
@@ -193,28 +200,47 @@ export async function hasGrantedConsent(userId: number, consentType: ConsentType
   return Boolean(row?.granted);
 }
 
-export async function ensureRequiredLegalConsents(userId: number, req?: Request): Promise<void> {
+/**
+ * The «Trattamento dati salute» consent: without it no AI path reads heart rate, heart-rate
+ * zones, training effect, VO2max, recovery or stress, of new or already imported swims.
+ * False when it cannot be read (no database, query error): privacy first.
+ */
+export async function hasHealthDataConsent(userId: number): Promise<boolean> {
+  try {
+    return await hasGrantedConsent(userId, "health_data_processing");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when the user accepted Termini and Privacy, in any version (never re-asked when the texts
+ * change: that would lock the older app builds out). The age confirmation is not required here:
+ * accounts created before it existed keep working without being asked again.
+ */
+export async function hasRequiredLegalConsents(userId: number): Promise<boolean> {
   const [hasTerms, hasPrivacy] = await Promise.all([
     hasGrantedConsent(userId, "terms_acceptance"),
     hasGrantedConsent(userId, "privacy_policy"),
   ]);
+  return hasTerms && hasPrivacy;
+}
 
-  const items: Array<{ consentType: ConsentType; granted: boolean; consentVersion?: string }> = [];
-  if (!hasTerms) {
-    items.push({
-      consentType: "terms_acceptance",
-      granted: true,
-      consentVersion: CONSENT_VERSION.terms_acceptance,
-    });
-  }
-  if (!hasPrivacy) {
-    items.push({
-      consentType: "privacy_policy",
-      granted: true,
-      consentVersion: CONSENT_VERSION.privacy_policy,
-    });
-  }
-
+/**
+ * Records the acceptance the user has just given (checkboxes Termini, Privacy and «Dichiaro di
+ * avere almeno 14 anni»): only the ones not recorded yet, so the first date stays. Never called
+ * without an explicit acceptance. Throws when they could not be stored: callers record it before
+ * issuing a session.
+ */
+export async function recordLegalAcceptance(userId: number, req?: Request): Promise<void> {
+  const granted = await Promise.all(REGISTRATION_CONSENTS.map((type) => hasGrantedConsent(userId, type)));
+  const items = REGISTRATION_CONSENTS.filter((_, index) => !granted[index]).map((consentType) => ({
+    consentType,
+    granted: true,
+    consentVersion: CONSENT_VERSION[consentType],
+  }));
   if (items.length === 0) return;
-  await setManyConsents({ userId, req, items });
+  const recorded = await setManyConsents({ userId, req, items });
+  // No database answers null rows: the acceptance is not stored, so no session may follow.
+  if (recorded.length !== items.length) throw new Error("Legal acceptance not recorded");
 }

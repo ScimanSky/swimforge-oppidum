@@ -47,7 +47,7 @@ cp .env.oracle.example .env.oracle
 
 Aggiorna `.env.oracle` con almeno:
 - Core: `DATABASE_URL`, `DB_SSL_REJECT_UNAUTHORIZED`, `DB_SSL_ALLOW_INSECURE_FALLBACK`, `DB_SSL_CA_CERT_BASE64`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- Security: `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`, `OAUTH_ALLOWED_REDIRECT_ORIGINS`
+- Security: `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`
 - Integrations: `GARMIN_SERVICE_SECRET`, `STRAVA_SERVICE_URL`, `STRAVA_SERVICE_SECRET`, `OPENAI_API_KEY` (se usato)
 - Garmin service: `GARMIN_STATE_KEY` (chiave Fernet che cifra su disco lo stato MFA pendente; vuota = solo in memoria), `GARMIN_SERVICE_TIMEOUT_MS=60000` (le strategie di login Garmin possono attendere fino a 20 s ciascuna)
 - Garmin hardening (opzionale, raccomandato): `GARMIN_CORS_ALLOW_ORIGINS`, `GARMIN_CORS_ALLOW_CREDENTIALS=false`
@@ -197,13 +197,24 @@ Configura due monitor separati:
    - expected status: `200`
    - severità: warning/non-blocking
 
-## 11) Cron jobs (VM)
-```cron
-*/10 * * * * curl -fsS -X POST "https://<your-domain>/api/cron/complete-challenges" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
-0 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/evaluate-skill-level" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
-30 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-social-retention" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
-*/15 6-8 * * 1,3,5 curl -fsS -X POST "https://<your-domain>/api/cron/club-ai/tick" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
+## 11) Cron jobs (cron-job.org)
+I job sono configurati su **cron-job.org**, non nel crontab della VM: ognuno è una richiesta `POST` all'endpoint con l'header `Authorization: Bearer <CRON_SECRET>` (lo stesso valore di `CRON_SECRET` in `.env.oracle`).
+
+| Endpoint | Frequenza |
+|---|---|
+| `POST https://<your-domain>/api/cron/complete-challenges` | ogni 10 minuti |
+| `POST https://<your-domain>/api/cron/evaluate-skill-level` | ogni notte (02:00) |
+| `POST https://<your-domain>/api/cron/cleanup-social-retention` | ogni notte (02:30) |
+| `POST https://<your-domain>/api/cron/club-ai/tick` | ogni 15 minuti, 6-8, lun/mer/ven |
+
+Equivalente da riga di comando, per una prova a mano:
+```bash
+curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-social-retention" -H "Authorization: Bearer <CRON_SECRET>"
 ```
+
+Note `cleanup-social-retention`:
+- cancella i messaggi diretti più vecchi di 365 giorni (1 anno) e le notifiche più vecchie di 90 giorni, come dice la Privacy Policy;
+- `DM_RETENTION_DAYS` e `NOTIFICATION_RETENTION_DAYS` (o `dmRetentionDays` e `notificationRetentionDays` nel body o nella query) cambiano i giorni: se li cambi, aggiorna anche la Privacy Policy.
 
 Note `club-ai/tick`:
 - richiede `CLUB_AI_AUTOMATION_ENABLED=true`

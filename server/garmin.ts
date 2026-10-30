@@ -878,6 +878,14 @@ export async function completeMfa(
 }
 
 /**
+ * Logs the user out of the garmin-service: it drops the session and deletes the token file on the
+ * VM. Throws when the service is not configured or answers with an error.
+ */
+export async function logoutGarminService(userId: number): Promise<void> {
+  await callGarminService(`/auth/logout?user_id=${userId}`, "POST");
+}
+
+/**
  * Disconnect Garmin account
  */
 export async function disconnectGarmin(userId: number): Promise<boolean> {
@@ -887,7 +895,7 @@ export async function disconnectGarmin(userId: number): Promise<boolean> {
   try {
     // Call microservice to logout
     try {
-      await callGarminService(`/auth/logout?user_id=${userId}`, "POST");
+      await logoutGarminService(userId);
     } catch {
       // Continue even if microservice fails
     }
