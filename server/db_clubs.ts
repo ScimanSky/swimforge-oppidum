@@ -595,7 +595,8 @@ export async function createClubInvite(actorId: number, clubId: number, input: {
       code,
       role: input.role ?? "member",
       status: "active",
-      maxUses: input.maxUses ?? 1,
+      // A coach or moderator link gives a role: it works once, whatever the client asked.
+      maxUses: input.role && input.role !== "member" ? 1 : (input.maxUses ?? 1),
       usedCount: 0,
       expiresAt: input.expiresAt ?? null,
       createdAt: new Date(),

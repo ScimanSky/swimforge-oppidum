@@ -69,6 +69,20 @@ describe("club role «coach»", () => {
     expect(m.state.inserts[0]).toMatchObject({ role: "coach", maxUses: 1 });
   });
 
+  it.each(["coach", "moderator"] as const)("a %s invite works once, even if more uses are asked", async (role) => {
+    await createClubInvite(1, 9, { role, maxUses: 25 });
+    expect(m.state.inserts[0]).toMatchObject({ role, maxUses: 1 });
+  });
+
+  it("a member invite keeps the uses asked", async () => {
+    await createClubInvite(1, 9, { role: "member", maxUses: 25 });
+    await createClubInvite(1, 9, { maxUses: 10 });
+    expect(m.state.inserts).toEqual([
+      expect.objectContaining({ role: "member", maxUses: 25 }),
+      expect.objectContaining({ role: "member", maxUses: 10 }),
+    ]);
+  });
+
   it("a moderator cannot create a coach invite, only member ones", async () => {
     m.state.actorRole = "moderator";
     await expect(createClubInvite(1, 9, { role: "coach" })).rejects.toThrow("Forbidden");
