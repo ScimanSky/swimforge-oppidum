@@ -283,6 +283,11 @@ describe("deleteUserAccount", () => {
         expect(wheresFor(table)).toContain("club_id IN ($)");
       }
       expect(wheresFor("public.event_attendees")).toContain("event_id IN (SELECT id FROM club_events WHERE club_id IN ($))");
+      // Every member's «Segna completato» of the club's workouts, before the workouts.
+      expect(wheresFor("public.club_workout_completions")).toContain("club_id IN ($)");
+      expect(m.steps.indexOf("delete:public.club_workout_completions")).toBeLessThan(
+        m.steps.indexOf("delete:public.club_pool_workouts"),
+      );
       expect(m.steps.indexOf("delete:public.event_attendees")).toBeLessThan(m.steps.indexOf("delete:public.club_events"));
       // Its logo and cover are not kept on the providers, and its whole folder goes after the commit.
       expect(m.collectUserMediaRefs).toHaveBeenCalledWith(m.db, 9, [4]);
@@ -337,17 +342,25 @@ describe("deleteUserAccount", () => {
     });
   });
 
-  it("deletes the user's club workout completions", async () => {
+  it("deletes the user's club workout completions, in every club", async () => {
     const { deleteUserAccount } = await import("./db");
     await deleteUserAccount(9);
-    const tables = m.deleteFromIfExists.mock.calls.map((call) => (call as unknown[])[1]);
-    expect(tables).toContain("public.club_workout_completions");
+    expect(wheresFor("public.club_workout_completions")).toEqual(["user_id = $"]);
+    expect(step("delete:public.club_workout_completions")).toBeLessThan(step("sql:DELETE FROM users"));
   });
 
-  it("deletes the user's presence row (the table stays, nothing writes it any more)", async () => {
+  it("deletes the user's archived social XP, through the helper that skips a missing table", async () => {
+    // The archive exists only after scripts/sql/2026-10-30-remove-social-xp.sql has run:
+    // deleteFromIfExists checks to_regclass first (server/lib/relation-exists.ts).
     const { deleteUserAccount } = await import("./db");
     await deleteUserAccount(9);
-    const tables = m.deleteFromIfExists.mock.calls.map((call) => (call as unknown[])[1]);
-    expect(tables).toContain("public.user_presence");
+    expect(wheresFor("public.xp_transactions_social_removed")).toEqual(["user_id = $"]);
+    expect(step("delete:public.xp_transactions_social_removed")).toBeLessThan(step("sql:DELETE FROM users"));
+  });
+
+  it("deletes the user's presence row once (the table stays, nothing writes it any more)", async () => {
+    const { deleteUserAccount } = await import("./db");
+    await deleteUserAccount(9);
+    expect(tables().filter((table) => table === "public.user_presence")).toHaveLength(1);
   });
 });

@@ -186,6 +186,8 @@ export async function deleteClubRows(tx: SqlExecutor, clubIds: number[]): Promis
     "public.club_historical_athletes",
     "public.club_historical_import_runs",
     "public.club_historical_sources",
+    // Every member's «Segna completato» of the club's workouts, before the workouts.
+    "public.club_workout_completions",
     "public.club_pool_workout_runs",
     "public.club_pool_workouts",
     "public.club_ai_automation_runs",
