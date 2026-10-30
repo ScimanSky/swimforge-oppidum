@@ -183,6 +183,14 @@ describe("data export", () => {
     }
   });
 
+  it("exports only the reports the user filed, never the ones of others they handled", async () => {
+    const { db, queries } = fakeDb();
+    await writtenExport(db);
+    const reports = queries.find((text) => text.includes("FROM social_post_reports"));
+    expect(reports).toContain("WHERE reporter_user_id = $1");
+    expect(reports).not.toContain("handled_by");
+  });
+
   it("builds the same document in memory for the tRPC endpoint", async () => {
     const built = await buildUserDataExport(fakeDb().db, 9);
     const { json } = await writtenExport(fakeDb().db);

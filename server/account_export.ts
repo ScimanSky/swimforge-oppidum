@@ -97,9 +97,10 @@ const SECTIONS: Section[] = [
   },
   { key: "clubMemberships", query: (userId) => sql`SELECT * FROM community_club_members WHERE user_id = ${userId} ORDER BY joined_at DESC` },
   {
+    // The reports the user filed. Reports they handled as a moderator are other users' data
+    // (reporter and reason): not part of this user's export.
     key: "reports",
-    query: (userId) =>
-      sql`SELECT * FROM social_post_reports WHERE reporter_user_id = ${userId} OR handled_by = ${userId} ORDER BY created_at DESC`,
+    query: (userId) => sql`SELECT * FROM social_post_reports WHERE reporter_user_id = ${userId} ORDER BY created_at DESC`,
   },
   { key: "hiddenPosts", query: (userId) => sql`SELECT * FROM social_hidden_posts WHERE user_id = ${userId} ORDER BY created_at DESC` },
   { key: "consents", query: (userId) => sql`SELECT * FROM user_consents WHERE user_id = ${userId} ORDER BY created_at DESC` },
