@@ -22,7 +22,8 @@ export async function levelForXp(totalXp: number): Promise<number> {
 
 /**
  * Self-heal: stores the level matching the user's total XP when the stored one differs (one
- * UPDATE, no change when they already match). The new level, or null when nothing changed.
+ * UPDATE, no change when they already match). Never with an empty level_thresholds: every level
+ * would drop to 1. The new level, or null when nothing changed.
  */
 export async function healLevel(userId: number): Promise<number | null> {
   const db = await getDb();
@@ -33,6 +34,7 @@ export async function healLevel(userId: number): Promise<number | null> {
     SET level = ${level}, updated_at = NOW()
     WHERE sp.user_id = ${userId}
       AND sp.level IS DISTINCT FROM ${level}
+      AND EXISTS (SELECT 1 FROM level_thresholds)
     RETURNING sp.level
   `);
   const healed = Number((result.rows[0] as { level?: unknown } | undefined)?.level);

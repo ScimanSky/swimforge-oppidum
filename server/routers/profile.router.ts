@@ -17,9 +17,23 @@ export const profileRouter = router({
         }
 
         // The level always follows the total XP (level_thresholds); a stored level left over from
-        // an old table or a missed update is fixed here (self-heal).
-        const level = await levelForXp(profile.totalXp);
-        if (level !== profile.level) await healLevel(ctx.user.id);
+        // an old table or a missed update is fixed here (self-heal). The answer shows what is
+        // stored: the healed level, or the stored one when nothing was healed (no thresholds) or
+        // the heal failed (logged, never an error for the profile).
+        let level = profile.level;
+        try {
+            const expected = await levelForXp(profile.totalXp);
+            if (expected !== profile.level) {
+                const healed = await healLevel(ctx.user.id);
+                if (healed !== null) level = healed;
+            }
+        } catch (error) {
+            logger.warn("[profile] level self-heal failed", {
+                event: "profile:level_heal_failed",
+                userId: ctx.user.id,
+                message: error instanceof Error ? error.message : String(error),
+            });
+        }
         const [nextLevel, currentLevel] = await Promise.all([
             db.getNextLevelThreshold(level),
             db.getLevelThreshold(level),

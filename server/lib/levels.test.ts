@@ -66,6 +66,13 @@ describe("healLevel", () => {
     expect(params).toEqual([42]);
   });
 
+  it("never with an empty level_thresholds (every level would drop to 1)", async () => {
+    h.state.results.push([]);
+    await expect(healLevel(42)).resolves.toBeNull();
+    const { sql: text } = render(h.state.executed[0]);
+    expect(text).toMatch(/AND EXISTS \(SELECT 1 FROM level_thresholds\)\s+RETURNING/);
+  });
+
   it("already consistent: nothing changes, null", async () => {
     h.state.results.push([]);
     await expect(healLevel(42)).resolves.toBeNull();

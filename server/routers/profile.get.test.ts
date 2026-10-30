@@ -91,4 +91,33 @@ describe("profile.get: soglie del livello", () => {
       xpToNextLevel: 1180,
     });
   });
+
+  it("nothing healed (level_thresholds empty): the stored level", async () => {
+    m.levelForXp.mockResolvedValue(1);
+    m.healLevel.mockResolvedValue(null);
+    m.db.getLevelThreshold.mockResolvedValue(undefined);
+    m.db.getNextLevelThreshold.mockResolvedValue(undefined);
+    const profile = await profileRouter.createCaller(ctx).get();
+    expect(m.healLevel).toHaveBeenCalledWith(42);
+    expect(m.db.getLevelThreshold).toHaveBeenCalledWith(12);
+    expect(profile).toMatchObject({ level: 12, xpLevel: 12 });
+  });
+
+  it("a failed heal is logged and the profile comes back as stored", async () => {
+    m.levelForXp.mockResolvedValue(10);
+    m.healLevel.mockRejectedValue(new Error("deadlock detected"));
+    m.db.getLevelThreshold.mockResolvedValue({ level: 12, xpRequired: 8000, title: "Delfino", color: "#000000" });
+    m.db.getNextLevelThreshold.mockResolvedValue({ level: 13, xpRequired: 9000 });
+    const profile = await profileRouter.createCaller(ctx).get();
+    expect(profile).toMatchObject({ level: 12, levelTitle: "Delfino", totalXp: 8420 });
+  });
+
+  it("a failed level lookup too", async () => {
+    m.levelForXp.mockRejectedValue(new Error("connection reset"));
+    m.db.getLevelThreshold.mockResolvedValue({ level: 12, xpRequired: 8000, title: "Delfino", color: "#000000" });
+    m.db.getNextLevelThreshold.mockResolvedValue(undefined);
+    const profile = await profileRouter.createCaller(ctx).get();
+    expect(m.healLevel).not.toHaveBeenCalled();
+    expect(profile.level).toBe(12);
+  });
 });
