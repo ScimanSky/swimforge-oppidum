@@ -241,8 +241,11 @@ export async function searchUsers(viewerUserId: number, query: string, limit = 1
   const normalizedQuery = query.trim();
   if (!normalizedQuery) return [];
 
-  const pattern = `%${normalizedQuery}%`;
-  const prefixPattern = `${normalizedQuery}%`;
+  // «%» and «_» typed by the user are letters, not LIKE wildcards (backslash is the default
+  // LIKE escape, so it is escaped too).
+  const likeText = normalizedQuery.replace(/[\\%_]/g, (char) => `\\${char}`);
+  const pattern = `%${likeText}%`;
+  const prefixPattern = `${likeText}%`;
   const normalizedLower = normalizedQuery.toLowerCase();
   const rows = await db
     .select({
