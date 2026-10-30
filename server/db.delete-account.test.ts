@@ -16,6 +16,8 @@ const m = vi.hoisted(() => {
     steps: [] as string[],
     ownedClubs: [] as Array<{ id: number; name: string; other_members: number }>,
     creatorColumnsNullable: true,
+    /** Other active members seen once the clubs are locked (someone joined after the first check). */
+    membersUnderLock: undefined as number | undefined,
     deleteFromIfExists: vi.fn(async (_tx: unknown, _table: string, _where?: unknown, _deps?: string[]) => true),
     relationExists: vi.fn(async () => true),
     collectUserMediaRefs: vi.fn(),
@@ -88,6 +90,7 @@ describe("deleteUserAccount", () => {
     m.steps.length = 0;
     m.ownedClubs = [];
     m.creatorColumnsNullable = true;
+    m.membersUnderLock = undefined;
     m.deleteFromIfExists.mockImplementation(async (_tx: unknown, table: string) => {
       m.steps.push(`delete:${table}`);
       return true;
@@ -98,7 +101,20 @@ describe("deleteUserAccount", () => {
     });
     m.tx.execute.mockImplementation(async (query: unknown) => {
       const text = sqlText(query);
-      if (/FROM community_clubs/.test(text) && /FOR UPDATE/.test(text)) return { rows: m.ownedClubs };
+      if (text === "SELECT id FROM users WHERE id = $ FOR UPDATE") {
+        m.steps.push("lock:user");
+        return { rows: [{ id: 9 }] };
+      }
+      if (/FROM community_clubs/.test(text) && /FOR UPDATE/.test(text)) {
+        m.steps.push("lock:clubs");
+        return { rows: m.ownedClubs.map(({ id, name }) => ({ id, name })) };
+      }
+      if (/FROM community_club_members/.test(text) && /GROUP BY club_id/.test(text)) {
+        m.steps.push("count:members");
+        return {
+          rows: m.ownedClubs.map((club) => ({ club_id: club.id, other_members: m.membersUnderLock ?? club.other_members })),
+        };
+      }
       if (/information_schema\.columns/.test(text)) {
         return { rows: [{ is_nullable: m.creatorColumnsNullable ? "YES" : "NO" }] };
       }
@@ -205,13 +221,35 @@ describe("deleteUserAccount", () => {
       expect(m.cleanupDeletedAccount).not.toHaveBeenCalled();
     });
 
-    it("locks the owned clubs and counts only the other active members", async () => {
+    it("locks the user row first: a concurrent transfer to the user or a new club of theirs waits, then fails its foreign key", async () => {
+      m.ownedClubs = [{ id: 4, name: "Solo", other_members: 0 }];
       const { deleteUserAccount } = await import("./db");
       await deleteUserAccount(9);
-      const lock = m.tx.execute.mock.calls.map((call) => sqlText(call[0])).find((text) => /FOR UPDATE/.test(text));
-      expect(lock).toContain("FROM community_clubs c WHERE c.owner_id = $");
-      expect(lock).toContain("m.club_id = c.id AND m.user_id <> $ AND m.status = 'active'");
-      expect(lock).toMatch(/FOR UPDATE OF c$/);
+      expect(sqlText(m.tx.execute.mock.calls[0][0])).toBe("SELECT id FROM users WHERE id = $ FOR UPDATE");
+      expect(m.steps[0]).toBe("lock:user");
+    });
+
+    it("refuses when a member joined between the first check and the lock, deleting nothing", async () => {
+      m.ownedClubs = [{ id: 4, name: "Solo", other_members: 0 }];
+      m.membersUnderLock = 1;
+      const { deleteUserAccount, AccountDeletionBlockedError } = await import("./db");
+      await expect(deleteUserAccount(9)).rejects.toBeInstanceOf(AccountDeletionBlockedError);
+      expect(tables()).toEqual([]);
+      expect(m.steps.some((entry) => entry.includes("DELETE FROM users"))).toBe(false);
+    });
+
+    it("locks the owned clubs, then counts the other active members in a statement of its own", async () => {
+      m.ownedClubs = [{ id: 4, name: "Solo", other_members: 0 }];
+      const { deleteUserAccount } = await import("./db");
+      await deleteUserAccount(9);
+      const texts = m.tx.execute.mock.calls.map((call) => sqlText(call[0]));
+      const lock = texts.findIndex((text) => /FROM community_clubs/.test(text) && /FOR UPDATE/.test(text));
+      expect(texts[lock]).toBe("SELECT id, name FROM community_clubs WHERE owner_id = $ ORDER BY id FOR UPDATE");
+      // Its own snapshot, taken once the club rows are locked: a member who joined meanwhile counts.
+      expect(texts[lock + 1]).toBe(
+        "SELECT club_id, COUNT(*)::int AS other_members FROM community_club_members WHERE club_id IN ($) AND user_id <> $ AND status = 'active' GROUP BY club_id",
+      );
+      expect(m.steps.slice(0, 3)).toEqual(["lock:user", "lock:clubs", "count:members"]);
     });
 
     it("deletes a club with no other members explicitly, with its posts, before the user row", async () => {

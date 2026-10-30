@@ -975,6 +975,11 @@ export async function deleteUserAccount(
   }
 
   await db.transaction(async (tx) => {
+    // The user row first: a concurrent transfer of a club to this user, or a new club or challenge
+    // of theirs, checks its foreign key against this row, so it waits and then fails instead of
+    // being caught by the deletion (or cascaded, before migration 0036).
+    await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+
     // Owned clubs, under lock: one that gained a member meanwhile still blocks the deletion. The
     // others go first and whole (posts, events, gallery, members...).
     const lockedClubs = await lockOwnedClubs(tx, userId);

@@ -29,7 +29,7 @@ export function accountDeletionBlockedMessage(clubs: Array<Pick<OwnedClub, "name
     : `Sei proprietario dei club ${names}, che hanno altri membri. Trasferisci la proprietà a un altro membro prima di eliminare l'account.`;
 }
 
-const ownedClubsQuery = (userId: number, lock: boolean): SQL => sql`
+const ownedClubsQuery = (userId: number): SQL => sql`
   SELECT
     c.id,
     c.name,
@@ -39,8 +39,7 @@ const ownedClubsQuery = (userId: number, lock: boolean): SQL => sql`
     ) AS other_members
   FROM community_clubs c
   WHERE c.owner_id = ${userId}
-  ORDER BY c.id
-  ${lock ? sql`FOR UPDATE OF c` : sql``}`;
+  ORDER BY c.id`;
 
 const toOwnedClubs = (rows: unknown[]): OwnedClub[] =>
   (rows as Array<{ id: unknown; name: unknown; other_members: unknown }>).map((row) => ({
@@ -52,13 +51,36 @@ const toOwnedClubs = (rows: unknown[]): OwnedClub[] =>
 /** The clubs the user owns, with how many other active members each has (none without clubs). */
 export async function listOwnedClubs(db: SqlExecutor, userId: number): Promise<OwnedClub[]> {
   if (!(await relationExists(db, "public.community_clubs"))) return [];
-  return toOwnedClubs((await db.execute(ownedClubsQuery(userId, false))).rows);
+  return toOwnedClubs((await db.execute(ownedClubsQuery(userId))).rows);
 }
 
-/** Same, locking the club rows for the deletion transaction. */
+/**
+ * Same, for the deletion transaction: the club rows are locked first, then the other active members
+ * are counted in a statement of its own, whose snapshot is taken once the locks are held (a member
+ * who joined meanwhile is counted; a join waiting on the club lock fails once the club is gone).
+ */
 export async function lockOwnedClubs(tx: SqlExecutor, userId: number): Promise<OwnedClub[]> {
   if (!(await relationExists(tx, "public.community_clubs"))) return [];
-  return toOwnedClubs((await tx.execute(ownedClubsQuery(userId, true))).rows);
+  const locked = (
+    await tx.execute(sql`SELECT id, name FROM community_clubs WHERE owner_id = ${userId} ORDER BY id FOR UPDATE`)
+  ).rows as Array<{ id: unknown; name: unknown }>;
+  if (locked.length === 0) return [];
+  const ids = sql.join(
+    locked.map((club) => sql`${Number(club.id)}`),
+    sql`, `,
+  );
+  const counts = (
+    await tx.execute(sql`
+      SELECT club_id, COUNT(*)::int AS other_members FROM community_club_members
+      WHERE club_id IN (${ids}) AND user_id <> ${userId} AND status = 'active'
+      GROUP BY club_id`)
+  ).rows as Array<{ club_id: unknown; other_members: unknown }>;
+  const others = new Map(counts.map((row) => [Number(row.club_id), Number(row.other_members ?? 0)]));
+  return locked.map((club) => ({
+    id: Number(club.id),
+    name: String(club.name ?? ""),
+    otherActiveMembers: others.get(Number(club.id)) ?? 0,
+  }));
 }
 
 export const clubsBlockingDeletion = (clubs: OwnedClub[]) => clubs.filter((club) => club.otherActiveMembers > 0);
