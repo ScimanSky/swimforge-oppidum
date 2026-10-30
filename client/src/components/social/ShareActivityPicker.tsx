@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { trpc } from "@/lib/trpc"
+import { errorToastMessage } from "@/lib/trpc-errors"
 import { formatDistance, formatDuration, formatTimeAgo } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import {
@@ -48,6 +49,10 @@ export function ShareActivityPicker({
   const [caption, setCaption] = useState("")
   const [mediaItems, setMediaItems] = useState<SelectedMedia[]>([])
   const [mentions, setMentions] = useState<MentionUser[]>([])
+  // Uploading and sharing: the uploads (ImageKit, Cloudinary) are not mutations, so isPending
+  // alone left «Condividi» tappable in between; the ref stops a second tap before the re-render.
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const mediaInputRef = useRef<HTMLInputElement>(null)
   const shareHistoryEntryActiveRef = useRef(false)
   const shareCloseFromPopStateRef = useRef(false)
@@ -69,16 +74,13 @@ export function ShareActivityPicker({
       const sharedActivityId = selectedId
       utils.community.feed.invalidate()
       utils.community.unsharedActivities.invalidate()
-      toast.success("Attivita condivisa!")
+      toast.success("Attività condivisa!")
       if (sharedActivityId) {
         onShared?.(sharedActivityId)
       }
       resetComposer()
       setSelectedId(null)
       onOpenChange(false)
-    },
-    onError: (error) => {
-      toast.error(error.message || "Errore nella condivisione")
     },
   })
 
@@ -164,7 +166,9 @@ export function ShareActivityPicker({
   }
 
   const handleShare = async () => {
-    if (!selectedId) return
+    if (!selectedId || submittingRef.current) return
+    submittingRef.current = true
+    setSubmitting(true)
     try {
       const uploadedMediaUrls: string[] = []
       for (const media of mediaItems) {
@@ -180,13 +184,19 @@ export function ShareActivityPicker({
         taggedUserIds: pickedMentionIds(caption, mentions),
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Errore nella condivisione"
-      toast.error(message)
+      toast.error(errorToastMessage(error, "Errore nella condivisione"))
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
     }
   }
 
   const isPending =
-    createPost.isPending || imageKitAuth.isPending || postImageUpload.isPending || cloudinaryVideoAuth.isPending
+    submitting ||
+    createPost.isPending ||
+    imageKitAuth.isPending ||
+    postImageUpload.isPending ||
+    cloudinaryVideoAuth.isPending
 
   useEffect(() => {
     if (!open || typeof window === "undefined") return

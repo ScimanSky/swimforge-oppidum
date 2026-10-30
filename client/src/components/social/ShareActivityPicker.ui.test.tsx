@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ShareActivityPicker } from "./ShareActivityPicker"
@@ -66,5 +66,18 @@ describe("ShareActivityPicker", () => {
       mediaUrl: null,
       taggedUserIds: [5],
     })
+  })
+
+  it("«Condividi» works once while the share is in progress", async () => {
+    let finish: (value: unknown) => void = () => {}
+    mocks.createPost.mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+    render(<ShareActivityPicker open onOpenChange={() => {}} initialActivityId={9} />)
+    const share = await screen.findByRole("button", { name: "Condividi" })
+    await userEvent.click(share)
+    expect(screen.getByRole("button", { name: "Condivisione..." })).toBeDisabled()
+    share.click()
+    await act(async () => finish({ success: true, postId: 1 }))
+    expect(mocks.createPost).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole("button", { name: "Condividi" })).toBeEnabled()
   })
 })
