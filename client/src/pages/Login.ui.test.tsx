@@ -25,6 +25,10 @@ vi.mock("@/lib/trpc", () => ({
 // A hash as the target: jsdom follows it (it cannot load another document), so the redirect shows.
 vi.mock("@/lib/auth-sync", () => ({
   postLoginPath: (isNew: boolean) => (isNew ? "#onboarding" : "#home"),
+  afterSyncPath: (o: { isNewUser: boolean; needsLegalAcceptance?: boolean }) =>
+    o.needsLegalAcceptance ? "#consenso" : o.isNewUser ? "#onboarding" : "#home",
+  LEGAL_ACCEPTANCE: { terms: true, privacy: true, minimumAge: true },
+  LEGAL_ACCEPTANCE_METADATA_KEY: "swimforge_legal_acceptance",
   syncSupabaseSession: state.sync,
 }));
 vi.mock("@/lib/native-auth", () => ({ startNativeGoogleLogin: state.googleNative }));

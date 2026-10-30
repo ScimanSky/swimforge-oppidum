@@ -1,18 +1,21 @@
 import {
     publicProcedure, protectedProcedure, router, z, db,
     TRPCError, sdk, verifySupabaseAccessToken,
-    loginLimiter, registrationLimiter,
     COOKIE_NAME, getSessionCookieOptions, issueCsrfCookie,
-    applyRateLimit, sql,
+    sql, logger,
 } from "./_shared";
 import { CSRF_COOKIE_NAME } from "@shared/const";
-import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
+import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE, NATIVE_DATA_EXPORT_MESSAGE } from "@shared/native";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
-import { ensureRequiredLegalConsents } from "../consent";
+import { hasRequiredLegalConsents, recordLegalAcceptance } from "../consent";
 import { deleteFromIfExists } from "../lib/relation-exists";
+import { AccountDeletionBlockedError, accountDeletionBlockedMessage } from "../account_clubs";
+import { reportAccountCleanupFailure } from "../account_cleanup";
+import { withTimeout } from "../lib/with-timeout";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
+import { DATA_EXPORT_RATE_LIMIT_MESSAGE, dataExportRateLimit } from "../lib/data-export-rate-limit";
 import type { User } from "../../drizzle/schema";
 
 // What auth.me hands to the client about the caller: never the password hash
@@ -34,83 +37,51 @@ export function toSelfUser(user: User | null) {
 
 const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
-const REGISTRATION_PASSWORD_SCHEMA = z
-    .string()
-    .min(12, "Password must be at least 12 characters")
-    .refine((value) => new TextEncoder().encode(value).length <= 72, "Password must be at most 72 bytes")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
+
+/** The Postgres error code of a failed query, also when drizzle wraps the driver error. */
+function pgErrorCode(error: unknown): string | undefined {
+    const shaped = error as { code?: unknown; cause?: { code?: unknown } } | null;
+    const code = shaped?.code ?? shaped?.cause?.code;
+    return typeof code === "string" ? code : undefined;
+}
+
+const SUPABASE_AUTH_DELETE_TIMEOUT_MS = 15_000;
+const DELETION_EMAIL_TIMEOUT_MS = 10_000;
+
+/** The request comes from the Android app (header set by its tRPC client). */
+function isNativeClient(req: { headers: Record<string, string | string[] | undefined> }): boolean {
+    const header = req.headers[NATIVE_CLIENT_HEADER];
+    return (Array.isArray(header) ? header[0] : header) === NATIVE_CLIENT_VALUE;
+}
+
+/** A Supabase Auth user id (UUID) in users.open_id: the account signs in through Supabase. */
+function isSupabaseUserId(openId: string | null | undefined): openId is string {
+    return Boolean(openId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(openId));
+}
+
+/**
+ * The deletion asks for the local password only of a legacy local account. A Supabase account never
+ * set one: a password left on its row (the removed local registration) belongs to someone else.
+ */
+function deletionRequiresPassword(user: Pick<User, "passwordHash" | "openId">): boolean {
+    return Boolean(user.passwordHash) && !isSupabaseUserId(user.openId);
+}
+
+/** The acceptance could not be stored: no session is issued without it. */
+const ACCEPTANCE_NOT_RECORDED_MESSAGE = "Non è stato possibile registrare l'accettazione di Termini e Privacy. Riprova.";
+
+/**
+ * The registration checkboxes, ticked by the user: Termini, Privacy and «Dichiaro di avere almeno
+ * 14 anni». Only this input records them.
+ */
+const LEGAL_ACCEPTANCE_SCHEMA = z.object({
+    terms: z.literal(true),
+    privacy: z.literal(true),
+    minimumAge: z.literal(true),
+});
 
 export const authRouter = router({
     me: publicProcedure.query(opts => toSelfUser(opts.ctx.user)),
-
-    // Register with email and password
-    register: publicProcedure
-        .input(z.object({
-            email: z.string().email(),
-            password: REGISTRATION_PASSWORD_SCHEMA,
-            name: z.string().optional(),
-        }))
-        .mutation(async ({ ctx, input }) => {
-            await applyRateLimit(registrationLimiter, ctx.req, ctx.res);
-            const result = await db.registerUser(input.email, input.password, input.name);
-
-            if (!result.success || !result.user) {
-                throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: result.error || "Registration failed"
-                });
-            }
-
-            // Create session token
-            const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
-                name: result.user.name || "",
-                expiresInMs: ENV.sessionMaxAgeMs,
-                tokenVersion: result.user.sessionTokenVersion ?? 1,
-            });
-
-            const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
-            issueCsrfCookie(ctx.req, ctx.res);
-
-            await ensureRequiredLegalConsents(result.user.id, ctx.req);
-
-            return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
-        }),
-
-    // Login with email and password
-    login: publicProcedure
-        .input(z.object({
-            email: z.string().email(),
-            password: z.string().min(1, "Password is required"),
-        }))
-        .mutation(async ({ ctx, input }) => {
-            await applyRateLimit(loginLimiter, ctx.req, ctx.res);
-            const result = await db.loginUser(input.email, input.password);
-
-            if (!result.success || !result.user) {
-                throw new TRPCError({
-                    code: "UNAUTHORIZED",
-                    message: result.error || "Invalid credentials"
-                });
-            }
-
-            // Create session token
-            const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
-                name: result.user.name || "",
-                expiresInMs: ENV.sessionMaxAgeMs,
-                tokenVersion: result.user.sessionTokenVersion ?? 1,
-            });
-
-            const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
-            issueCsrfCookie(ctx.req, ctx.res);
-            await ensureRequiredLegalConsents(result.user.id, ctx.req);
-
-            return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
-        }),
 
     // compat: remove after 2027-01-31, old Android builds call it (online presence is gone;
     // they send it every minute and must not see an error).
@@ -132,6 +103,8 @@ export const authRouter = router({
                 email: z.string().email(),
                 name: z.string().nullable(),
             }),
+            // Sent once the user has ticked the checkboxes (registration form or /auth/consenso).
+            legalAcceptance: LEGAL_ACCEPTANCE_SCHEMA.optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             let supabaseUser;
@@ -176,6 +149,14 @@ export const authRouter = router({
             let user = await db.getUserByEmail(supabaseEmail);
             const isNewUser = !user;
 
+            // Termini, Privacy and the age are accepted with checkboxes, never recorded on their own:
+            // without them (Google sign-in of a new user, or an account that never accepted) no
+            // account and no session, the app shows the acceptance step and calls again with it.
+            const hasAccepted = user ? await hasRequiredLegalConsents(user.id) : false;
+            if (!hasAccepted && !input.legalAcceptance) {
+                return { success: false, needsLegalAcceptance: true, isNewUser } as const;
+            }
+
             if (!user) {
                 // Crea nuovo utente da OAuth
                 const result = await db.createOAuthUser({
@@ -194,8 +175,46 @@ export const authRouter = router({
 
                 user = result.user;
             } else {
+                // The row found by email belongs to another identity (open_id null from the removed
+                // local registration, a Manus id, a Supabase user deleted and recreated): it goes to
+                // the Supabase user who just proved the email, and every session issued before for
+                // it is revoked, before the new one exists.
+                if (user.openId !== supabaseUser.id) {
+                    try {
+                        const tokenVersion = await db.relinkUserToSupabaseIdentity(user.id, supabaseUser.id);
+                        user = { ...user, openId: supabaseUser.id, passwordHash: null, sessionTokenVersion: tokenVersion };
+                    } catch (error) {
+                        const duplicate = pgErrorCode(error) === "23505";
+                        logger.error("[Auth] Supabase identity not bound to the account", {
+                            event: "auth:supabase_relink_failed",
+                            userId: user.id,
+                            duplicate,
+                            message: error instanceof Error ? error.message : String(error),
+                        });
+                        throw new TRPCError(
+                            duplicate
+                                ? { code: "CONFLICT", message: "Questo accesso è già collegato a un altro account SwimForge. Scrivi a admin@swimforge.it." }
+                                : { code: "INTERNAL_SERVER_ERROR", message: "Accesso non riuscito, riprova." },
+                        );
+                    }
+                }
                 // Aggiorna last signed in
                 await db.updateUserLastSignedIn(user.id);
+            }
+
+            // Right after the account exists and before any session: if the acceptance cannot be
+            // recorded, no cookie and no token (the next sign-in asks for it again).
+            if (!hasAccepted) {
+                try {
+                    await recordLegalAcceptance(user.id, ctx.req);
+                } catch (error) {
+                    logger.error("[Auth] Legal acceptance not recorded at sign-in", {
+                        event: "auth:legal_acceptance_record_failed",
+                        userId: user.id,
+                        message: error instanceof Error ? error.message : String(error),
+                    });
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: ACCEPTANCE_NOT_RECORDED_MESSAGE });
+                }
             }
 
             // Crea session token
@@ -208,18 +227,25 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
-            await ensureRequiredLegalConsents(user.id, ctx.req);
-            const clientHeader = ctx.req.headers[NATIVE_CLIENT_HEADER];
-            const isNativeClient = (Array.isArray(clientHeader) ? clientHeader[0] : clientHeader) === NATIVE_CLIENT_VALUE;
             return {
                 success: true,
                 isNewUser,
                 user: { id: user.id, email: user.email, name: user.name },
-                ...(isNativeClient ? { sessionToken } : {}),
+                ...(isNativeClient(ctx.req) ? { sessionToken } : {}),
             };
         }),
 
     exportMyData: protectedProcedure.query(async ({ ctx }) => {
+        // Older Android builds call this and save the result through <a download>, which the
+        // WebView ignores, then report «Esportazione completata»: they get the website guidance
+        // instead, and the export is never built for nothing.
+        if (isNativeClient(ctx.req)) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: NATIVE_DATA_EXPORT_MESSAGE });
+        }
+        // Same per-user budget as GET /api/account/export: a heavy read of the whole account.
+        if (!(await dataExportRateLimit.consume(ctx.user.id))) {
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: DATA_EXPORT_RATE_LIMIT_MESSAGE });
+        }
         const payload = await db.exportUserData(ctx.user.id);
         return payload;
     }),
@@ -231,8 +257,10 @@ export const authRouter = router({
         }
 
         return {
-            requiresPassword: Boolean(user.passwordHash),
+            requiresPassword: deletionRequiresPassword(user),
             loginMethod: user.loginMethod ?? "email",
+            // Clubs with other members: transferred first, or the deletion is refused.
+            blockingClubs: await db.getAccountDeletionBlockers(ctx.user.id),
         } as const;
     }),
 
@@ -299,7 +327,8 @@ export const authRouter = router({
             const otherUserIds = (otherUsersResult.rows as Array<{ id: number }>).map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
 
             for (const userId of otherUserIds) {
-                await db.deleteUserAccount(userId);
+                // Every club goes in this reset, shared or not.
+                await db.deleteUserAccount(userId, { ownedClubs: "delete" });
             }
 
             await dbConn.transaction(async (tx) => {
@@ -390,9 +419,15 @@ export const authRouter = router({
                 throw new TRPCError({ code: "NOT_FOUND", message: "Utente non trovato" });
             }
 
+            // A club with other active members is never deleted with its owner: transfer it first.
+            const blockingClubs = await db.getAccountDeletionBlockers(ctx.user.id);
+            if (blockingClubs.length > 0) {
+                throw new TRPCError({ code: "PRECONDITION_FAILED", message: accountDeletionBlockedMessage(blockingClubs) });
+            }
+
             // Local accounts require password confirmation.
             // OAuth/social accounts can be deleted directly from an authenticated session.
-            if (user.passwordHash) {
+            if (deletionRequiresPassword(user)) {
                 const password = input.password?.trim() ?? "";
                 if (!password) {
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Password obbligatoria" });
@@ -404,7 +439,16 @@ export const authRouter = router({
             }
 
             const deletedAt = new Date();
-            const deletedUser = await db.deleteUserAccount(ctx.user.id);
+            let deletedUser: Awaited<ReturnType<typeof db.deleteUserAccount>>;
+            try {
+                deletedUser = await db.deleteUserAccount(ctx.user.id);
+            } catch (error) {
+                // A member joined one of the clubs meanwhile: nothing was deleted.
+                if (error instanceof AccountDeletionBlockedError) {
+                    throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
+                }
+                throw error;
+            }
             if (!deletedUser) {
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
@@ -412,21 +456,34 @@ export const authRouter = router({
                 });
             }
 
-            // Best effort: delete Supabase Auth user when open_id is a UUID.
-            if (deletedUser.openId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deletedUser.openId)) {
+            // The rows are gone. Side by side and bounded in time: the Supabase Auth user (when
+            // open_id is one) and the confirmation email. A Supabase failure is reported (error
+            // level and Rollbar) to be finished by hand; a slow email is answered as not sent.
+            const supabaseId = deletedUser.openId;
+            const deleteSupabaseUser = async () => {
+                if (!isSupabaseUserId(supabaseId)) return;
                 try {
-                    const supabaseAdmin = getSupabaseAdminClient();
-                    await supabaseAdmin.auth.admin.deleteUser(deletedUser.openId);
-                } catch {
-                    // ignore: local deletion already completed
+                    const { error } = await withTimeout(
+                        getSupabaseAdminClient().auth.admin.deleteUser(supabaseId),
+                        SUPABASE_AUTH_DELETE_TIMEOUT_MS,
+                        "supabase auth deleteUser",
+                    );
+                    if (error) throw new Error(error.message);
+                } catch (error) {
+                    reportAccountCleanupFailure(
+                        "account:supabase_auth_delete_failed",
+                        "[Account deletion] Supabase Auth user not deleted",
+                        { userId: deletedUser.id, message: error instanceof Error ? error.message : String(error) },
+                    );
                 }
-            }
-
-            const emailSent = await sendAccountDeletionConfirmationEmail({
-                to: deletedUser.email,
-                displayName: deletedUser.name,
-                deletedAt,
-            });
+            };
+            const sendConfirmation = () =>
+                withTimeout(
+                    sendAccountDeletionConfirmationEmail({ to: deletedUser.email, displayName: deletedUser.name, deletedAt }),
+                    DELETION_EMAIL_TIMEOUT_MS,
+                    "account deletion email",
+                ).catch(() => false);
+            const [, emailSent] = await Promise.all([deleteSupabaseUser(), sendConfirmation()]);
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.clearCookie(COOKIE_NAME, cookieOptions);

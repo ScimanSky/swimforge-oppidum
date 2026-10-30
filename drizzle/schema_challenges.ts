@@ -22,7 +22,9 @@ export const challenges = pgTable("challenges", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 128 }).notNull(),
   description: text("description"),
-  creatorId: integer("creator_id").notNull(), // User who created the challenge
+  // User who created the challenge. FK users.id ON DELETE SET NULL (migration 0036): the
+  // challenge, its participants and their progress outlive the creator's account.
+  creatorId: integer("creator_id"),
   type: challengeTypeEnum("type").notNull(), // pool, open_water, both
   objective: challengeObjectiveEnum("objective").notNull(), // What to measure
   duration: challengeDurationEnum("duration").notNull(), // How long

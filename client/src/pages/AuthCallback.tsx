@@ -6,7 +6,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Wordmark } from "@/components/corsia/Wordmark";
 import { Button } from "@/components/ui/button";
 import { authErrorMessage } from "@/lib/auth-errors";
-import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
+import { afterSyncPath, syncSupabaseSession } from "@/lib/auth-sync";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 
@@ -49,14 +49,19 @@ export default function AuthCallback() {
 
   const syncWithBackend = async (session: Parameters<typeof syncSupabaseSession>[0]) => {
     try {
-      const { isNewUser } = await syncSupabaseSession(session, (input) =>
+      const outcome = await syncSupabaseSession(session, (input) =>
         utils.client.auth.syncSupabaseUser.mutate(input),
       );
+      if (outcome.needsLegalAcceptance) {
+        // Termini, Privacy and age still to accept (e.g. first Google sign-in): no account yet.
+        navigate(afterSyncPath(outcome), { replace: true });
+        return;
+      }
       console.log('[AuthCallback] syncSupabaseUser SUCCESS:', session.user.id);
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
       redirectLater(() => {
-        const target = postLoginPath(isNewUser);
+        const target = afterSyncPath(outcome);
         console.log('[AuthCallback] Redirecting to:', target);
         window.location.href = target;
       }, 1000);

@@ -1,5 +1,5 @@
 {
-  "id": "379039b1-751b-4832-82c9-d4a436272e11",
+  "id": "65800e43-b98c-496c-b9d2-454c2f9b5f1d",
   "prevId": "3d1dd0d2-df41-45a8-90af-8b2b19fdce6f",
   "version": "7",
   "dialect": "postgresql",
@@ -782,7 +782,7 @@
           "name": "creator_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "title": {
           "name": "title",
@@ -2445,81 +2445,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.club_workout_completions": {
-      "name": "club_workout_completions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "workout_id": {
-          "name": "workout_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "club_id": {
-          "name": "club_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "activity_id": {
-          "name": "activity_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_club_workout_completions_workout": {
-          "name": "idx_club_workout_completions_workout",
-          "columns": [
-            {
-              "expression": "workout_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "club_workout_completions_user_workout_unique": {
-          "name": "club_workout_completions_user_workout_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "workout_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.community_club_invites": {
       "name": "community_club_invites",
       "schema": "",
@@ -2540,7 +2465,7 @@
           "name": "inviter_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "code": {
           "name": "code",

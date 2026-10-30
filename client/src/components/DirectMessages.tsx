@@ -42,6 +42,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { dmRetentionNote } from "@/lib/dm-retention";
 import { formatDayMonth, formatSessionDate, getInitials } from "@/lib/format";
 import { previousInAppPath } from "@/lib/in-app-history";
 import { trpc } from "@/lib/trpc";
@@ -105,11 +106,7 @@ function messagesHref({ conId, composing }: MessagesView) {
   return query ? `${MESSAGES_PATH}?${query}` : MESSAGES_PATH;
 }
 
-const RETENTION_DAYS = (() => {
-  const days = Number(import.meta.env.VITE_DM_RETENTION_DAYS ?? 60);
-  return Number.isFinite(days) ? days : 60;
-})();
-const RETENTION_NOTE = `I messaggi vengono eliminati automaticamente dal server dopo ${RETENTION_DAYS} giorni.`;
+const RETENTION_NOTE = dmRetentionNote();
 const SEARCH_DEBOUNCE_MS = 250;
 /** The open chat, while the page is on screen: how quickly a reply shows up. */
 const DM_CHAT_POLL_MS = 5_000;

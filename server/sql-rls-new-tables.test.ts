@@ -25,12 +25,12 @@ function expectGuardedRls(text: string, table: string) {
 }
 
 describe("RLS on the new tables", () => {
-  it("migration 0036: club_workout_completions, after the CREATE", () => {
-    const text = code(read("drizzle/0036_add_club_workout_completions.sql"));
+  it("migration 0037: club_workout_completions, after the CREATE", () => {
+    const text = code(read("drizzle/0037_add_club_workout_completions.sql"));
     expectGuardedRls(text, "club_workout_completions");
     expect(text.indexOf("ENABLE ROW LEVEL SECURITY")).toBeGreaterThan(text.indexOf("CREATE TABLE IF NOT EXISTS"));
     // drizzle-kit runs each statement on its own: a breakpoint before the block.
-    const raw = read("drizzle/0036_add_club_workout_completions.sql");
+    const raw = read("drizzle/0037_add_club_workout_completions.sql");
     expect(raw.slice(raw.lastIndexOf("CREATE INDEX"), raw.indexOf("DO $$"))).toContain("--> statement-breakpoint");
   });
 
@@ -40,5 +40,27 @@ describe("RLS on the new tables", () => {
     const block = text.lastIndexOf("ENABLE ROW LEVEL SECURITY");
     expect(block).toBeGreaterThan(text.indexOf("CREATE TABLE IF NOT EXISTS xp_transactions_social_removed"));
     expect(block).toBeLessThan(text.lastIndexOf("COMMIT;"));
+  });
+});
+
+describe("migration 0037_add_club_workout_completions", () => {
+  it("is the last entry of the drizzle journal, after main's 0036, with its snapshot chained to 0036", () => {
+    const journal = JSON.parse(read("drizzle/meta/_journal.json"));
+    const last = journal.entries[journal.entries.length - 1];
+    const previous = journal.entries[journal.entries.length - 2];
+    expect(last).toMatchObject({ idx: 37, tag: "0037_add_club_workout_completions", breakpoints: true });
+    expect(previous).toMatchObject({ idx: 36, tag: "0036_keep_clubs_and_challenges_on_account_deletion" });
+    // drizzle-kit applies a migration only when it is newer than the last one applied.
+    expect(last.when).toBeGreaterThan(previous.when);
+
+    const snapshot = JSON.parse(read("drizzle/meta/0037_snapshot.json"));
+    const before = JSON.parse(read("drizzle/meta/0036_snapshot.json"));
+    expect(snapshot.prevId).toBe(before.id);
+    expect(snapshot.id).not.toBe(before.id);
+    expect(Object.keys(snapshot.tables).filter((table) => !(table in before.tables))).toEqual([
+      "public.club_workout_completions",
+    ]);
+    // Main's 0036 changes are kept.
+    expect(snapshot.tables["public.club_events"]).toEqual(before.tables["public.club_events"]);
   });
 });

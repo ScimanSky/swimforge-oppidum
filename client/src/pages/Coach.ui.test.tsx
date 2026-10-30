@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   generateCalls: 0,
   chatCalls: [] as any[],
   chatResponse: { message: "Risposta del coach", provider: "gemini", fallback: false } as any,
+  consents: { canUseHealthFeatures: true } as any,
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -51,6 +52,7 @@ vi.mock("@/lib/trpc", () => ({
       },
     },
     activityInsights: { list: { useQuery: () => ({ data: state.insights }) } },
+    consent: { list: { useQuery: () => ({ data: state.consents }) } },
     useUtils: () => ({
       aiCoach: { getWorkouts: { setData: vi.fn(), refetch: vi.fn(async () => undefined) } },
     }),
@@ -92,6 +94,7 @@ describe("Coach AI", () => {
   beforeEach(() => {
     localStorage.clear();
     state.generateCalls = 0;
+    state.consents = { canUseHealthFeatures: true };
     state.chatCalls = [];
     state.chatResponse = { message: "Risposta del coach", provider: "gemini", fallback: false };
     vi.mocked(toast.warning).mockClear();
@@ -456,5 +459,24 @@ describe("Coach AI", () => {
     await user.type(screen.getByRole("textbox", { name: "Cerca nelle analisi" }), "virate");
     expect(titles()).toEqual(["Virate lente"]);
     expect(within(archive).getByText("1 di 2 analisi")).toBeTruthy();
+  });
+
+  describe("health-data consent", () => {
+    it("says nothing while the consent is given", () => {
+      render(<Coach />);
+      expect(screen.queryByRole("region", { name: "Analisi AI dei dati sanitari disattivata" })).toBeNull();
+    });
+
+    it("without it, says what is off and where to turn it back on", () => {
+      state.consents = { canUseHealthFeatures: false };
+      render(<Coach />);
+      const notice = screen.getByRole("region", { name: "Analisi AI dei dati sanitari disattivata" });
+      expect(notice).toHaveTextContent("l'AI non analizza le singole nuotate");
+      expect(notice).toHaveTextContent("frequenza cardiaca");
+      expect(within(notice).getByRole("link", { name: "Apri Impostazioni → Privacy" })).toHaveAttribute(
+        "href",
+        "/settings?tab=privacy",
+      );
+    });
   });
 });

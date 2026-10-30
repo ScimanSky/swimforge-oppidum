@@ -24,6 +24,7 @@ export const PUBLIC_PATHS = [
   "/",
   "/auth",
   "/auth/callback",
+  "/auth/consenso",
   "/login",
   "/register",
   "/signup",

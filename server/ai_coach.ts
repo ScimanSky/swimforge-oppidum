@@ -14,6 +14,7 @@ import { withErrorHandling } from "./lib/withErrorHandling";
 import { AppError } from "./lib/errors";
 import { config } from "./config";
 import { getSwimMetrics } from "./swim_metrics";
+import { hasHealthDataConsent } from "./consent";
 import {
   SWIM_METRICS_COACH_RULES,
   paceZoneCoachRules,
@@ -59,6 +60,8 @@ export type UserStatsForCoach = {
   referencePace: number | null;
   hrZones: {
     hasData: boolean;
+    /** True without the health-data consent: no heart-rate data in the prompt, not even counts. */
+    excluded: boolean;
     activitiesWithHR: number;
     zone1: string;
     zone2: string;
@@ -478,7 +481,7 @@ async function generateText(prompt: string): Promise<string> {
 /**
  * Fetch comprehensive user statistics for workout generation
  */
-async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
+export async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const db = await getDb();
   if (!db) {
     throw new Error(DB_UNAVAILABLE_ERR_MSG);
@@ -552,8 +555,10 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
     ? `${swimMetricsForCoach(swimMetrics)}\n\n${swimMetricsGlossary()}`
     : "Metriche di nuoto non disponibili in questo momento.";
 
-  // HR zones analysis - only from activities with HR data (using hrZoneXSeconds)
-  const activitiesWithHR = recentActivities.filter(a =>
+  // HR zones analysis - only from activities with HR data (using hrZoneXSeconds), and only with
+  // the health-data consent: without it the heart rate never reaches the model.
+  const healthDataAllowed = await hasHealthDataConsent(userId);
+  const activitiesWithHR = !healthDataAllowed ? [] : recentActivities.filter(a =>
     (a.hrZone1Seconds || 0) + (a.hrZone2Seconds || 0) + (a.hrZone3Seconds || 0) + (a.hrZone4Seconds || 0) + (a.hrZone5Seconds || 0) > 0
   );
 
@@ -599,6 +604,7 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
     referencePace: avgPace > 0 ? avgPace : null,
     hrZones: {
       hasData: hasHRData,
+      excluded: !healthDataAllowed,
       activitiesWithHR: activitiesWithHR.length,
       zone1: avgHRZone1Pct.toFixed(1),
       zone2: avgHRZone2Pct.toFixed(1),
@@ -629,6 +635,26 @@ function volumeGuide(userStats: UserStatsForCoach): string {
     return "   - Totale: adatto alle nuotate recenti dell'atleta (vedi la distanza media); senza storico in vasca resta prudente.";
   }
   return `   - Totale: vicino alle nuotate abituali in vasca (mediana delle ultime ${history.swims}: ${history.medianMeters} m), mai oltre ${cap} m.`;
+}
+
+const HR_EXCLUDED_TEXT =
+  "- Dati di frequenza cardiaca esclusi: l'atleta non ha dato il consenso al trattamento dei dati sanitari. Non chiederli e non usarli: dosa l'intensità con le zone di passo e la fatica percepita.";
+
+/** The heart-rate zones block: the shares, a «no data» line, or the line saying they are excluded. */
+function hrZonesText(hr: UserStatsForCoach["hrZones"], workoutType: "pool" | "dryland"): string {
+  if (hr.excluded) return HR_EXCLUDED_TEXT;
+  if (!hr.hasData) return "- Dati HR non disponibili (il nuotatore dovrebbe monitorare HR nelle prossime sessioni)";
+  if (workoutType === "dryland") {
+    return `- Zona 1-2 (Aerobica): ${(parseFloat(hr.zone1) + parseFloat(hr.zone2)).toFixed(1)}%
+- Zona 3-5 (Alta intensità): ${(parseFloat(hr.zone3) + parseFloat(hr.zone4) + parseFloat(hr.zone5)).toFixed(1)}%
+- Dati disponibili da ${hr.activitiesWithHR} attività`;
+  }
+  return `- Zona 1 (Recupero): ${hr.zone1}%
+- Zona 2 (Aerobica): ${hr.zone2}%
+- Zona 3 (Soglia): ${hr.zone3}%
+- Zona 4 (Anaerobica): ${hr.zone4}%
+- Zona 5 (Massimale): ${hr.zone5}%
+- Dati disponibili da ${hr.activitiesWithHR} attività`;
 }
 
 /**
@@ -681,12 +707,7 @@ ${paceZoneCoachRules(zones, history)}
 - nelle "notes" di ogni serie con una zona, o nei "coachNotes", spiega ogni zona usata in una riga: sensazione, passo e a cosa serve.
 
 **ZONE FREQUENZA CARDIACA:**
-${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
-- Zona 2 (Aerobica): ${userStats.hrZones.zone2}%
-- Zona 3 (Soglia): ${userStats.hrZones.zone3}%
-- Zona 4 (Anaerobica): ${userStats.hrZones.zone4}%
-- Zona 5 (Massimale): ${userStats.hrZones.zone5}%
-- Dati disponibili da ${userStats.hrZones.activitiesWithHR} attività` : '- Dati HR non disponibili (il nuotatore dovrebbe monitorare HR nelle prossime sessioni)'}
+${hrZonesText(userStats.hrZones, "pool")}
 
 **ISTRUZIONI FONDAMENTALI:**
 
@@ -831,9 +852,7 @@ ${userStats.swimMetricsText}
 ${SWIM_METRICS_COACH_RULES}
 
 **ZONE FREQUENZA CARDIACA:**
-${userStats.hrZones.hasData ? `- Zona 1-2 (Aerobica): ${(parseFloat(userStats.hrZones.zone1) + parseFloat(userStats.hrZones.zone2)).toFixed(1)}%
-- Zona 3-5 (Alta intensità): ${(parseFloat(userStats.hrZones.zone3) + parseFloat(userStats.hrZones.zone4) + parseFloat(userStats.hrZones.zone5)).toFixed(1)}%
-- Dati disponibili da ${userStats.hrZones.activitiesWithHR} attività` : '- Dati HR non disponibili (il nuotatore dovrebbe monitorare HR nelle prossime sessioni)'}
+${hrZonesText(userStats.hrZones, "dryland")}
 
 **ISTRUZIONI:**
 1. Analizza le metriche per identificare aree da rafforzare

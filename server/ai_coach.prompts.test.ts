@@ -13,7 +13,7 @@ const stats: UserStatsForCoach = {
   profile: { aiSkillLabel: "Intermedio", level: 5, totalXp: 3000, totalDistanceMeters: 90000, totalSessions: 40 },
   recent: { activitiesCount: 8, totalDistance: 20000, totalTime: 22000, avgPace: "110.00", avgSwolf: "36.0", sessionsPerWeek: "1.9" },
   swimMetricsText: "METRICHE DI NUOTO (test)\n- Passo soglia (CSS): 1:44/100 m",
-  hrZones: { hasData: false, activitiesWithHR: 0, zone1: "0", zone2: "0", zone3: "0", zone4: "0", zone5: "0" },
+  hrZones: { hasData: false, excluded: false, activitiesWithHR: 0, zone1: "0", zone2: "0", zone3: "0", zone4: "0", zone5: "0" },
   latestActivities: [],
   paceZones: null,
   poolHistory: null,

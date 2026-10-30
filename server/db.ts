@@ -19,7 +19,7 @@ import { ENV } from './_core/env';
 import { updateUserProfileBadge } from './db_profile_badges';
 import { logger } from "./middleware/logger";
 import { classifyAsyncError } from "./lib/withErrorHandling";
-import { deleteFromIfExists } from "./lib/relation-exists";
+import { deleteFromIfExists, relationExists } from "./lib/relation-exists";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
@@ -196,96 +196,6 @@ export async function getDb() {
 // USER QUERIES
 // ============================================
 
-// Register a new user with email and password
-export async function registerUser(email: string, password: string, name?: string): Promise<{ success: boolean; user?: User; error?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
-  }
-
-  try {
-    // Hash password before transaction to keep lock time short.
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const user = await db.transaction(async (tx) => {
-      const existing = await tx.select().from(users).where(eq(users.email, email)).limit(1);
-      if (existing.length > 0) {
-        throw new Error("Email already registered");
-      }
-
-      const result = await tx.insert(users).values({
-        email,
-        passwordHash,
-        name: name || email.split('@')[0],
-        loginMethod: 'email',
-        lastSignedIn: new Date(),
-      }).returning();
-
-      if (result.length === 0) {
-        throw new Error("Failed to create user");
-      }
-
-      const createdUser = result[0];
-      await tx.insert(swimmerProfiles).values({ userId: createdUser.id });
-      return createdUser;
-    });
-
-    // Best-effort badge assignment after successful transactional user creation.
-    await updateUserProfileBadge(user.id, 0);
-
-    return { success: true, user };
-  } catch (error) {
-    if (error instanceof Error && error.message === "Email already registered") {
-      return { success: false, error: "Email already registered" };
-    }
-    const { kind, message } = classifyAsyncError(error);
-    logger.error(`[Database] Failed to register user (${kind}): ${message}`, {
-      event: "auth:register_failed",
-      kind,
-      message,
-    });
-    return { success: false, error: "Registration failed" };
-  }
-}
-
-// Login with email and password
-export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
-  }
-
-  try {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (result.length === 0) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    const user = result[0];
-    if (!user.passwordHash) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    // Update last signed in
-    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
-
-    return { success: true, user };
-  } catch (error) {
-    const { kind, message } = classifyAsyncError(error);
-    logger.error(`[Database] Failed to login user (${kind}): ${message}`, {
-      event: "auth:login_failed",
-      kind,
-      message,
-    });
-    return { success: false, error: "Login failed" };
-  }
-}
-
 // Get user by ID
 export async function getUserById(id: number): Promise<User | undefined> {
   const db = await getDb();
@@ -317,71 +227,6 @@ export async function updateUser(
   }
   if (Object.keys(updatePayload).length === 0) return;
   await db.update(users).set(updatePayload).where(eq(users.id, userId));
-}
-
-// Legacy: upsert user (for OAuth compatibility)
-export async function upsertUser(user: InsertUser): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    logger.warn("[Database] Cannot upsert user: database not available", {
-      event: "db:upsert_skipped",
-    });
-    return;
-  }
-
-  try {
-    await db.transaction(async (tx) => {
-      const values: InsertUser = { email: user.email || '' };
-      const updateSet: Record<string, unknown> = {};
-
-      if (user.openId) values.openId = user.openId;
-      if (user.name) {
-        values.name = user.name;
-        updateSet.name = user.name;
-      }
-      if (user.loginMethod) {
-        values.loginMethod = user.loginMethod;
-        updateSet.loginMethod = user.loginMethod;
-      }
-      if (user.lastSignedIn !== undefined) {
-        values.lastSignedIn = user.lastSignedIn;
-        updateSet.lastSignedIn = user.lastSignedIn;
-      }
-      if (user.role !== undefined) {
-        values.role = user.role;
-        updateSet.role = user.role;
-      }
-
-      if (!values.lastSignedIn) {
-        values.lastSignedIn = new Date();
-      }
-
-      if (Object.keys(updateSet).length === 0) {
-        updateSet.lastSignedIn = new Date();
-      }
-
-      const upserted = await tx.insert(users).values(values).onConflictDoUpdate({
-        target: users.email,
-        set: updateSet,
-      }).returning({ id: users.id });
-
-      const userId = upserted[0]?.id;
-      if (!userId) {
-        throw new Error("Failed to upsert user");
-      }
-
-      await tx.insert(swimmerProfiles).values({ userId }).onConflictDoNothing({
-        target: swimmerProfiles.userId,
-      });
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error(`[Database] Failed to upsert user: ${message}`, {
-      event: "db:upsert_failed",
-      message,
-    });
-    throw error;
-  }
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -993,6 +838,31 @@ export async function verifyUserPassword(userId: number, password: string): Prom
   return bcrypt.compare(password, passwordHash);
 }
 
+/**
+ * Binds the account to the Supabase identity that signed in with its email: open_id becomes the
+ * Supabase user id, every session issued before for the row is revoked (session_token_version + 1)
+ * and a local password, which no path accepts anymore, is dropped. One statement, so the row never
+ * has the new identity with the old sessions still valid. Returns the new token version.
+ */
+export async function relinkUserToSupabaseIdentity(userId: number, supabaseId: string): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
+  }
+  const result = await db.execute(sql`
+    UPDATE users
+    SET open_id = ${supabaseId},
+        password_hash = NULL,
+        session_token_version = COALESCE(session_token_version, 1) + 1,
+        updated_at = NOW()
+    WHERE id = ${userId}
+    RETURNING session_token_version
+  `);
+  const row = result.rows[0] as { session_token_version?: unknown } | undefined;
+  if (!row) throw new Error("User not found");
+  return Number(row.session_token_version);
+}
+
 export async function incrementSessionTokenVersion(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -1005,108 +875,52 @@ export async function incrementSessionTokenVersion(userId: number): Promise<void
   `);
 }
 
+/** The user's data export as one object (see account_export.ts; the app streams it instead). */
 export async function exportUserData(userId: number) {
   const db = await getDb();
   if (!db) {
     throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
-
-  const [
-    userResult,
-    profileResult,
-    activitiesResult,
-    socialPostsResult,
-    socialCommentsResult,
-    socialSplashesResult,
-    socialFollowsResult,
-    badgesResult,
-    xpResult,
-    recordsResult,
-    weeklyStatsResult,
-    goalsResult,
-    notificationsResult,
-    directMessagesResult,
-    clubsMembershipResult,
-    reportsResult,
-    hiddenPostsResult,
-    consentsResult,
-  ] = await Promise.all([
-    db.execute(sql`
-      SELECT id, open_id, name, email, login_method, role, created_at, updated_at, last_signed_in
-      FROM users
-      WHERE id = ${userId}
-      LIMIT 1
-    `),
-    db.execute(sql`SELECT * FROM swimmer_profiles WHERE user_id = ${userId} LIMIT 1`),
-    db.execute(sql`SELECT * FROM swimming_activities WHERE user_id = ${userId} ORDER BY activity_date DESC`),
-    db.execute(sql`SELECT * FROM social_posts WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM social_comments WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM social_splashes WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`
-      SELECT *
-      FROM social_follows
-      WHERE follower_id = ${userId} OR following_id = ${userId}
-      ORDER BY created_at DESC
-    `),
-    db.execute(sql`
-      SELECT ub.*, bd.code AS badge_code, bd.name AS badge_name
-      FROM user_badges ub
-      JOIN badge_definitions bd ON bd.id = ub.badge_id
-      WHERE ub.user_id = ${userId}
-      ORDER BY ub.earned_at DESC
-    `),
-    db.execute(sql`SELECT * FROM xp_transactions WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM personal_records WHERE user_id = ${userId} ORDER BY achieved_at DESC`),
-    db.execute(sql`SELECT * FROM weekly_stats WHERE user_id = ${userId} ORDER BY week_start DESC`),
-    db.execute(sql`SELECT * FROM user_goals WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM user_notifications WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`
-      SELECT *
-      FROM direct_messages
-      WHERE sender_id = ${userId} OR receiver_id = ${userId}
-      ORDER BY created_at DESC
-    `),
-    db.execute(sql`SELECT * FROM community_club_members WHERE user_id = ${userId} ORDER BY joined_at DESC`),
-    db.execute(sql`
-      SELECT *
-      FROM social_post_reports
-      WHERE reporter_user_id = ${userId} OR handled_by = ${userId}
-      ORDER BY created_at DESC
-    `),
-    db.execute(sql`SELECT * FROM social_hidden_posts WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM user_consents WHERE user_id = ${userId} ORDER BY created_at DESC`),
-  ]);
-
-  return {
-    exportedAt: new Date().toISOString(),
-    user: userResult.rows[0] ?? null,
-    profile: profileResult.rows[0] ?? null,
-    data: {
-      activities: activitiesResult.rows,
-      socialPosts: socialPostsResult.rows,
-      socialComments: socialCommentsResult.rows,
-      socialSplashes: socialSplashesResult.rows,
-      socialFollows: socialFollowsResult.rows,
-      badges: badgesResult.rows,
-      xpTransactions: xpResult.rows,
-      personalRecords: recordsResult.rows,
-      weeklyStats: weeklyStatsResult.rows,
-      goals: goalsResult.rows,
-      notifications: notificationsResult.rows,
-      directMessages: directMessagesResult.rows,
-      clubMemberships: clubsMembershipResult.rows,
-      reports: reportsResult.rows,
-      hiddenPosts: hiddenPostsResult.rows,
-      consents: consentsResult.rows,
-    },
-  };
+  const { buildUserDataExport } = await import("./account_export");
+  return buildUserDataExport(db, userId);
 }
 
-export async function deleteUserAccount(userId: number): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
+export { AccountDeletionBlockedError } from "./account_clubs";
+
+/** The owned clubs that block the account deletion, with the members they can go to. */
+export async function getAccountDeletionBlockers(userId: number) {
   const db = await getDb();
   if (!db) {
     throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
+  const { listClubsBlockingDeletion } = await import("./account_clubs");
+  return listClubsBlockingDeletion(db, userId);
+}
+
+/**
+ * Deletes the account and everything that is only the user's. Clubs the user owns: one with other
+ * active members blocks the deletion (AccountDeletionBlockedError: transfer it first), one without
+ * is deleted with the account. `ownedClubs: "delete"` (dev launch reset only) deletes them all.
+ * Challenges, club events and invites the user created stay, without their author.
+ */
+export async function deleteUserAccount(
+  userId: number,
+  options: { ownedClubs?: "refuse" | "delete" } = {},
+): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
+  }
+  const ownedClubsMode = options.ownedClubs ?? "refuse";
+  const {
+    AccountDeletionBlockedError,
+    clubsBlockingDeletion,
+    deleteClubRows,
+    disableClubAutomationsOf,
+    listOwnedClubs,
+    lockOwnedClubs,
+    releaseAuthoredRows,
+  } = await import("./account_clubs");
 
   const userResult = await db.execute(sql`
     SELECT id, email, name, open_id
@@ -1120,36 +934,49 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
 
   if (!user) return null;
 
-  const shouldIgnoreMissingRelation = (error: unknown) => {
-    if (!error || typeof error !== "object") return false;
-    const pgError = error as { code?: string };
-    return pgError.code === "42P01"; // undefined_table
-  };
+  // Clubs with other members block the deletion: checked here first (no media read for nothing),
+  // then again under lock in the transaction.
+  const ownedClubs = await listOwnedClubs(db, userId);
+  const blocking = clubsBlockingDeletion(ownedClubs);
+  if (ownedClubsMode === "refuse" && blocking.length > 0) throw new AccountDeletionBlockedError(blocking);
 
-  // Collect Story ImageKit file IDs before account deletion.
-  let storyImageKitFileIds: string[] = [];
+  // Media references (avatar, posts, stories, club uploads) are read before the rows go: the
+  // files are deleted from the providers after the transaction. The logo and cover of a club
+  // deleted with the account are not kept.
+  const { collectUserMediaRefs, cleanupDeletedAccount, reportAccountCleanupFailure } = await import("./account_cleanup");
+  let mediaRefs: Awaited<ReturnType<typeof collectUserMediaRefs>>;
   try {
-    const storyAssetsResult = await db.execute(sql`
-      SELECT imagekit_file_id
-      FROM stories
-      WHERE user_id = ${userId}
-        AND imagekit_file_id IS NOT NULL
-        AND imagekit_file_id <> ''
-    `);
-    storyImageKitFileIds = Array.from(
-      new Set(
-        storyAssetsResult.rows
-          .map((row) => ((row as { imagekit_file_id?: string | null }).imagekit_file_id ?? "").trim())
-          .filter((id) => id.length > 0)
-      )
-    );
+    mediaRefs = await collectUserMediaRefs(db, userId, ownedClubs.map((club) => club.id));
   } catch (error) {
-    if (!shouldIgnoreMissingRelation(error)) {
-      throw error;
-    }
+    // The per-user folders are still deleted; only files referenced by URL elsewhere are missed.
+    logger.warn("[Database] Could not read the media of the account to delete", {
+      event: "account:media_refs_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    mediaRefs = { userId, imageKitFileIds: [], urls: [], keepUrls: [] };
   }
 
+  // The clubs the transaction deletes: their whole provider folder goes after the commit.
+  let deletedClubIds: number[] = [];
   await db.transaction(async (tx) => {
+    // The user row first: a concurrent transfer of a club to this user, or a new club or challenge
+    // of theirs, checks its foreign key against this row, so it waits and then fails instead of
+    // being caught by the deletion (or cascaded, before migration 0036).
+    await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+
+    // Owned clubs, under lock: one that gained a member meanwhile still blocks the deletion. The
+    // others go first and whole (posts, events, gallery, members...).
+    const lockedClubs = await lockOwnedClubs(tx, userId);
+    const stillBlocking = clubsBlockingDeletion(lockedClubs);
+    if (ownedClubsMode === "refuse" && stillBlocking.length > 0) throw new AccountDeletionBlockedError(stillBlocking);
+    deletedClubIds = lockedClubs.map((club) => club.id);
+    await deleteClubRows(tx, deletedClubIds);
+    // Challenges, club events and invites the user created stay for the others; the club AI
+    // automations that post as the user stop.
+    await releaseAuthoredRows(tx, userId);
+    await disableClubAutomationsOf(tx, userId);
+
     // Legacy season engagement tables: created at runtime by the removed season
     // engine, so they may not exist.
     await deleteFromIfExists(tx, "public.season_activity_predictions", sql`user_id = ${userId}`);
@@ -1175,6 +1002,21 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
       ["public.stories"]
     );
     await deleteFromIfExists(tx, "public.stories", sql`user_id = ${userId}`);
+
+    // Product analytics (before the posts it points at): the user's own events and the ones about
+    // them, i.e. their profile and posts viewed by others. Created at runtime by product_analytics,
+    // so it may not exist.
+    await deleteFromIfExists(
+      tx,
+      "public.product_engagement_events",
+      sql`
+        user_id = ${userId}
+        OR (entity_type = 'user_profile' AND entity_id = ${userId})
+        OR (entity_type = 'social_post' AND entity_id IN (SELECT id FROM social_posts WHERE user_id = ${userId}))
+      `,
+      ["public.social_posts"]
+    );
+    await deleteFromIfExists(tx, "public.user_presence", sql`user_id = ${userId}`);
 
     // Social graph and feed
     await deleteFromIfExists(
@@ -1218,11 +1060,15 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
       "public.social_post_reports",
       sql`
         reporter_user_id = ${userId}
-        OR handled_by = ${userId}
         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
       `,
       ["public.social_posts"]
     );
+    // Reports the user only handled as a moderator belong to their reporters: they stay, without
+    // the moderator.
+    if (await relationExists(tx, "public.social_post_reports")) {
+      await tx.execute(sql`UPDATE social_post_reports SET handled_by = NULL WHERE handled_by = ${userId}`);
+    }
     await deleteFromIfExists(tx, "public.social_follows", sql`follower_id = ${userId} OR following_id = ${userId}`);
     await deleteFromIfExists(tx, "public.social_posts", sql`user_id = ${userId}`);
 
@@ -1247,6 +1093,41 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     await deleteFromIfExists(tx, "public.activity_ai_insights", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.ai_coach_workouts", sql`user_id = ${userId}`);
 
+    // Swims, explicitly (no reliance on the ON DELETE CASCADE of an archived migration): lengths,
+    // laps and the rows pointing at the swims first, then the swims.
+    const userSwims = sql`SELECT id FROM swimming_activities WHERE user_id = ${userId}`;
+    await deleteFromIfExists(
+      tx,
+      "public.garmin_activity_lengths",
+      sql`activity_id IN (${userSwims})`,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.garmin_activity_laps",
+      sql`activity_id IN (${userSwims})`,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.ghost_challenges",
+      sql`
+        challenger_user_id = ${userId}
+        OR opponent_user_id = ${userId}
+        OR challenger_activity_id IN (${userSwims})
+        OR opponent_activity_id IN (${userSwims})
+      `,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.challenge_activity_log",
+      sql`user_id = ${userId} OR activity_id IN (${userSwims})`,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(tx, "public.challenge_participants", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.swimming_activities", sql`user_id = ${userId}`);
+
     // External sync tokens
     await deleteFromIfExists(tx, "public.garmin_tokens", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.strava_tokens", sql`user_id = ${userId}`);
@@ -1257,36 +1138,21 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     // Push device tokens (no FK to users)
     await deleteFromIfExists(tx, "public.device_tokens", sql`user_id = ${userId}`);
 
-    // Online presence: no longer written (the heartbeat is gone), old rows go with the account.
-    await deleteFromIfExists(tx, "public.user_presence", sql`user_id = ${userId}`);
-
     // Final identity rows
     await deleteFromIfExists(tx, "public.user_goals", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.swimmer_profiles", sql`user_id = ${userId}`);
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
 
-  if (storyImageKitFileIds.length > 0) {
-    try {
-      const { deleteImageKitFileById } = await import("./lib/imagekit");
-      const results = await Promise.allSettled(storyImageKitFileIds.map((fileId) => deleteImageKitFileById(fileId)));
-      const failed = results.filter((result) => result.status === "rejected");
-      if (failed.length > 0) {
-        logger.warn(`[Database] Failed to cleanup ${failed.length}/${storyImageKitFileIds.length} ImageKit files during account deletion`, {
-          event: "account:imagekit_cleanup_partial_failure",
-          userId,
-          failedCount: failed.length,
-        });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn(`[Database] ImageKit cleanup after account deletion failed: ${message}`, {
-        event: "account:imagekit_cleanup_failed",
-        userId,
-        message,
-      });
-    }
-  }
+  // Outside the transaction, best effort and detached (the answer does not wait for it): media on
+  // ImageKit, Cloudinary and Supabase Storage, and the Garmin session on the garmin-service.
+  // Every provider call is bounded in time; failures are logged, never thrown.
+  void cleanupDeletedAccount({ ...mediaRefs, deletedClubIds }).catch((error: unknown) => {
+    reportAccountCleanupFailure("account:external_cleanup_failed", "[Database] External cleanup of the deleted account failed", {
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   return {
     id: user.id,

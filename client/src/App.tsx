@@ -23,6 +23,7 @@ import { trpc } from "./lib/trpc";
 // app-shell → supabase-js, kept out of the entry chunk).
 const Home = lazy(() => import("./pages/Home"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const LegalAcceptance = lazy(() => import("./pages/LegalAcceptance"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -40,6 +41,7 @@ const PUBLIC_PAGES: Record<PublicPath, ComponentType> = {
   "/": Home,
   "/auth": AuthRedirect,
   "/auth/callback": AuthCallback,
+  "/auth/consenso": LegalAcceptance,
   "/login": Login,
   "/register": Register,
   "/signup": Register,

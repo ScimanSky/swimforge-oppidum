@@ -46,6 +46,8 @@ import { homePathForPlatform } from "@/lib/navigation"
 import { isNativePlatform } from "@/lib/platform"
 import { formatInteger } from "@/lib/format"
 import { errorToastMessage } from "@/lib/trpc-errors"
+import { NATIVE_DATA_EXPORT_MESSAGE, canDownloadDataExportHere, downloadDataExport } from "@/lib/data-export"
+import { ClubTransferList, type BlockingClub } from "@/components/settings/ClubTransferList"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
@@ -143,12 +145,14 @@ const consentItems = [
   {
     type: "health_data_processing",
     title: "Trattamento dati salute",
-    description: "Necessario per frequenza cardiaca, VO2max, stress, calorie e sync completo Garmin.",
+    description:
+      "Permette di importare da Garmin frequenza cardiaca (media, massima, per giro e per vasca), zone cardio, training effect, VO2max, recupero, stress e calorie, e di farli analizzare dall'AI di Google Gemini: analisi di ogni nuotata, zone cardio negli allenamenti del Coach, analisi delle nuotate nella chat. Senza questo consenso la sincronizzazione Garmin è ferma e l'AI non usa questi dati, nemmeno delle nuotate già importate.",
   },
   {
     type: "garmin_sync",
     title: "Sincronizzazione Garmin",
-    description: "Autorizza l'importazione e il trattamento dei dati da Garmin Connect.",
+    description:
+      "Permette di collegare Garmin Connect e importare le tue nuotate: data, distanza, tempi, passo, giri e vasche, bracciate, SWOLF e stile. Serve anche il consenso «Trattamento dati salute».",
   },
   // No «Sincronizzazione Strava»: Strava is gone. The server still accepts the strava_sync
   // consent from old app builds.
@@ -267,6 +271,8 @@ export default function Settings() {
 
   const displayName = me?.name || me?.email || "Utente"
   const deleteRequiresPassword = deleteAccountStatusQuery.data?.requiresPassword ?? true
+  // Owned clubs with other members: transferred first, the server refuses the deletion meanwhile.
+  const blockingClubs: BlockingClub[] = deleteAccountStatusQuery.data?.blockingClubs ?? []
   const initials = displayName
     .split(" ")
     .map((part) => part[0])
@@ -450,6 +456,11 @@ export default function Settings() {
         return
       }
       toast.error(errorToastMessage(error, "Impossibile eliminare l'account."))
+      // A club still has other members (e.g. one joined meanwhile): back to the transfer list.
+      if (error.data?.code === "PRECONDITION_FAILED") {
+        setDeleteDialogOpen(false)
+        void deleteAccountStatusQuery.refetch()
+      }
     },
   })
   const setConsentMutation = trpc.consent.set.useMutation({
@@ -774,25 +785,17 @@ export default function Settings() {
     }
   }
 
+  const [isExporting, setIsExporting] = useState(false)
   const handleExportData = async () => {
+    if (isExporting) return
+    setIsExporting(true)
     try {
-      const payload = await utils.auth.exportMyData.fetch()
-      const now = new Date()
-      const fileName = `swimforge-data-export-${now.toISOString().slice(0, 10)}.json`
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json;charset=utf-8",
-      })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement("a")
-      anchor.href = url
-      anchor.download = fileName
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(url)
+      await downloadDataExport()
       toast.success("Esportazione completata.")
     } catch (error: unknown) {
-      toast.error(errorToastMessage(error, "Impossibile esportare i dati."))
+      toast.error(error instanceof Error && error.message ? error.message : "Impossibile esportare i dati.")
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -1357,7 +1360,7 @@ export default function Settings() {
 
             <Section
               title="Consensi GDPR"
-              description="Gestisci i consensi opzionali. Termini e Privacy sono obbligatori per usare il servizio."
+              description="Gestisci i consensi facoltativi. Termini e Privacy sono obbligatori per usare il servizio."
             >
               {consentsQuery.isLoading ? (
                 <LoadingSkeleton
@@ -1374,13 +1377,22 @@ export default function Settings() {
                     <RequiredConsent
                       title="Termini di Servizio"
                       status="Obbligatorio · accettato"
-                      version={(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.1"}
+                      version={(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.2"}
                     />
                     <RequiredConsent
                       title="Privacy Policy"
                       status="Obbligatorio · accettata"
-                      version={(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.1"}
+                      version={(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.2"}
                     />
+                  </div>
+                  <div className="rounded-xl bg-raised p-3">
+                    <p className="font-semibold">Coach AI e Google Gemini</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Consigli, piano e chat del Coach sono generati da Google Gemini a partire da distanze, tempi, passo
+                      e zone di passo delle tue nuotate. Quando scrivi nella chat del Coach, i tuoi messaggi, con
+                      obiettivo e vincoli, sono inviati a Gemini per ottenere la risposta: non scrivere dati sulla
+                      salute che non servono. Nome, email e data di nascita non vengono inviati.
+                    </p>
                   </div>
                   <div className="divide-y divide-border">
                     {consentItems.map((item) => (
@@ -1412,16 +1424,21 @@ export default function Settings() {
 
             <Section title="Dati e account">
               <div className="mt-2 divide-y divide-border">
-                <ActionRow
-                  title="Esporta i dati"
-                  description="Scarica tutti i tuoi dati in formato JSON"
-                  action={
-                    <Button variant="outline" onClick={handleExportData}>
-                      <Download aria-hidden />
-                      Esporta
-                    </Button>
-                  }
-                />
+                {canDownloadDataExportHere() ? (
+                  <ActionRow
+                    title="Esporta i dati"
+                    description="Scarica tutti i tuoi dati in formato JSON"
+                    action={
+                      <Button variant="outline" onClick={handleExportData} disabled={isExporting}>
+                        <Download aria-hidden />
+                        {isExporting ? "Esportazione…" : "Esporta"}
+                      </Button>
+                    }
+                  />
+                ) : (
+                  // The Android WebView cannot save the file: the website can.
+                  <ActionRow title="Esporta i dati" description={NATIVE_DATA_EXPORT_MESSAGE} action={null} />
+                )}
                 <ActionRow
                   title="Esci da tutti i dispositivi"
                   description="Disconnetti tutte le sessioni attive"
@@ -1437,17 +1454,28 @@ export default function Settings() {
                     </Button>
                   }
                 />
-                <ActionRow
-                  title="Elimina account"
-                  titleClassName="text-danger"
-                  description="Elimina per sempre il tuo account e tutti i dati"
-                  action={
-                    <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-                      <Trash2 aria-hidden />
-                      Elimina
-                    </Button>
-                  }
-                />
+                <div>
+                  <ActionRow
+                    title="Elimina account"
+                    titleClassName="text-danger"
+                    description={
+                      blockingClubs.length > 0
+                        ? "Trasferisci prima i club di cui sei proprietario"
+                        : "Elimina per sempre il tuo account e tutti i dati"
+                    }
+                    action={
+                      <Button
+                        variant="destructive"
+                        onClick={() => setDeleteDialogOpen(true)}
+                        disabled={blockingClubs.length > 0}
+                      >
+                        <Trash2 aria-hidden />
+                        Elimina
+                      </Button>
+                    }
+                  />
+                  <ClubTransferList clubs={blockingClubs} onTransferred={() => void deleteAccountStatusQuery.refetch()} />
+                </div>
                 {isDevResetAccount ? (
                   <ActionRow
                     title="Reset dell'app per il lancio (solo dev)"

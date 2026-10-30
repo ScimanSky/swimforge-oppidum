@@ -102,12 +102,12 @@ Important:
 5. Garmin status endpoint from UI
 
 ## 6. Cron Endpoints
-Cron routes require `Authorization: Bearer <CRON_SECRET>`.
+Cron routes require `Authorization: Bearer <CRON_SECRET>`. In production they are called by cron-job.org (see `docs/ORACLE_DEPLOYMENT.md` §11).
 
 Available cron endpoints:
 - `POST /api/cron/complete-challenges`
 - `POST /api/cron/evaluate-skill-level`
-- `POST /api/cron/cleanup-social-retention`
+- `POST /api/cron/cleanup-social-retention` (direct messages older than 365 days, notifications older than 90 days)
 - `POST /api/cron/club-ai/tick`
 
 `/api/cron/club-ai/tick` operational behavior:

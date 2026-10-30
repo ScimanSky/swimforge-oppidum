@@ -17,7 +17,6 @@ export { initializeAllUserProfileBadges } from "../db_profile_badges";
 export { TRPCError } from "@trpc/server";
 export { verifySupabaseAccessToken } from "../_core/supabase";
 export type { Request, Response } from "express";
-export { loginLimiter, registrationLimiter } from "../middleware/security";
 export {
     getOrSetCached,
     cacheKeys,

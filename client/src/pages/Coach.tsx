@@ -39,8 +39,9 @@ import {
 } from "@shared/coachWorkout"
 import { insightChip } from "@/lib/coach-insights"
 import { toast } from "sonner"
-import { Sparkles, AlertTriangle } from "lucide-react"
-import { useSearch } from "wouter"
+import { Sparkles, AlertTriangle, HeartOff } from "lucide-react"
+import { Link, useSearch } from "wouter"
+import { HEALTH_AI_DISABLED_MESSAGE, HEALTH_AI_DISABLED_TITLE, PRIVACY_SETTINGS_PATH } from "@shared/consent"
 
 const sectionTitle = "text-[17px] font-bold"
 type WorkoutSection = CoachWorkoutSection
@@ -357,6 +358,10 @@ export default function Coach() {
     return formatDate(workoutsData.generatedAt)
   }, [workoutsData?.generatedAt])
 
+  // Without the health-data consent the AI never reads heart rate & co.: say what is off.
+  const consentsQuery = trpc.consent.list.useQuery(undefined, { staleTime: 30_000 })
+  const healthAiOff = consentsQuery.data ? !consentsQuery.data.canUseHealthFeatures : false
+
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
     { limit: 50, offset: 0 },
     { staleTime: 60 * 1000 }
@@ -474,6 +479,21 @@ export default function Coach() {
             ) : null}
           </dl>
         </section>
+
+        {healthAiOff ? (
+          <section aria-labelledby="coach-health-ai-off" className="surface-panel flex gap-3 p-4">
+            <HeartOff className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
+            <div className="min-w-0">
+              <h2 id="coach-health-ai-off" className="text-[15px] font-semibold text-foreground">
+                {HEALTH_AI_DISABLED_TITLE}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">{HEALTH_AI_DISABLED_MESSAGE}</p>
+              <Button asChild variant="outline" size="sm" className="mt-3">
+                <Link href={PRIVACY_SETTINGS_PATH}>Apri Impostazioni → Privacy</Link>
+              </Button>
+            </div>
+          </section>
+        ) : null}
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "insights" | "workouts" | "session-iq" | "chat")} className="space-y-3">
           <TabsList aria-label="Sezioni del coach">

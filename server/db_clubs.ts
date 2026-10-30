@@ -2,6 +2,7 @@ import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, ilike, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getDb } from "./db";
+import { deleteClubRows } from "./account_clubs";
 import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
 
 export type ClubScope = "all" | "mine";
@@ -318,60 +319,53 @@ export async function createClub(userId: number, input: { name: string; descript
   return clubId;
 }
 
+type MembershipExecutor = { execute: (query: SQL) => Promise<{ rows: unknown[] }> };
+
+/**
+ * FOR SHARE on the club row, taken by every write that makes someone an active member, in the same
+ * transaction: it waits for an account deletion holding the club (FOR UPDATE) and then finds no
+ * club, or the deletion waits for it and then counts the new member. Null when the club is gone.
+ */
+async function lockClubForMembership(tx: MembershipExecutor, clubId: number) {
+  const result = await tx.execute(sql`SELECT id, visibility, rules FROM community_clubs WHERE id = ${clubId} FOR SHARE`);
+  return (result.rows[0] as { id: number; visibility: string | null; rules: string | null } | undefined) ?? null;
+}
+
 export async function joinClub(userId: number, clubId: number, options: { acceptRules?: boolean } = {}) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
-  const club = await db
-    .select({
-      id: communityClubs.id,
-      isPrivate: communityClubs.isPrivate,
-      visibility: communityClubs.visibility,
-      rules: communityClubs.rules,
-    })
-    .from(communityClubs)
-    .where(eq(communityClubs.id, clubId))
-    .limit(1);
-
-  if (!club.length) throw new Error("Club not found");
-  const hasRules = Boolean(club[0].rules && club[0].rules.trim().length > 0);
-  if (hasRules && !options.acceptRules) {
-    throw new Error("Rules not accepted");
-  }
-
-  const existing = await db
-    .select({
-      id: communityClubMembers.id,
-      status: communityClubMembers.status,
-      role: communityClubMembers.role,
-    })
-    .from(communityClubMembers)
-    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
-    .limit(1);
-
-  if (existing.length) {
-    if (existing[0].status === "banned") {
-      throw new Error("Banned");
+  return db.transaction(async (tx) => {
+    const club = await lockClubForMembership(tx, clubId);
+    if (!club) throw new Error("Club not found");
+    const hasRules = Boolean(club.rules && club.rules.trim().length > 0);
+    if (hasRules && !options.acceptRules) {
+      throw new Error("Rules not accepted");
     }
-    const hasStaffRole = ["owner", "admin", "moderator"].includes(existing[0].role);
-    const nextStatus = hasStaffRole || club[0].visibility === "public" ? "active" : "pending";
 
-    await db
-      .update(communityClubMembers)
-      .set({ status: nextStatus, joinedAt: new Date() })
-      .where(eq(communityClubMembers.id, existing[0].id));
-    return nextStatus === "active" ? { joined: true } : { requested: true };
-  }
+    const existingResult = await tx.execute(sql`
+      SELECT id, status, role FROM community_club_members
+      WHERE club_id = ${clubId} AND user_id = ${userId}
+      LIMIT 1`);
+    const existing = existingResult.rows[0] as { id: number; status: string; role: string } | undefined;
 
-  await db.insert(communityClubMembers).values({
-    clubId,
-    userId,
-    role: "member",
-    status: club[0].visibility === "public" ? "active" : "pending",
-    joinedAt: new Date(),
+    if (existing) {
+      if (existing.status === "banned") {
+        throw new Error("Banned");
+      }
+      const hasStaffRole = ["owner", "admin", "moderator"].includes(existing.role);
+      const nextStatus = hasStaffRole || club.visibility === "public" ? "active" : "pending";
+
+      await tx.execute(sql`UPDATE community_club_members SET status = ${nextStatus}, joined_at = NOW() WHERE id = ${existing.id}`);
+      return nextStatus === "active" ? { joined: true } : { requested: true };
+    }
+
+    const status = club.visibility === "public" ? "active" : "pending";
+    await tx.execute(sql`
+      INSERT INTO community_club_members (club_id, user_id, role, status, joined_at)
+      VALUES (${clubId}, ${userId}, 'member', ${status}, NOW())`);
+    return status === "active" ? { joined: true } : { requested: true };
   });
-
-  return club[0].visibility === "public" ? { joined: true } : { requested: true };
 }
 
 export async function leaveClub(userId: number, clubId: number) {
@@ -447,14 +441,12 @@ export async function approveJoinRequest(actorId: number, clubId: number, userId
     throw new Error("Forbidden");
   }
 
-  await db
-    .update(communityClubMembers)
-    .set({ status: "active", joinedAt: new Date() })
-    .where(and(
-      eq(communityClubMembers.clubId, clubId),
-      eq(communityClubMembers.userId, userId),
-      eq(communityClubMembers.status, "pending")
-    ));
+  await db.transaction(async (tx) => {
+    if (!(await lockClubForMembership(tx, clubId))) throw new Error("Club not found");
+    await tx.execute(sql`
+      UPDATE community_club_members SET status = 'active', joined_at = NOW()
+      WHERE club_id = ${clubId} AND user_id = ${userId} AND status = 'pending'`);
+  });
 
   return { approved: true };
 }
@@ -509,10 +501,10 @@ export async function unbanMember(actorId: number, clubId: number, userId: numbe
     throw new Error("Forbidden");
   }
 
-  await db
-    .update(communityClubMembers)
-    .set({ status: "active" })
-    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
+  await db.transaction(async (tx) => {
+    if (!(await lockClubForMembership(tx, clubId))) throw new Error("Club not found");
+    await tx.execute(sql`UPDATE community_club_members SET status = 'active' WHERE club_id = ${clubId} AND user_id = ${userId}`);
+  });
 
   return { unbanned: true };
 }
@@ -541,6 +533,35 @@ export async function updateMemberRole(actorId: number, clubId: number, userId: 
     .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
 
   return { updated: true };
+}
+
+/**
+ * Hands the club to another active member: only its owner can, for instance before deleting their
+ * account. The new owner gets the owner role, the old owner stays as admin.
+ */
+export async function transferClubOwnership(actorId: number, clubId: number, newOwnerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
+
+  return db.transaction(async (tx) => {
+    const club = await tx.execute(sql`SELECT owner_id FROM community_clubs WHERE id = ${clubId} FOR UPDATE`);
+    const owner = club.rows[0] as { owner_id: unknown } | undefined;
+    if (!owner) throw new Error("Club not found");
+    if (Number(owner.owner_id) !== actorId) throw new Error("Forbidden");
+    if (newOwnerId === actorId) throw new Error("Target not an active member");
+
+    const target = await tx.execute(sql`
+      SELECT status, role FROM community_club_members
+      WHERE club_id = ${clubId} AND user_id = ${newOwnerId}
+      LIMIT 1`);
+    const membership = target.rows[0] as { status?: string } | undefined;
+    if (membership?.status !== "active") throw new Error("Target not an active member");
+
+    await tx.execute(sql`UPDATE community_clubs SET owner_id = ${newOwnerId}, updated_at = now() WHERE id = ${clubId}`);
+    await tx.execute(sql`UPDATE community_club_members SET role = 'owner' WHERE club_id = ${clubId} AND user_id = ${newOwnerId}`);
+    await tx.execute(sql`UPDATE community_club_members SET role = 'admin' WHERE club_id = ${clubId} AND user_id = ${actorId}`);
+    return { transferred: true, clubId, ownerId: newOwnerId } as const;
+  });
 }
 
 export async function listClubInvites(actorId: number, clubId: number) {
@@ -652,6 +673,7 @@ export async function acceptClubInvite(userId: number, code: string) {
     if (invite.status !== "active") throw new Error("Invite inactive");
     if (invite.expires_at && invite.expires_at.getTime() < Date.now()) throw new Error("Invite expired");
     if (invite.used_count >= invite.max_uses) throw new Error("Invite exhausted");
+    if (!(await lockClubForMembership(tx, invite.club_id))) throw new Error("Club not found");
 
     const existing = await tx
       .select({
@@ -739,17 +761,17 @@ export async function deleteClub(userId: number, clubId: number) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
-  const club = await db
-    .select({ id: communityClubs.id, ownerId: communityClubs.ownerId })
-    .from(communityClubs)
-    .where(eq(communityClubs.id, clubId))
-    .limit(1);
+  return db.transaction(async (tx) => {
+    const club = await tx.execute(sql`SELECT owner_id FROM community_clubs WHERE id = ${clubId} FOR UPDATE`);
+    const owner = club.rows[0] as { owner_id: unknown } | undefined;
+    if (!owner) throw new Error("Club not found");
+    if (Number(owner.owner_id) !== userId) throw new Error("Forbidden");
 
-  if (!club.length) throw new Error("Club not found");
-  if (club[0].ownerId !== userId) throw new Error("Forbidden");
-
-  await db.delete(communityClubs).where(eq(communityClubs.id, clubId));
-  return { success: true };
+    // Every row of the club, explicitly: its posts must not outlive it into the public feed
+    // (social_posts.club_id only sets null).
+    await deleteClubRows(tx, [clubId]);
+    return { success: true };
+  });
 }
 
 export async function getClubWeeklyStats(clubId: number) {

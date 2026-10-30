@@ -74,13 +74,17 @@ vi.mock("@/lib/trpc", () => {
     fetch: vi.fn(),
   });
   const utils: any = new Proxy({}, { get: () => new Proxy({}, { get: () => procedure("utils") }) });
+  // «auth.me», and nested routers too («community.clubs.transferOwnership»).
+  const HOOKS = new Set(["useQuery", "useMutation", "invalidate", "fetch"]);
+  const node = (path: string): any =>
+    new Proxy({}, { get: (_t, name: string) => (HOOKS.has(name) ? procedure(path)[name] : node(`${path}.${name}`)) });
   return {
     trpc: new Proxy(
       {},
       {
         get: (_target, router: string) => {
           if (router === "useUtils") return () => utils;
-          return new Proxy({}, { get: (_t, name: string) => procedure(`${router}.${name}`) });
+          return node(router);
         },
       }
     ),
@@ -268,6 +272,21 @@ describe("Settings (Corsia)", () => {
     expect(screen.getByRole("heading", { name: "Garmin Connect" })).toBeInTheDocument();
   });
 
+  it("consensi GDPR: testi accurati su Garmin, dati salute e Google Gemini, niente Strava", () => {
+    state.search = "tab=privacy";
+    render(<Settings />);
+    const section = screen.getByRole("region", { name: "Consensi GDPR" });
+    expect(within(section).queryByRole("switch", { name: "Sincronizzazione Strava" })).toBeNull();
+    expect(section).not.toHaveTextContent(/strava/i);
+    expect(within(section).getByRole("switch", { name: "Trattamento dati salute" })).toBeInTheDocument();
+    expect(within(section).getByRole("switch", { name: "Sincronizzazione Garmin" })).toBeInTheDocument();
+    expect(section).toHaveTextContent("analizzare dall'AI di Google Gemini");
+    expect(section).toHaveTextContent("frequenza cardiaca");
+    expect(section).toHaveTextContent("nemmeno delle nuotate già importate");
+    expect(section).toHaveTextContent("Permette di collegare Garmin Connect e importare le tue nuotate");
+    expect(section).toHaveTextContent("i tuoi messaggi, con obiettivo e vincoli, sono inviati a Gemini");
+  });
+
   it("consenso marketing col profilo in caricamento: interruttore bloccato, niente impostazioni di default salvate", () => {
     state.queries["profile.get"] = { isLoading: true };
     state.search = "tab=privacy";
@@ -368,4 +387,59 @@ describe("Settings (Corsia)", () => {
     expect(toast.error).not.toHaveBeenCalled();
     expect(state.mutations["auth.deleteAccount"].calls).toEqual([{ password: "sbagliata" }]);
   });
+
+  it("eliminazione bloccata da club con altri membri: «Trasferisci a…» per ognuno, «Elimina» disabilitato", () => {
+    state.search = "tab=privacy";
+    state.queries["auth.deleteAccountStatus"] = {
+      data: {
+        requiresPassword: false,
+        blockingClubs: [
+          { id: 3, name: "Rari Nantes", otherActiveMembers: 1, members: [{ userId: 12, name: "Giulia", username: null }] },
+        ],
+      },
+    };
+    render(<Settings />);
+    expect(screen.getByRole("button", { name: "Elimina" })).toBeDisabled();
+    expect(screen.getByText("Trasferisci prima i club di cui sei proprietario")).toBeInTheDocument();
+    const region = screen.getByRole("region", { name: "Club da trasferire" });
+    expect(within(region).getByRole("combobox", { name: "Trasferisci a… Rari Nantes" })).toBeInTheDocument();
+  });
+
+  it("eliminazione rifiutata dal server per un club: messaggio e club ricaricati", async () => {
+    state.search = "tab=privacy";
+    state.queries["auth.deleteAccountStatus"] = { data: { requiresPassword: false, blockingClubs: [] } };
+    render(<Settings />);
+    await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
+    const dialog = screen.getByRole("dialog", { name: "Conferma eliminazione account" });
+    state.mutations["auth.deleteAccount"].fail = trpcError(
+      "PRECONDITION_FAILED",
+      "Sei proprietario del club «Rari Nantes», che ha altri membri. Trasferisci la proprietà a un altro membro prima di eliminare l'account."
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "Conferma eliminazione" }));
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Trasferisci la proprietà"))
+    );
+    expect(state.refetch["auth.deleteAccountStatus"]).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Conferma eliminazione account" })).toBeNull();
+  });
+
+  it("esportazione sull'app Android: messaggio onesto verso il sito, nessun «Esporta» né «completata»", async () => {
+    (globalThis as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    try {
+      state.search = "tab=privacy";
+      render(<Settings />);
+      expect(screen.getByText(/Scarica i tuoi dati dal sito swimforge\.it/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Esporta" })).toBeNull();
+      expect(toast.success).not.toHaveBeenCalled();
+    } finally {
+      delete (globalThis as { Capacitor?: unknown }).Capacitor;
+    }
+  });
+
+  it("esportazione sul web: un pulsante «Esporta»", () => {
+    state.search = "tab=privacy";
+    render(<Settings />);
+    expect(screen.getByRole("button", { name: "Esporta" })).toBeInTheDocument();
+  });
 });
+

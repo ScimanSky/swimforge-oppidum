@@ -1,7 +1,17 @@
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
-import { CONSENT_TYPES, CONSENT_VERSION, listLatestUserConsents, setManyConsents, setUserConsent, type ConsentType } from "../consent";
+import {
+  CONSENT_TYPES,
+  CONSENT_VERSION,
+  REGISTRATION_CONSENTS,
+  listLatestUserConsents,
+  setManyConsents,
+  setUserConsent,
+  type ConsentType,
+} from "../consent";
+
+const isRegistrationConsent = (type: ConsentType) => (REGISTRATION_CONSENTS as readonly ConsentType[]).includes(type);
 
 const consentTypeEnum = z.enum(CONSENT_TYPES);
 
@@ -31,7 +41,7 @@ export const consentRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      if (!input.granted && (input.consentType === "terms_acceptance" || input.consentType === "privacy_policy")) {
+      if (!input.granted && isRegistrationConsent(input.consentType)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Termini e Privacy sono necessari per usare il servizio.",
@@ -70,7 +80,7 @@ export const consentRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const invalidRequired = input.items.some(
-        (item) => (item.consentType === "terms_acceptance" || item.consentType === "privacy_policy") && !item.granted,
+        (item) => isRegistrationConsent(item.consentType) && !item.granted,
       );
 
       if (invalidRequired) {

@@ -265,7 +265,7 @@ Totale indicativo: 20-27 giorni di lavoro per arrivare al test chiuso.
 - Garmin: la libreria non ufficiale può rompersi in qualsiasi momento; l'import FIT è la
   rete di sicurezza, l'API ufficiale la soluzione.
 - Play Store: account sviluppatore, chiave di firma (Play App Signing), privacy policy
-  già presente (`PRIVACY_POLICY.md`), dichiarazione dati, test chiuso con tester.
+  già presente (`client/src/content/legal/privacy.md`, pubblicata su /privacy), dichiarazione dati, test chiuso con tester.
 - Firebase: nuovo progetto solo per FCM (nessun Analytics, nessun permesso pubblicità).
 - Due sessioni Claude sullo stesso working tree vanno evitate; per lavoro parallelo
   usare un worktree git separato.

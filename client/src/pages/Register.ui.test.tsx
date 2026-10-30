@@ -20,6 +20,10 @@ vi.mock("@/lib/trpc", () => ({
 // A hash as the target: jsdom follows it (it cannot load another document), so the redirect shows.
 vi.mock("@/lib/auth-sync", () => ({
   postLoginPath: (isNew: boolean) => (isNew ? "#onboarding" : "#home"),
+  afterSyncPath: (o: { isNewUser: boolean; needsLegalAcceptance?: boolean }) =>
+    o.needsLegalAcceptance ? "#consenso" : o.isNewUser ? "#onboarding" : "#home",
+  LEGAL_ACCEPTANCE: { terms: true, privacy: true, minimumAge: true },
+  LEGAL_ACCEPTANCE_METADATA_KEY: "swimforge_legal_acceptance",
   syncSupabaseSession: state.sync,
 }));
 vi.mock("@/lib/public-url", () => ({ publicSiteUrl: (path: string) => `https://swimforge.it${path}` }));
@@ -52,7 +56,8 @@ async function fillValidForm() {
   await userEvent.type(screen.getByLabelText("Cognome"), "Lovelace");
   await userEvent.type(screen.getByLabelText("Email"), "ada@swimforge.it");
   await userEvent.type(screen.getByLabelText("Password"), "segreta123");
-  await userEvent.click(screen.getByRole("checkbox"));
+  await userEvent.click(screen.getByRole("checkbox", { name: /Accetto i Termini di Servizio/ }));
+  await userEvent.click(screen.getByRole("checkbox", { name: "Dichiaro di avere almeno 14 anni" }));
 }
 
 describe("Register (Corsia)", () => {
@@ -73,6 +78,7 @@ describe("Register (Corsia)", () => {
     expect(password).toHaveAttribute("autocomplete", "new-password");
     expect(password).toHaveAccessibleDescription("Almeno 8 caratteri.");
     expect(screen.getByRole("checkbox", { name: /Accetto i Termini di Servizio e la Privacy Policy/ })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Dichiaro di avere almeno 14 anni" })).not.toBeChecked();
     expect(screen.queryByText("Livello Esperienza")).toBeNull();
     expect(screen.getByRole("button", { name: "Passa al tema scuro" })).toBeInTheDocument();
   });
@@ -89,8 +95,11 @@ describe("Register (Corsia)", () => {
     expect(screen.getByLabelText("Password")).toHaveAccessibleDescription(
       "La password deve avere almeno 8 caratteri. Almeno 8 caratteri."
     );
-    expect(screen.getByRole("checkbox")).toHaveAccessibleDescription(
+    expect(screen.getByRole("checkbox", { name: /Accetto i Termini di Servizio/ })).toHaveAccessibleDescription(
       "Accetta i Termini di Servizio e la Privacy Policy per continuare."
+    );
+    expect(screen.getByRole("checkbox", { name: "Dichiaro di avere almeno 14 anni" })).toHaveAccessibleDescription(
+      "Per usare SwimForge devi avere almeno 14 anni."
     );
     expect(state.signUp).not.toHaveBeenCalled();
   });
@@ -105,7 +114,11 @@ describe("Register (Corsia)", () => {
       password: "segreta123",
       options: {
         emailRedirectTo: "https://swimforge.it/auth/callback",
-        data: { full_name: "Ada Lovelace", name: "Ada Lovelace" },
+        data: {
+          full_name: "Ada Lovelace",
+          name: "Ada Lovelace",
+          swimforge_legal_acceptance: { terms: true, privacy: true, minimumAge: true, acceptedAt: expect.any(String) },
+        },
       },
     });
     expect(await screen.findByRole("heading", { level: 1, name: "Controlla la tua email" })).toBeInTheDocument();
@@ -124,7 +137,8 @@ describe("Register (Corsia)", () => {
     expect(state.sync).toHaveBeenCalledWith(
       { access_token: "t", user: { id: "u" } },
       expect.any(Function),
-      { email: "ada@swimforge.it", name: "Ada Lovelace" }
+      { email: "ada@swimforge.it", name: "Ada Lovelace" },
+      { terms: true, privacy: true, minimumAge: true }
     );
   });
 
@@ -139,5 +153,18 @@ describe("Register (Corsia)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Esiste già un account con questa email: accedi.");
     expect(screen.getByRole("button", { name: "Crea account" })).toBeEnabled();
+  });
+
+  it("senza la dichiarazione dei 14 anni non registra", async () => {
+    renderRegister();
+    await userEvent.type(screen.getByLabelText("Nome"), "Ada");
+    await userEvent.type(screen.getByLabelText("Cognome"), "Lovelace");
+    await userEvent.type(screen.getByLabelText("Email"), "ada@swimforge.it");
+    await userEvent.type(screen.getByLabelText("Password"), "segreta123");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Accetto i Termini di Servizio/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Crea account" }));
+
+    expect(screen.getByRole("checkbox", { name: "Dichiaro di avere almeno 14 anni" })).toHaveFocus();
+    expect(state.signUp).not.toHaveBeenCalled();
   });
 });

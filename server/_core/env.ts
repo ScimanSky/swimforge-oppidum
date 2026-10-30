@@ -41,24 +41,6 @@ function parseBoolEnv(name: string, fallback = false): boolean {
   return fallback;
 }
 
-function normalizeOrigin(value: string): string | null {
-  try {
-    return new URL(value).origin;
-  } catch {
-    return null;
-  }
-}
-
-function parseOriginList(values: Array<string | undefined | null>): string[] {
-  const origins = values
-    .flatMap((value) => (value ?? "").split(","))
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map(normalizeOrigin)
-    .filter((value): value is string => Boolean(value));
-  return Array.from(new Set(origins));
-}
-
 function parseIntListEnv(name: string): number[] {
   const raw = process.env[name];
   if (!raw) return [];
@@ -91,16 +73,6 @@ export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: requireEnv("JWT_SECRET"),
   databaseUrl: requireEnv("DATABASE_URL"),
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  oAuthAllowedRedirectOrigins: parseOriginList([
-    process.env.OAUTH_ALLOWED_REDIRECT_ORIGINS,
-    process.env.API_URL,
-    process.env.RENDER_EXTERNAL_URL,
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-  ]),
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
