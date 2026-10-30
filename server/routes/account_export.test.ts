@@ -25,6 +25,7 @@ vi.mock("../db", () => ({ getDb: async () => ({ execute: m.execute }) }));
 
 import { EventEmitter } from "node:events";
 import { accountExportRouter, writeExportChunk } from "./account_export";
+import { DATA_EXPORT_VERSION } from "../account_export";
 
 let server: Server;
 let baseUrl = "";
@@ -70,7 +71,7 @@ describe("GET /api/account/export", () => {
     expect(response.headers.get("content-disposition")).toMatch(/^attachment; filename="swimforge-dati-\d{4}-\d{2}-\d{2}\.json"$/);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(body).toMatchObject({ version: 2, user: { id: 42 } });
+    expect(body).toMatchObject({ version: DATA_EXPORT_VERSION, user: { id: 42 } });
     expect(body.data.laps).toEqual([]);
     expect(m.consume).toHaveBeenCalledWith(42);
   });

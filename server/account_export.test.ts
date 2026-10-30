@@ -84,6 +84,12 @@ function fakeDb(options: { laps?: number; lengths?: number; activities?: number;
       if (text.includes("FROM activity_ai_insights")) return { rows: [{ id: 1, user_id: 9, activity_id: 11, title: "Ritmo costante" }] };
       if (text.includes("FROM ai_insights_cache")) return { rows: [{ id: 2, user_id: 9, insights: ["📈 Progressione: bene"] }] };
       if (text.includes("FROM ai_coach_workouts")) return { rows: [{ id: 3, user_id: 9, workout_type: "pool" }] };
+      if (text.includes("FROM club_workout_completions")) {
+        return { rows: [{ id: 4, workout_id: 21, club_id: 3, user_id: 9, activity_id: null, completed_at: new Date("2026-10-29T07:30:00Z") }] };
+      }
+      if (text.includes("FROM xp_transactions_social_removed")) {
+        return { rows: [{ id: 5, user_id: 9, amount: 16, reason: "bonus", description: "action_xp:2026-10-01:comment:3" }] };
+      }
       return { rows: [] };
     }),
   };
@@ -100,7 +106,7 @@ describe("data export", () => {
   it("is JSON with a version, the user, the profile without secrets and the swim settings", async () => {
     const { json } = await writtenExport(fakeDb().db);
     expect(json.version).toBe(DATA_EXPORT_VERSION);
-    expect(json.version).toBe(2);
+    expect(json.version).toBe(3);
     expect(typeof json.exportedAt).toBe("string");
     expect(json.user).toMatchObject({ id: 9, email: "ada@example.com", created_at: "2026-01-01T00:00:00.000Z" });
     expect(json.profile).toMatchObject({ user_id: 9 });
@@ -195,6 +201,25 @@ describe("data export", () => {
     const built = await buildUserDataExport(fakeDb().db, 9);
     const { json } = await writtenExport(fakeDb().db);
     expect({ ...built, exportedAt: "x" }).toEqual({ ...json, exportedAt: "x" });
+  });
+
+  it("has the user's club workouts marked done and the archived social XP", async () => {
+    const { db, queries } = fakeDb();
+    const { json } = await writtenExport(db);
+    expect(json.data.clubWorkoutCompletions).toEqual([
+      { id: 4, workout_id: 21, club_id: 3, user_id: 9, activity_id: null, completed_at: "2026-10-29T07:30:00.000Z" },
+    ]);
+    expect(json.data.xpTransactionsSocialRemoved).toEqual([
+      { id: 5, user_id: 9, amount: 16, reason: "bonus", description: "action_xp:2026-10-01:comment:3" },
+    ]);
+    expect(queries.find((text) => text.includes("FROM club_workout_completions"))).toContain("WHERE user_id = $1");
+    expect(queries.find((text) => text.includes("FROM xp_transactions_social_removed"))).toContain("WHERE user_id = $1");
+  });
+
+  it("before the social XP script has run, the archive is an empty section", async () => {
+    const { json } = await writtenExport(fakeDb({ missing: /FROM xp_transactions_social_removed/ }).db);
+    expect(json.data.xpTransactionsSocialRemoved).toEqual([]);
+    expect(json.data.clubWorkoutCompletions).toHaveLength(1);
   });
 
   it("leaves a section empty when its table is missing", async () => {

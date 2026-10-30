@@ -9,8 +9,11 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { SqlExecutor } from "./lib/relation-exists";
 
-/** 2: laps, lengths, swim settings (CSS test, pace zones) and the AI coach rows. */
-export const DATA_EXPORT_VERSION = 2;
+/**
+ * 2: laps, lengths, swim settings (CSS test, pace zones) and the AI coach rows.
+ * 3: the club workouts marked done and the archived social XP.
+ */
+export const DATA_EXPORT_VERSION = 3;
 export const DATA_EXPORT_PAGE_SIZE = 1000;
 /** Each swim row carries its whole Garmin payload (raw_data): fewer of them per page. */
 export const DATA_EXPORT_ACTIVITY_PAGE_SIZE = 50;
@@ -69,6 +72,13 @@ const SECTIONS: Section[] = [
     page: (userId, afterId, limit) =>
       sql`SELECT * FROM xp_transactions WHERE user_id = ${userId} AND id > ${afterId} ORDER BY id LIMIT ${limit}`,
   },
+  {
+    // The XP once given for social actions, removed on 30/10/2026 and kept in an archive
+    // (scripts/sql/2026-10-30-remove-social-xp.sql). Before that script runs the table does not
+    // exist: an empty section.
+    key: "xpTransactionsSocialRemoved",
+    query: (userId) => sql`SELECT * FROM xp_transactions_social_removed WHERE user_id = ${userId} ORDER BY id`,
+  },
   // AI coach: the per-swim analyses, the Coach page advice and the generated workouts.
   { key: "activityInsights", query: (userId) => sql`SELECT * FROM activity_ai_insights WHERE user_id = ${userId} ORDER BY generated_at DESC` },
   { key: "coachInsights", query: (userId) => sql`SELECT * FROM ai_insights_cache WHERE user_id = ${userId}` },
@@ -96,6 +106,11 @@ const SECTIONS: Section[] = [
       ORDER BY id LIMIT ${limit}`,
   },
   { key: "clubMemberships", query: (userId) => sql`SELECT * FROM community_club_members WHERE user_id = ${userId} ORDER BY joined_at DESC` },
+  {
+    // «Segna completato» of the club workouts: the user's own rows only.
+    key: "clubWorkoutCompletions",
+    query: (userId) => sql`SELECT * FROM club_workout_completions WHERE user_id = ${userId} ORDER BY completed_at DESC`,
+  },
   {
     // The reports the user filed. Reports they handled as a moderator are other users' data
     // (reporter and reason): not part of this user's export.
