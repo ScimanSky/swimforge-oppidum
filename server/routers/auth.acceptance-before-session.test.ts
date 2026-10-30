@@ -12,23 +12,18 @@ const m = vi.hoisted(() => ({
   hasRequiredLegalConsents: vi.fn(),
   recordLegalAcceptance: vi.fn(),
   createOAuthUser: vi.fn(),
-  registerUser: vi.fn(),
-  deleteUserAccount: vi.fn(),
 }));
 
 vi.mock("./_shared", async () => {
   const actual = await vi.importActual<typeof import("./_shared")>("./_shared");
   return {
     ...actual,
-    applyRateLimit: vi.fn(async () => {}),
     verifySupabaseAccessToken: m.verifySupabaseAccessToken,
     db: {
       ...actual.db,
       getUserByEmail: m.getUserByEmail,
       updateUserLastSignedIn: m.updateUserLastSignedIn,
       createOAuthUser: m.createOAuthUser,
-      registerUser: m.registerUser,
-      deleteUserAccount: m.deleteUserAccount,
     },
     sdk: { createSessionToken: m.createSessionToken },
   };
@@ -65,10 +60,6 @@ beforeEach(() => {
     m.order.push("create");
     return { success: true, user: { id: 8, email: "a@b.it", name: null, sessionTokenVersion: 1 } };
   });
-  m.registerUser.mockImplementation(async () => {
-    m.order.push("create");
-    return { success: true, user: { id: 8, email: "a@b.it", name: "a", sessionTokenVersion: 1 } };
-  });
   m.createSessionToken.mockImplementation(async () => {
     m.order.push("session");
     return "jwt-token";
@@ -77,7 +68,6 @@ beforeEach(() => {
   m.recordLegalAcceptance.mockImplementation(async () => {
     m.order.push("record");
   });
-  m.deleteUserAccount.mockResolvedValue({ id: 8 });
 });
 
 describe("auth.syncSupabaseUser", () => {
@@ -109,25 +99,5 @@ describe("auth.syncSupabaseUser", () => {
     ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
     expect(c.res.cookie).not.toHaveBeenCalled();
     expect(m.createSessionToken).not.toHaveBeenCalled();
-  });
-});
-
-describe("auth.register", () => {
-  const registerInput = { email: "a@b.it", password: "Abcdefgh123!", legalAcceptance: acceptance };
-
-  it("records the acceptance before the session", async () => {
-    await authRouter.createCaller(ctx()).register(registerInput);
-    expect(m.order).toEqual(["create", "record", "session", "cookie", "cookie"]);
-  });
-
-  it("record fails → no Set-Cookie, and the account without acceptance is removed", async () => {
-    m.recordLegalAcceptance.mockRejectedValue(new Error("connection reset"));
-    const c = ctx();
-    await expect(authRouter.createCaller(c).register(registerInput)).rejects.toMatchObject({
-      code: "INTERNAL_SERVER_ERROR",
-    });
-    expect(c.res.cookie).not.toHaveBeenCalled();
-    expect(m.createSessionToken).not.toHaveBeenCalled();
-    expect(m.deleteUserAccount).toHaveBeenCalledWith(8);
   });
 });

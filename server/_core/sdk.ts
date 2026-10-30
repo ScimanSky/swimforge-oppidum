@@ -23,8 +23,9 @@ export type SessionPayload = {
 
 /**
  * Sessions of the app: signed JWTs (cookie on the web, bearer on the native app) issued only by
- * auth.register and auth.syncSupabaseUser, after Termini, Privacy and the age are recorded. No
- * other path creates accounts or sessions (the Manus OAuth callback and its upsert are gone).
+ * auth.syncSupabaseUser, for a Supabase identity, after Termini, Privacy and the age are recorded.
+ * No other path creates accounts or sessions (local registration and login, the Manus OAuth
+ * callback and its upsert are gone).
  */
 class SDKServer {
   private parseCookies(cookieHeader: string | undefined) {

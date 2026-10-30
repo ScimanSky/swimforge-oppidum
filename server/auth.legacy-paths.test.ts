@@ -2,9 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-// Accounts and sessions exist only after Termini, Privacy and the age are accepted: the legacy
-// paths that could create either without it (local password login, the Manus OAuth callback and
-// the OAuth upsert inside authenticateRequest) are gone.
+// Accounts and sessions exist only after Termini, Privacy and the age are accepted, through a
+// Supabase identity: the legacy paths (local password registration and login, the Manus OAuth
+// callback and the OAuth upsert inside authenticateRequest) are gone.
 
 const m = vi.hoisted(() => {
   const previousEnv = {
@@ -39,9 +39,12 @@ afterAll(() => {
 const root = path.resolve(import.meta.dirname, "..");
 
 describe("legacy auth paths", () => {
-  it("has no local password login", () => {
-    expect(Object.keys(authRouter._def.procedures)).not.toContain("login");
-    expect(Object.keys(authRouter._def.procedures)).toEqual(expect.arrayContaining(["register", "syncSupabaseUser"]));
+  it("has no local password login and no local registration", () => {
+    const procedures = Object.keys(authRouter._def.procedures);
+    expect(procedures).not.toContain("login");
+    // auth.register created a password account for any email, unverified (account pre-hijack).
+    expect(procedures).not.toContain("register");
+    expect(procedures).toContain("syncSupabaseUser");
   });
 
   it("serves no OAuth callback", () => {

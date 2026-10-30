@@ -196,58 +196,6 @@ export async function getDb() {
 // USER QUERIES
 // ============================================
 
-// Register a new user with email and password
-export async function registerUser(email: string, password: string, name?: string): Promise<{ success: boolean; user?: User; error?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
-  }
-
-  try {
-    // Hash password before transaction to keep lock time short.
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const user = await db.transaction(async (tx) => {
-      const existing = await tx.select().from(users).where(eq(users.email, email)).limit(1);
-      if (existing.length > 0) {
-        throw new Error("Email already registered");
-      }
-
-      const result = await tx.insert(users).values({
-        email,
-        passwordHash,
-        name: name || email.split('@')[0],
-        loginMethod: 'email',
-        lastSignedIn: new Date(),
-      }).returning();
-
-      if (result.length === 0) {
-        throw new Error("Failed to create user");
-      }
-
-      const createdUser = result[0];
-      await tx.insert(swimmerProfiles).values({ userId: createdUser.id });
-      return createdUser;
-    });
-
-    // Best-effort badge assignment after successful transactional user creation.
-    await updateUserProfileBadge(user.id, 0);
-
-    return { success: true, user };
-  } catch (error) {
-    if (error instanceof Error && error.message === "Email already registered") {
-      return { success: false, error: "Email already registered" };
-    }
-    const { kind, message } = classifyAsyncError(error);
-    logger.error(`[Database] Failed to register user (${kind}): ${message}`, {
-      event: "auth:register_failed",
-      kind,
-      message,
-    });
-    return { success: false, error: "Registration failed" };
-  }
-}
-
 // Get user by ID
 export async function getUserById(id: number): Promise<User | undefined> {
   const db = await getDb();

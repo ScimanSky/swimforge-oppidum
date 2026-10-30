@@ -1,9 +1,8 @@
 import {
     publicProcedure, protectedProcedure, router, z, db,
     TRPCError, sdk, verifySupabaseAccessToken,
-    registrationLimiter,
     COOKIE_NAME, getSessionCookieOptions, issueCsrfCookie,
-    applyRateLimit, sql, logger,
+    sql, logger,
 } from "./_shared";
 import { CSRF_COOKIE_NAME } from "@shared/const";
 import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
@@ -37,14 +36,6 @@ export function toSelfUser(user: User | null) {
 
 const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
-const REGISTRATION_PASSWORD_SCHEMA = z
-    .string()
-    .min(12, "Password must be at least 12 characters")
-    .refine((value) => new TextEncoder().encode(value).length <= 72, "Password must be at most 72 bytes")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
 
 /** The acceptance could not be stored: no session is issued without it. */
 const ACCEPTANCE_NOT_RECORDED_MESSAGE = "Non è stato possibile registrare l'accettazione di Termini e Privacy. Riprova.";
@@ -61,53 +52,6 @@ const LEGAL_ACCEPTANCE_SCHEMA = z.object({
 
 export const authRouter = router({
     me: publicProcedure.query(opts => toSelfUser(opts.ctx.user)),
-
-    // Register with email and password
-    register: publicProcedure
-        .input(z.object({
-            email: z.string().email(),
-            password: REGISTRATION_PASSWORD_SCHEMA,
-            name: z.string().optional(),
-            legalAcceptance: LEGAL_ACCEPTANCE_SCHEMA,
-        }))
-        .mutation(async ({ ctx, input }) => {
-            await applyRateLimit(registrationLimiter, ctx.req, ctx.res);
-            const result = await db.registerUser(input.email, input.password, input.name);
-
-            if (!result.success || !result.user) {
-                throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: result.error || "Registration failed"
-                });
-            }
-
-            // The acceptance is recorded before any session exists. If it cannot be, the account
-            // just created goes away again: no account, no session without the acceptance.
-            try {
-                await recordLegalAcceptance(result.user.id, ctx.req);
-            } catch (error) {
-                logger.error("[Auth] Legal acceptance not recorded at registration", {
-                    event: "auth:legal_acceptance_record_failed",
-                    userId: result.user.id,
-                    message: error instanceof Error ? error.message : String(error),
-                });
-                await db.deleteUserAccount(result.user.id).catch(() => null);
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: ACCEPTANCE_NOT_RECORDED_MESSAGE });
-            }
-
-            // Create session token
-            const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
-                name: result.user.name || "",
-                expiresInMs: ENV.sessionMaxAgeMs,
-                tokenVersion: result.user.sessionTokenVersion ?? 1,
-            });
-
-            const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
-            issueCsrfCookie(ctx.req, ctx.res);
-
-            return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
-        }),
 
     logout: publicProcedure.mutation(async ({ ctx }) => {
         if (ctx.user?.id) {
