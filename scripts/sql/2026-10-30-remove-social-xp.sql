@@ -81,6 +81,19 @@ SET level = COALESCE((SELECT max(lt.level) FROM level_thresholds lt WHERE lt.xp_
 WHERE sp.level IS DISTINCT FROM
       COALESCE((SELECT max(lt.level) FROM level_thresholds lt WHERE lt.xp_required <= (sp.total_xp)), 1);
 
+-- The archive is not for the Supabase API roles (anon, authenticated: the keys shipped in the
+-- app): row level security on, their privileges revoked. The role running this script owns the
+-- archive (it creates it) and is the app's role, and an owner is not subject to RLS without
+-- FORCE ROW LEVEL SECURITY, so nothing changes for the app. A database without the Supabase
+-- roles (local, tests) skips it.
+DO $$
+BEGIN
+  IF to_regrole('anon') IS NOT NULL AND to_regrole('authenticated') IS NOT NULL THEN
+    ALTER TABLE public.xp_transactions_social_removed ENABLE ROW LEVEL SECURITY;
+    REVOKE ALL ON TABLE public.xp_transactions_social_removed FROM anon, authenticated;
+  END IF;
+END $$;
+
 COMMIT;
 
 -- Checks (read only), after running:
