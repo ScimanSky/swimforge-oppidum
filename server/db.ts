@@ -281,7 +281,6 @@ export async function updateUser(
   await db.update(users).set(updatePayload).where(eq(users.id, userId));
 }
 
-
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
