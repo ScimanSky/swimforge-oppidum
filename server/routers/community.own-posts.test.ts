@@ -137,6 +137,31 @@ describe("community.latestSwim", () => {
     });
   });
 
+  it("«shared» only with a live post: a swim marked shared whose post is gone opens the share sheet", async () => {
+    const { getDb } = await import("../db");
+    const execute = vi.fn(async (_query: unknown) => ({
+      rows: [{ id: 99, activity_name: "Soglia", activity_date: "2026-10-28T08:00:00Z", share_to_feed: false }],
+    }));
+    vi.mocked(getDb).mockResolvedValue({ execute } as never);
+    await expect(communityRouter.createCaller(ctx()).latestSwim()).resolves.toMatchObject({ shared: false });
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const text = new PgDialect().sqlToQuery(execute.mock.calls[0][0] as never).sql;
+    expect(text).toMatch(/a\.share_to_feed AND EXISTS \(\s+SELECT 1 FROM social_posts p\s+WHERE p\.activity_id = a\.id AND p\.user_id = a\.user_id AND p\.is_deleted = false/);
+  });
+
+  it("the share sheet finds that swim too (unsharedActivities with includeActivityId)", async () => {
+    const { getDb } = await import("../db");
+    const execute = vi.fn(async (_query: unknown) => ({ rows: [] as unknown[] }));
+    execute.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 99 }] });
+    vi.mocked(getDb).mockResolvedValue({ execute } as never);
+    await expect(communityRouter.createCaller(ctx()).unsharedActivities({ includeActivityId: 99 })).resolves.toEqual([
+      { id: 99 },
+    ]);
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const included = new PgDialect().sqlToQuery(execute.mock.calls[1][0] as never).sql;
+    expect(included).toMatch(/a\.share_to_feed = false\s+OR NOT EXISTS/);
+  });
+
   it("no swims yet: null", async () => {
     const { getDb } = await import("../db");
     vi.mocked(getDb).mockResolvedValue({ execute: vi.fn(async () => ({ rows: [] })) } as never);

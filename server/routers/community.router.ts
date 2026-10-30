@@ -762,10 +762,20 @@ export const communityRouter = router({
             `);
             const rows = result.rows as Array<{ id: number }>;
             if (includeId && !rows.some((row) => Number(row.id) === includeId)) {
+                // The swim asked for (latestSwim): also when it is marked shared but its post is
+                // gone, so sharing it again is possible (see latestSwim).
                 const included = await db.execute(sql`
-                    SELECT id, activity_name, distance_meters, duration_seconds, activity_date, activity_source
-                    FROM swimming_activities
-                    WHERE user_id = ${ctx.user.id} AND share_to_feed = false AND id = ${includeId}
+                    SELECT a.id, a.activity_name, a.distance_meters, a.duration_seconds, a.activity_date, a.activity_source
+                    FROM swimming_activities a
+                    WHERE a.user_id = ${ctx.user.id}
+                      AND a.id = ${includeId}
+                      AND (
+                        a.share_to_feed = false
+                        OR NOT EXISTS (
+                          SELECT 1 FROM social_posts p
+                          WHERE p.activity_id = a.id AND p.user_id = a.user_id AND p.is_deleted = false
+                        )
+                      )
                     LIMIT 1
                 `);
                 return [...included.rows, ...rows];
@@ -773,7 +783,11 @@ export const communityRouter = router({
             return rows;
         }),
 
-    /** The user's most recent swim, for «Condividi l'ultima nuotata»; null when none. */
+    /**
+     * The user's most recent swim, for «Condividi l'ultima nuotata»; null when none. `shared`
+     * only when its post is really in the feed: a swim marked shared whose post is gone (an
+     * older inconsistency) opens the share sheet, not an editor with nothing to edit.
+     */
     latestSwim: protectedProcedure
         .query(async ({ ctx }) => {
             const { getDb } = await import("../db");
@@ -782,10 +796,14 @@ export const communityRouter = router({
             if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
 
             const result = await db.execute(sql`
-                SELECT id, activity_name, activity_date, share_to_feed
-                FROM swimming_activities
-                WHERE user_id = ${ctx.user.id}
-                ORDER BY activity_date DESC, id DESC
+                SELECT a.id, a.activity_name, a.activity_date,
+                    (a.share_to_feed AND EXISTS (
+                        SELECT 1 FROM social_posts p
+                        WHERE p.activity_id = a.id AND p.user_id = a.user_id AND p.is_deleted = false
+                    )) AS share_to_feed
+                FROM swimming_activities a
+                WHERE a.user_id = ${ctx.user.id}
+                ORDER BY a.activity_date DESC, a.id DESC
                 LIMIT 1
             `);
             const row = result.rows[0] as
