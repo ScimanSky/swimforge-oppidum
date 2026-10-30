@@ -138,8 +138,38 @@ describe("activity insight prompt", () => {
     expect(prompt).toContain("Lap: 80");
     expect(prompt).toContain("Bracciate per vasca: 16");
     expect(prompt).toContain("Stroke: freestyle");
-    expect(prompt).toContain("Training effect: 32");
-    expect(prompt).toContain("Anaerobic TE: 11");
+    // Stored ×10 (0-50): the prompt carries Garmin's 0-5 scale.
+    expect(prompt).toContain("Training effect aerobico: 3.2/5");
+    expect(prompt).toContain("Training effect anaerobico: 1.1/5");
+    expect(prompt).not.toContain("Training effect: 32");
+    // Integer centimetres per stroke.
+    expect(prompt).toContain("Stroke distance: 190 cm");
+  });
+
+  it("reads the Garmin fallbacks on their own scale: TE already 0-5, stroke distance in metres", async () => {
+    const swim = garminSwim() as Record<string, unknown>;
+    delete swim.training_effect;
+    delete swim.anaerobic_training_effect;
+    delete swim.avg_stroke_distance;
+    swim.raw_data = { activity: { aerobicTrainingEffect: 2.7, anaerobicTrainingEffect: 0.4, avgStrokeDistance: 1.85 } };
+    await generateActivityInsight(swim);
+    const prompt = m.prompts[0];
+    expect(prompt).toContain("Training effect aerobico: 2.7/5");
+    expect(prompt).toContain("Training effect anaerobico: 0.4/5");
+    expect(prompt).toContain("Stroke distance: 185 cm");
+  });
+
+  it("writes n/d without units when the swim has no TE or stroke distance", async () => {
+    const swim = garminSwim() as Record<string, unknown>;
+    delete swim.training_effect;
+    delete swim.anaerobic_training_effect;
+    delete swim.avg_stroke_distance;
+    swim.raw_data = null;
+    await generateActivityInsight(swim);
+    const prompt = m.prompts[0];
+    expect(prompt).toContain("Training effect aerobico: n/d");
+    expect(prompt).toContain("Training effect anaerobico: n/d");
+    expect(prompt).toContain("Stroke distance: n/d");
   });
 
   it("never uses the Garmin activity name as the stroke", async () => {

@@ -321,16 +321,28 @@ function normalizeActivity(activity: Record<string, unknown>) {
       raw?.["avgStrokeCadenceRpm"] ??
       raw?.["avgStrokeCadence"]
   );
-  const avgStrokeDistance = toNumber(
-    activity["avgStrokeDistance"] ?? activity["avg_stroke_distance"] ?? raw?.["avgStrokeDistance"]
+  // Centimetres per stroke: the column is integer cm, Garmin's own field is in metres.
+  const avgStrokeDistance = (() => {
+    const stored = toNumber(activity["avgStrokeDistance"] ?? activity["avg_stroke_distance"]);
+    if (stored !== null) return Math.round(stored);
+    const metres = toNumber(raw?.["avgStrokeDistance"]);
+    return metres === null ? null : Math.round(metres < 10 ? metres * 100 : metres);
+  })();
+  // Garmin's 0-5 scale: the columns store it ×10 (0-50, see normalizeTrainingEffect in garmin.ts),
+  // the raw Garmin fields carry it as is.
+  const trainingEffectOnFive = (stored: unknown, garmin: unknown): number | null => {
+    const fromRow = toNumber(stored);
+    if (fromRow !== null) return Math.round(fromRow) / 10;
+    const fromGarmin = toNumber(garmin);
+    return fromGarmin === null ? null : Math.round(fromGarmin * 10) / 10;
+  };
+  const trainingEffect = trainingEffectOnFive(
+    activity["trainingEffect"] ?? activity["training_effect"],
+    raw?.["aerobicTrainingEffect"],
   );
-  const trainingEffect = toNumber(
-    activity["trainingEffect"] ?? activity["training_effect"] ?? raw?.["aerobicTrainingEffect"]
-  );
-  const anaerobicTrainingEffect = toNumber(
-    activity["anaerobicTrainingEffect"] ??
-      activity["anaerobic_training_effect"] ??
-      raw?.["anaerobicTrainingEffect"]
+  const anaerobicTrainingEffect = trainingEffectOnFive(
+    activity["anaerobicTrainingEffect"] ?? activity["anaerobic_training_effect"],
+    raw?.["anaerobicTrainingEffect"],
   );
   const vo2MaxValue = toNumber(
     activity["vo2MaxValue"] ?? activity["vo2_max_value"] ?? raw?.["vO2MaxValue"] ?? raw?.["vo2_max_value"]
@@ -386,6 +398,11 @@ function formatHrZones(zoneSeconds: Array<number | null>): string {
   return zoneSeconds.map((seconds, index) => `Z${index + 1} ${seconds ?? 0}`).join(", ");
 }
 
+/** «3.2/5» (Garmin's training effect scale), n/d when the swim has none. */
+function formatTrainingEffect(value: number | null): string {
+  return value === null ? "n/d" : `${value.toFixed(1)}/5`;
+}
+
 /**
  * The per-swim analysis prompt. Only explicit swim fields (distance, time, pace, pool, laps, heart
  * rate and zones, SWOLF, strokes, training effect): never the raw Garmin payload, which carries the
@@ -419,9 +436,9 @@ DATI SESSIONE:
 - SWOLF medio: ${normalized.avgSwolf ?? "n/d"}
 - Bracciate per vasca: ${normalized.avgStrokesPerLength ?? "n/d"}
 - Stroke cadence: ${normalized.avgStrokeCadence ?? "n/d"}
-- Stroke distance: ${normalized.avgStrokeDistance ?? "n/d"}
-- Training effect: ${normalized.trainingEffect ?? "n/d"}
-- Anaerobic TE: ${normalized.anaerobicTrainingEffect ?? "n/d"}
+- Stroke distance: ${normalized.avgStrokeDistance === null ? "n/d" : `${normalized.avgStrokeDistance} cm`}
+- Training effect aerobico: ${formatTrainingEffect(normalized.trainingEffect)}
+- Training effect anaerobico: ${formatTrainingEffect(normalized.anaerobicTrainingEffect)}
 - VO2max: ${normalized.vo2MaxValue ?? "n/d"}
 - Segmenti/Laps disponibili:
 - ${segmentContextText}
