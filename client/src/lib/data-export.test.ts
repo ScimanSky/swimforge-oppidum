@@ -1,9 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DATA_EXPORT_PATH, dataExportFileName, downloadDataExport } from "./data-export";
+import { DATA_EXPORT_PATH, NATIVE_DATA_EXPORT_MESSAGE, dataExportFileName, downloadDataExport } from "./data-export";
 
 describe("data export download", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    delete (globalThis as { Capacitor?: unknown }).Capacitor;
+  });
+
+  it("on the Android app claims nothing: no download (the WebView cannot save it), the site instead", async () => {
+    (globalThis as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    const fetchImpl = vi.fn();
+    await expect(downloadDataExport(fetchImpl as unknown as typeof fetch)).rejects.toThrow(NATIVE_DATA_EXPORT_MESSAGE);
+    expect(NATIVE_DATA_EXPORT_MESSAGE).toContain("Scarica i tuoi dati dal sito swimforge.it");
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("names the file with the day", () => {

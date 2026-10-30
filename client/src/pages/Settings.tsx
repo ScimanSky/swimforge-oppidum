@@ -46,7 +46,7 @@ import { homePathForPlatform } from "@/lib/navigation"
 import { isNativePlatform } from "@/lib/platform"
 import { formatInteger } from "@/lib/format"
 import { errorToastMessage } from "@/lib/trpc-errors"
-import { downloadDataExport } from "@/lib/data-export"
+import { NATIVE_DATA_EXPORT_MESSAGE, canDownloadDataExportHere, downloadDataExport } from "@/lib/data-export"
 import { ClubTransferList, type BlockingClub } from "@/components/settings/ClubTransferList"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
@@ -1424,16 +1424,21 @@ export default function Settings() {
 
             <Section title="Dati e account">
               <div className="mt-2 divide-y divide-border">
-                <ActionRow
-                  title="Esporta i dati"
-                  description="Scarica tutti i tuoi dati in formato JSON"
-                  action={
-                    <Button variant="outline" onClick={handleExportData} disabled={isExporting}>
-                      <Download aria-hidden />
-                      {isExporting ? "Esportazione…" : "Esporta"}
-                    </Button>
-                  }
-                />
+                {canDownloadDataExportHere() ? (
+                  <ActionRow
+                    title="Esporta i dati"
+                    description="Scarica tutti i tuoi dati in formato JSON"
+                    action={
+                      <Button variant="outline" onClick={handleExportData} disabled={isExporting}>
+                        <Download aria-hidden />
+                        {isExporting ? "Esportazione…" : "Esporta"}
+                      </Button>
+                    }
+                  />
+                ) : (
+                  // The Android WebView cannot save the file: the website can.
+                  <ActionRow title="Esporta i dati" description={NATIVE_DATA_EXPORT_MESSAGE} action={null} />
+                )}
                 <ActionRow
                   title="Esci da tutti i dispositivi"
                   description="Disconnetti tutte le sessioni attive"

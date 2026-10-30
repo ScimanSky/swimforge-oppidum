@@ -399,5 +399,24 @@ describe("Settings (Corsia)", () => {
     expect(state.refetch["auth.deleteAccountStatus"]).toHaveBeenCalled();
     expect(screen.queryByRole("dialog", { name: "Conferma eliminazione account" })).toBeNull();
   });
+
+  it("esportazione sull'app Android: messaggio onesto verso il sito, nessun «Esporta» né «completata»", async () => {
+    (globalThis as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    try {
+      state.search = "tab=privacy";
+      render(<Settings />);
+      expect(screen.getByText(/Scarica i tuoi dati dal sito swimforge\.it/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Esporta" })).toBeNull();
+      expect(toast.success).not.toHaveBeenCalled();
+    } finally {
+      delete (globalThis as { Capacitor?: unknown }).Capacitor;
+    }
+  });
+
+  it("esportazione sul web: un pulsante «Esporta»", () => {
+    state.search = "tab=privacy";
+    render(<Settings />);
+    expect(screen.getByRole("button", { name: "Esporta" })).toBeInTheDocument();
+  });
 });
 
