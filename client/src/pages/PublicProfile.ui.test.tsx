@@ -194,6 +194,18 @@ describe("PublicProfile (Corsia)", () => {
     expect(screen.queryByRole("button", { name: "Segui" })).toBeNull();
   });
 
+  it("the swimmer's club (their «Club principale», as the server allows) under the name", () => {
+    state.profile.clubName = "Oppidum Cagliari";
+    renderProfile();
+    const card = screen.getByRole("region", { name: "Ada Rossi" });
+    expect(within(card).getByText("Oppidum Cagliari")).toBeInTheDocument();
+    cleanup();
+
+    state.profile.clubName = null;
+    renderProfile();
+    expect(screen.queryByText("Oppidum Cagliari")).toBeNull();
+  });
+
   it("only a username: it is the title, without a repeated @username", () => {
     state.profile.name = null;
     renderProfile();

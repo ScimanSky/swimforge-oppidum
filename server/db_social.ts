@@ -1,6 +1,7 @@
 import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { authorClubNameSql } from "./lib/author-club";
 import {
   socialPosts,
   socialSplashes,
@@ -15,32 +16,8 @@ export type FeedScope = "global" | "self" | "following";
 export type PostReportReason = "spam" | "offensive" | "harassment" | "misinformation" | "other";
 export type PostReportStatus = "open" | "in_review" | "resolved" | "rejected";
 
-/**
- * The name of the post author's most recent club (`p` is the social_posts alias), shown
- * next to the author. A club that is not public shows only to the viewer's own clubs:
- * otherwise the feed would tell everyone who belongs to a private or invite-only club.
- */
-export function authorClubNameSql(viewerId: number) {
-  return sql`(
-    SELECT c.name
-    FROM community_club_members m
-    JOIN community_clubs c ON c.id = m.club_id
-    WHERE m.user_id = p.user_id
-      AND m.status = 'active'
-      AND (
-        (c.visibility = 'public' AND c.is_private IS NOT TRUE)
-        OR EXISTS (
-          SELECT 1
-          FROM community_club_members vm
-          WHERE vm.club_id = c.id
-            AND vm.user_id = ${viewerId}
-            AND vm.status = 'active'
-        )
-      )
-    ORDER BY m.joined_at DESC NULLS LAST, m.id DESC
-    LIMIT 1
-  )`;
-}
+/** The author's club next to their name: see lib/author-club.ts («Club principale»). */
+export { authorClubNameSql };
 
 /**
  * Swim fields of a feed post (`p` post, `a` its activity): Garmin's average pace (from moving

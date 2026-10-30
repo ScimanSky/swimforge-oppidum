@@ -3,9 +3,9 @@ import { type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { TrpcContext } from "./_core/context";
 
-// The feed and the post detail show the name of the author's club next to the author.
-// A club that is not public must not leak who belongs to it: its name shows only to
-// its active members.
+// The feed and the post detail show the name of the author's club next to the author: their
+// «Club principale», else their latest club. A club that is not public must not leak who
+// belongs to it: its name shows only to its active members.
 
 const VIEWER_ID = 42;
 const dialect = new PgDialect();
@@ -45,21 +45,20 @@ function expectClubNameVisibleOnlyWhenAllowed(query: unknown, viewerId: number) 
   const { sql: text, params } = render(query);
   const end = text.indexOf("AS user_club_name");
   expect(end, "the query selects user_club_name").toBeGreaterThan(0);
-  const start = text.lastIndexOf("SELECT c.name", end);
-  expect(start, "user_club_name is a club name subquery").toBeGreaterThan(0);
+  const start = text.lastIndexOf("SELECT CASE", text.lastIndexOf("pref.primary_club) = 'null'", end));
+  expect(start, "user_club_name is the author club subquery").toBeGreaterThan(0);
   const subquery = text.slice(start, end);
 
-  // Only the author's active memberships.
+  // «Club principale» first, else the author's latest club: only active memberships.
+  expect(subquery).toMatch(/'primaryClubId'/);
+  expect(subquery).toMatch(/pm\.user_id = p\.user_id/);
   expect(subquery).toMatch(/m\.user_id = p\.user_id/);
   expect(subquery).toMatch(/m\.status = 'active'/);
-  // A public club shows to everyone...
-  expect(subquery).toMatch(/c\.visibility = 'public' AND c\.is_private IS NOT TRUE/);
-  // ...any other club only to the viewer's own active memberships of it.
-  expect(subquery).toMatch(/vm\.club_id = c\.id/);
-  expect(subquery).toMatch(/vm\.status = 'active'/);
-  const viewerParam = /vm\.user_id = \$(\d+)/.exec(subquery);
-  expect(viewerParam, "the membership check is bound to the viewer").not.toBeNull();
-  expect(params[Number(viewerParam![1]) - 1]).toBe(viewerId);
+  // Both ways a public club shows to everyone, any other club only to its active members.
+  expect(subquery.match(/c\.visibility = 'public' AND c\.is_private IS NOT TRUE/g)).toHaveLength(2);
+  const viewerParams = Array.from(subquery.matchAll(/vm\.user_id = \$(\d+)/g));
+  expect(viewerParams, "both membership checks are bound to the viewer").toHaveLength(2);
+  for (const match of viewerParams) expect(params[Number(match[1]) - 1]).toBe(viewerId);
 }
 
 describe("getSocialFeed user_club_name", () => {

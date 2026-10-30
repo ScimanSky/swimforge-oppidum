@@ -79,6 +79,8 @@ export default function PublicProfile() {
   const coverUrl = text(profile.coverUrl) || text(profile.cover_url)
   const bio = text(profile.bio)
   const location = text(profile.location)
+  // «Club principale» (else the latest club): only a club this viewer may see.
+  const clubName = text(profile.clubName)
   const level = toFiniteNumber(profile.level)
   const totalXp = toFiniteNumber(profile.totalXp)
   const isFollowing = Boolean(profile.isFollowing)
@@ -111,6 +113,7 @@ export default function PublicProfile() {
                 {name && username ? (
                   <p className="truncate text-sm text-muted-foreground">@{username}</p>
                 ) : null}
+                {clubName ? <p className="truncate text-sm text-muted-foreground">{clubName}</p> : null}
               </div>
             </div>
 

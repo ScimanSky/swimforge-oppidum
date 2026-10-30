@@ -54,6 +54,7 @@ import GarminSection from "@/components/GarminSection"
 import GarminSyncCountPicker from "@/components/GarminSyncCountPicker"
 import { garminSyncButtonLabel, useGarminSyncCount } from "@/lib/garmin-sync-count"
 import { Link as RouterLink, useLocation } from "wouter"
+import { PrimaryClubField } from "@/components/club/PrimaryClubField"
 
 const notificationSettings = [
   {
@@ -1050,6 +1051,14 @@ export default function Settings() {
                     <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
                       {updateProfileMutation.isPending ? "Salvataggio…" : "Salva modifiche"}
                     </Button>
+                  </div>
+                </Section>
+
+                <Section title="Club">
+                  <div className="mt-4">
+                    <PrimaryClubField
+                      value={isRecord(profile?.preferences) ? profile.preferences.primaryClubId : undefined}
+                    />
                   </div>
                 </Section>
 

@@ -170,6 +170,18 @@ describe("public profiles and search", () => {
     expect(Object.keys(profile!)).not.toContain("email");
   });
 
+  it("getUserPublicProfile shows the swimmer's club the way the feed does («Club principale», visibility)", async () => {
+    const { getUserPublicProfile } = await import("./db_public_profiles");
+    m.state.selectResults.push([{ userId: 5, name: "Ada", username: "ada", clubName: "Oppidum Cagliari", privacySettings: null }]);
+    const profile = await getUserPublicProfile({ viewerUserId: 1, targetUserId: 5 });
+    expect(profile?.clubName).toBe("Oppidum Cagliari");
+    const { sql: text, params } = dialect.sqlToQuery((m.state.selections[0] as any).clubName as SQL);
+    expect(text).toMatch(/'primaryClubId'/);
+    expect(text).toMatch(/psp\.user_id = "users"\."id"/);
+    const viewerParam = /vm\.user_id = \$(\d+)/.exec(text);
+    expect(params[Number(viewerParam![1]) - 1]).toBe(1);
+  });
+
   it("getUserPublicProfile does not hand out the target's raw privacy settings", async () => {
     const { getUserPublicProfile } = await import("./db_public_profiles");
     m.state.selectResults.push(

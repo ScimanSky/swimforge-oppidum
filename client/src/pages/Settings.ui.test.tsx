@@ -31,6 +31,10 @@ vi.mock("@/components/GarminSection", () => ({
   ),
 }));
 vi.mock("@/lib/supabase", () => ({ supabase: { auth: { signOut: vi.fn() } } }));
+// Tested on its own (PrimaryClubField.ui.test): here only what Settings hands it.
+vi.mock("@/components/club/PrimaryClubField", () => ({
+  PrimaryClubField: ({ value }: { value: unknown }) => <p>Club principale scelto: {JSON.stringify(value) ?? "nessuna scelta"}</p>,
+}));
 vi.mock("@/lib/push", () => ({ registerPushToken: vi.fn(), unregisterPushToken: vi.fn(async () => {}) }));
 // The Radix switch and select measure themselves; jsdom has no ResizeObserver.
 vi.stubGlobal(
@@ -152,6 +156,22 @@ describe("Settings (Corsia)", () => {
     expect(screen.getByLabelText("Data di nascita")).toHaveAttribute("autocomplete", "bday");
     expect(screen.getByLabelText("Bio")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cambia foto profilo" })).toBeInTheDocument();
+  });
+
+  it("profilo: la sezione «Club» con il club principale salvato nelle preferenze", () => {
+    render(<Settings />);
+    const section = screen.getByRole("region", { name: "Club" });
+    expect(section).toHaveTextContent("Club principale scelto: nessuna scelta");
+    cleanup();
+
+    state.queries["profile.get"] = { data: { ...profile, preferences: { ...profile.preferences, primaryClubId: 3 } } };
+    render(<Settings />);
+    expect(screen.getByRole("region", { name: "Club" })).toHaveTextContent("Club principale scelto: 3");
+    cleanup();
+
+    state.queries["profile.get"] = { data: { ...profile, preferences: { ...profile.preferences, primaryClubId: null } } };
+    render(<Settings />);
+    expect(screen.getByRole("region", { name: "Club" })).toHaveTextContent("Club principale scelto: null");
   });
 
   it("profilo in caricamento: scheletro, nessun modulo vuoto", () => {

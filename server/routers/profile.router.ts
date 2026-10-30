@@ -144,6 +144,30 @@ export const profileRouter = router({
             });
             return { success: true };
         }),
+    /**
+     * «Club principale»: the club shown next to the user's name (feed, post, public profile).
+     * One of their active clubs, or null for «Nessuno» (no club at all). Saved in
+     * preferences.primaryClubId with the atomic merge; leaving that club later writes nothing,
+     * the club name query ignores a club they are no longer an active member of.
+     */
+    setPrimaryClub: protectedProcedure
+        .input(z.object({ clubId: z.number().int().positive().nullable() }))
+        .mutation(async ({ ctx, input }) => {
+            if (input.clubId !== null) {
+                const { getClubMemberRole } = await import("../db_clubs");
+                const membership = await getClubMemberRole(ctx.user.id, input.clubId);
+                if (membership?.status !== "active") {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: "Puoi scegliere solo un club di cui fai parte.",
+                    });
+                }
+            }
+            const saved = await mergeSwimmerPreferences(ctx.user.id, { primaryClubId: input.clubId });
+            if (!saved) throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            return { primaryClubId: input.clubId };
+        }),
+
     uploadMedia: protectedProcedure
         .input(
             z.object({
