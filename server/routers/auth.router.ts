@@ -46,12 +46,13 @@ const REGISTRATION_PASSWORD_SCHEMA = z
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
 
+/** The acceptance could not be stored: no session is issued without it. */
+const ACCEPTANCE_NOT_RECORDED_MESSAGE = "Non è stato possibile registrare l'accettazione di Termini e Privacy. Riprova.";
+
 /**
  * The registration checkboxes, ticked by the user: Termini, Privacy and «Dichiaro di avere almeno
  * 14 anni». Only this input records them.
  */
-const ACCEPTANCE_NOT_RECORDED_MESSAGE = "Non è stato possibile registrare l'accettazione di Termini e Privacy. Riprova.";
-
 const LEGAL_ACCEPTANCE_SCHEMA = z.object({
     terms: z.literal(true),
     privacy: z.literal(true),
