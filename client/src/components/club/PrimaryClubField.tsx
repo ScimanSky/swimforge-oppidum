@@ -1,5 +1,6 @@
 import { useId } from "react"
 import { toast } from "sonner"
+import { LoadError } from "@/components/corsia/LoadState"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { trpc } from "@/lib/trpc"
@@ -22,8 +23,11 @@ export function PrimaryClubField({ value }: { value: unknown }) {
   const setPrimaryClub = trpc.profile.setPrimaryClub.useMutation({
     onSuccess: () => {
       toast.success("Club principale salvato.")
+      // Everywhere the club shows next to the name: own profile, feed, post page, public profile.
       void utils.profile.get.invalidate()
       void utils.community.feed.invalidate()
+      void utils.community.postById.invalidate()
+      void utils.community.users.getPublicProfile.invalidate()
     },
     onError: (error) => toast.error(errorToastMessage(error, "Non riesco a salvare il club principale.")),
   })
@@ -41,6 +45,10 @@ export function PrimaryClubField({ value }: { value: unknown }) {
 
   if (clubsQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Caricamento dei tuoi club…</p>
+  }
+  // A failed load is not «no clubs».
+  if (clubsQuery.isError && !clubsQuery.data) {
+    return <LoadError variant="inline" onRetry={() => void clubsQuery.refetch()} />
   }
   if (clubs.length === 0) {
     return <p className="text-sm text-muted-foreground">Non fai parte di nessun club.</p>

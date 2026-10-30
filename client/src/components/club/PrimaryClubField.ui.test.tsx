@@ -5,6 +5,9 @@ import { PrimaryClubField } from "./PrimaryClubField"
 
 const state = vi.hoisted(() => ({
   clubs: [] as any[] | undefined,
+  listError: false,
+  refetch: vi.fn(),
+  invalidated: [] as string[],
   listInputs: [] as unknown[],
   saves: [] as unknown[],
   invalidate: vi.fn(),
@@ -14,16 +17,29 @@ const state = vi.hoisted(() => ({
 vi.mock("sonner", () => ({ toast: { success: state.toastSuccess, error: vi.fn() } }))
 vi.mock("@/lib/trpc", () => ({
   trpc: {
-    useUtils: () => ({
-      profile: { get: { invalidate: state.invalidate } },
-      community: { feed: { invalidate: state.invalidate } },
-    }),
+    useUtils: () => {
+      const cache = (name: string) => ({
+        invalidate: () => {
+          state.invalidated.push(name)
+          state.invalidate()
+        },
+      })
+      return {
+        profile: { get: cache("profile.get") },
+        community: {
+          feed: cache("feed"),
+          postById: cache("postById"),
+          users: { getPublicProfile: cache("getPublicProfile") },
+        },
+      }
+    },
     community: {
       clubs: {
         list: {
           useQuery: (input: unknown) => {
             state.listInputs.push(input)
-            return { data: state.clubs, isPending: state.clubs === undefined }
+            if (state.listError) return { data: undefined, isPending: false, isError: true, refetch: state.refetch }
+            return { data: state.clubs, isPending: state.clubs === undefined, isError: false, refetch: state.refetch }
           },
         },
       },
@@ -59,6 +75,9 @@ describe("PrimaryClubField", () => {
     state.saves = []
     state.invalidate.mockReset()
     state.toastSuccess.mockReset()
+    state.listError = false
+    state.refetch.mockReset()
+    state.invalidated = []
   })
   afterEach(cleanup)
 
@@ -78,7 +97,8 @@ describe("PrimaryClubField", () => {
     await userEvent.click(screen.getByRole("option", { name: "Oppidum Cagliari" }))
     expect(state.saves).toEqual([{ clubId: 3 }])
     expect(state.toastSuccess).toHaveBeenCalledWith("Club principale salvato.")
-    expect(state.invalidate).toHaveBeenCalled()
+    // The public profile shows the club too.
+    expect(state.invalidated).toEqual(expect.arrayContaining(["profile.get", "feed", "postById", "getPublicProfile"]))
   })
 
   it("«Nessuno» saves null; the stored choice is shown", async () => {
@@ -97,6 +117,15 @@ describe("PrimaryClubField", () => {
   it("a club left after choosing it reads as not chosen", () => {
     render(<PrimaryClubField value={99} />)
     expect(screen.getByRole("combobox", { name: "Club principale" })).toHaveTextContent("Scegli un club")
+  })
+
+  it("a failed load is not «no clubs»: an error with «Riprova»", async () => {
+    state.listError = true
+    render(<PrimaryClubField value={undefined} />)
+    expect(screen.queryByText("Non fai parte di nessun club.")).toBeNull()
+    expect(screen.getByRole("alert")).toHaveTextContent("Non riesco a caricare i dati")
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }))
+    expect(state.refetch).toHaveBeenCalled()
   })
 
   it("no clubs: says so, no select", () => {
