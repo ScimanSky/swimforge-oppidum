@@ -16,6 +16,7 @@ import {
     xpRouter,
     levelsRouter,
     garminRouter,
+    stravaRouter,
 } from "./gameplay.router";
 import { challengesRouter } from "./challenges.router";
 import { communityRouter } from "./community.router";
@@ -45,6 +46,8 @@ export const appRouter = router({
     xp: xpRouter,
     levels: levelsRouter,
     garmin: garminRouter,
+    // compat: remove after 2027-01-31, old Android builds call it.
+    strava: stravaRouter,
     challenges: challengesRouter,
     community: communityRouter,
     consent: consentRouter,

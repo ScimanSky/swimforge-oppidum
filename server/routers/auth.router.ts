@@ -112,6 +112,10 @@ export const authRouter = router({
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
 
+    // compat: remove after 2027-01-31, old Android builds call it (online presence is gone;
+    // they send it every minute and must not see an error).
+    heartbeat: protectedProcedure.mutation(() => ({ ok: true }) as const),
+
     logout: publicProcedure.mutation(async ({ ctx }) => {
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.clearCookie(COOKIE_NAME, cookieOptions);

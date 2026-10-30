@@ -551,6 +551,12 @@ export const levelsRouter = router({
 });
 
 // Garmin Integration
+// compat: remove after 2027-01-31, old Android builds call it. Strava is gone: without this
+// their «Account collegati» shows a permanent error.
+export const stravaRouter = router({
+    status: protectedProcedure.query(() => ({ connected: false as const, lastSync: null })),
+});
+
 export const garminRouter = router({
     status: protectedProcedure.query(async ({ ctx }) => {
         return await garmin.getGarminStatus(ctx.user.id);

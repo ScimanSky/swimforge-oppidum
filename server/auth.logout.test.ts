@@ -71,10 +71,3 @@ describe("auth.logout", () => {
     });
   });
 });
-
-describe("online presence", () => {
-  it("is gone: no auth.heartbeat procedure to call every minute", () => {
-    expect(Object.keys(appRouter._def.procedures)).not.toContain("auth.heartbeat");
-    expect(Object.keys(appRouter._def.procedures)).toContain("auth.logout");
-  });
-});
