@@ -242,17 +242,18 @@ Puoi eliminare l'account da **Impostazioni > Privacy > Dati e account > Elimina 
 - token Garmin nel database, consensi e token per le notifiche push;
 - gli eventi delle statistiche d'uso interne che riguardano te, il tuo profilo o i tuoi post, e il dato sulla tua presenza online.
 
-Subito dopo cancelliamo dai fornitori (ImageKit, Cloudinary e Supabase) le foto, i video e i PDF che hai caricato e chiudiamo la sessione Garmin sul server di sincronizzazione, cancellandone i token. Se un fornitore non risponde, l'errore viene registrato e completiamo la cancellazione a mano entro 30 giorni.
+Subito dopo cancelliamo dai fornitori (ImageKit, Cloudinary e Supabase) le foto, i video e i PDF che hai caricato e, per un club eliminato con il tuo account, tutti i file del club: logo, copertina, galleria e file caricati dagli altri membri. Chiudiamo anche la sessione Garmin sul server di sincronizzazione, cancellandone i token. Se un fornitore non risponde, l'errore viene registrato e completiamo la cancellazione a mano entro 30 giorni.
 
 Se il servizio email è attivo, ti mandiamo un'email di conferma.
 
 **Cosa resta.** Alcuni dati servono ad altri utenti e restano anche dopo l'eliminazione, sulla base del legittimo interesse degli altri partecipanti e del club (sezione 3):
 
 - le sfide che hai creato, con i progressi degli altri partecipanti, e gli eventi e gli inviti che hai creato nei club: restano senza alcun collegamento al tuo account;
-- nei club che continuano a esistere: le gare che hai creato come responsabile, gli allenamenti del club che hai generato o pubblicato e le impostazioni dei contenuti automatici del club. Restano anche le tue iscrizioni alle gare e i tuoi risultati, che fanno parte della storia sportiva del club: i risultati riportano il nome dell'atleta e, se il club l'ha importata, l'email. Lo stesso vale per la tua scheda nello storico del club, importata da siti pubblici di risultati. In questi dati resta il numero del tuo vecchio account, che non corrisponde più a nessun profilo;
+- nei club che continuano a esistere: le gare che hai creato come responsabile, gli allenamenti del club che hai generato o pubblicato e le impostazioni dei contenuti automatici del club. Se i contenuti automatici venivano pubblicati a tuo nome, li disattiviamo: lo staff del club può riattivarli scegliendo un altro autore. Restano anche le tue iscrizioni alle gare e i tuoi risultati, che fanno parte della storia sportiva del club: i risultati riportano il nome dell'atleta e, se il club l'ha importata, l'email. Lo stesso vale per la tua scheda nello storico del club, importata da siti pubblici di risultati. In questi dati resta il numero del tuo vecchio account, che non corrisponde più a nessun profilo;
 - il logo e la copertina che hai caricato per un club che continua a esistere: appartengono al club;
+- le segnalazioni di altri utenti che hai gestito come moderatore: restano a chi le ha inviate, senza il collegamento al tuo account;
 - le notifiche ricevute da altri che riportano il tuo nome, per esempio «ha iniziato a seguirti», fino alla loro cancellazione automatica dopo 90 giorni;
-- di un club eliminato con il tuo account restano presso i fornitori il logo, la copertina e gli altri file che non hai caricato tu, senza più collegamenti nell'app: scrivici e li cancelliamo;
+- di un club eliminato con il tuo account restano presso i fornitori le foto e i video dei post del club pubblicati da altri membri: sono nelle cartelle dei loro autori, che potrebbero usarli anche in altri post, e si cancellano quando quegli utenti eliminano l'account;
 - le copie di sicurezza (backup) del database gestite da Supabase, se presenti, che si sovrascrivono a rotazione.
 
 Per far cancellare anche quello che resta, per esempio i tuoi risultati nelle gare di un club, scrivici.
