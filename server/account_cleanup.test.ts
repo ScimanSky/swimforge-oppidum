@@ -140,6 +140,30 @@ describe("collectUserMediaRefs", () => {
     });
   });
 
+  it("does not keep the logo and cover of the clubs deleted with the account", async () => {
+    const texts: string[] = [];
+    const params: unknown[][] = [];
+    const db = {
+      execute: vi.fn(async (query: any) => {
+        const values: unknown[] = [];
+        const walk = (chunk: any): string => {
+          if (Array.isArray(chunk?.value)) return chunk.value.join("");
+          if (Array.isArray(chunk?.queryChunks)) return chunk.queryChunks.map(walk).join("");
+          values.push(chunk);
+          return "$";
+        };
+        texts.push(walk(query).replace(/\s+/g, " "));
+        params.push(values);
+        return { rows: [] };
+      }),
+    };
+    await collectUserMediaRefs(db, 9, [4, 5]);
+    const clubs = texts.findIndex((text) => text.includes("FROM community_clubs"));
+    expect(texts[clubs]).toContain("WHERE logo_url LIKE $ AND id NOT IN ($, $) UNION");
+    expect(texts[clubs]).toContain("WHERE cover_image_url LIKE $ AND id NOT IN ($, $)");
+    expect(params[clubs]).toEqual(["%/clubs/%/9/%", 4, 5, "%/clubs/%/9/%", 4, 5]);
+  });
+
   it("treats a table missing on an older database as empty", async () => {
     const db = { execute: vi.fn(async () => Promise.reject(Object.assign(new Error("no table"), { code: "42P01" }))) };
     await expect(collectUserMediaRefs(db, 9)).resolves.toEqual({ userId: 9, imageKitFileIds: [], urls: [], keepUrls: [] });

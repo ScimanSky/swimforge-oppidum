@@ -481,6 +481,32 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 return updateMemberRole(ctx.user.id, input.clubId, input.userId, input.role);
             }),
 
+        // The owner hands the club to another active member (e.g. before deleting the account):
+        // the new owner gets the owner role, the old owner stays as admin.
+        transferOwnership: protectedProcedure
+            .input(z.object({ clubId: z.number().int().positive(), newOwnerId: z.number().int().positive() }))
+            .mutation(async ({ ctx, input }) => {
+                const { transferClubOwnership } = await import("../db_clubs");
+                try {
+                    return await transferClubOwnership(ctx.user.id, input.clubId, input.newOwnerId);
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : "";
+                    if (message === "Forbidden") {
+                        throw new TRPCError({ code: "FORBIDDEN", message: "Solo il proprietario può trasferire il club." });
+                    }
+                    if (message === "Club not found") {
+                        throw new TRPCError({ code: "NOT_FOUND", message: "Club non trovato." });
+                    }
+                    if (message === "Target not an active member") {
+                        throw new TRPCError({
+                            code: "BAD_REQUEST",
+                            message: "Il nuovo proprietario deve essere un membro attivo del club.",
+                        });
+                    }
+                    throw error;
+                }
+            }),
+
         // CLUB MEETS (gare/convocazioni)
         meets: router({
             list: meetsProcedure

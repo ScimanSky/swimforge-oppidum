@@ -1039,11 +1039,35 @@ export async function exportUserData(userId: number) {
   return buildUserDataExport(db, userId);
 }
 
-export async function deleteUserAccount(userId: number): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
+export { AccountDeletionBlockedError } from "./account_clubs";
+
+/** The owned clubs that block the account deletion, with the members they can go to. */
+export async function getAccountDeletionBlockers(userId: number) {
   const db = await getDb();
   if (!db) {
     throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
+  const { listClubsBlockingDeletion } = await import("./account_clubs");
+  return listClubsBlockingDeletion(db, userId);
+}
+
+/**
+ * Deletes the account and everything that is only the user's. Clubs the user owns: one with other
+ * active members blocks the deletion (AccountDeletionBlockedError: transfer it first), one without
+ * is deleted with the account. `ownedClubs: "delete"` (dev launch reset only) deletes them all.
+ * Challenges, club events and invites the user created stay, without their author.
+ */
+export async function deleteUserAccount(
+  userId: number,
+  options: { ownedClubs?: "refuse" | "delete" } = {},
+): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
+  }
+  const ownedClubsMode = options.ownedClubs ?? "refuse";
+  const { AccountDeletionBlockedError, clubsBlockingDeletion, deleteClubRows, listOwnedClubs, lockOwnedClubs, releaseAuthoredRows } =
+    await import("./account_clubs");
 
   const userResult = await db.execute(sql`
     SELECT id, email, name, open_id
@@ -1057,12 +1081,19 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
 
   if (!user) return null;
 
+  // Clubs with other members block the deletion: checked here first (no media read for nothing),
+  // then again under lock in the transaction.
+  const ownedClubs = await listOwnedClubs(db, userId);
+  const blocking = clubsBlockingDeletion(ownedClubs);
+  if (ownedClubsMode === "refuse" && blocking.length > 0) throw new AccountDeletionBlockedError(blocking);
+
   // Media references (avatar, posts, stories, club uploads) are read before the rows go: the
-  // files are deleted from the providers after the transaction.
+  // files are deleted from the providers after the transaction. The logo and cover of a club
+  // deleted with the account are not kept.
   const { collectUserMediaRefs, cleanupDeletedAccount } = await import("./account_cleanup");
   let mediaRefs: Awaited<ReturnType<typeof collectUserMediaRefs>>;
   try {
-    mediaRefs = await collectUserMediaRefs(db, userId);
+    mediaRefs = await collectUserMediaRefs(db, userId, ownedClubs.map((club) => club.id));
   } catch (error) {
     // The per-user folders are still deleted; only files referenced by URL elsewhere are missed.
     logger.warn("[Database] Could not read the media of the account to delete", {
@@ -1074,6 +1105,18 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
   }
 
   await db.transaction(async (tx) => {
+    // Owned clubs, under lock: one that gained a member meanwhile still blocks the deletion. The
+    // others go first and whole (posts, events, gallery, members...).
+    const lockedClubs = await lockOwnedClubs(tx, userId);
+    const stillBlocking = clubsBlockingDeletion(lockedClubs);
+    if (ownedClubsMode === "refuse" && stillBlocking.length > 0) throw new AccountDeletionBlockedError(stillBlocking);
+    await deleteClubRows(
+      tx,
+      lockedClubs.map((club) => club.id),
+    );
+    // Challenges, club events and invites the user created stay for the others.
+    await releaseAuthoredRows(tx, userId);
+
     // Legacy season engagement tables: created at runtime by the removed season
     // engine, so they may not exist.
     await deleteFromIfExists(tx, "public.season_activity_predictions", sql`user_id = ${userId}`);

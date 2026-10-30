@@ -13,6 +13,7 @@ import { ENV } from "../_core/env";
 import { hasRequiredLegalConsents, recordLegalAcceptance } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
+import { AccountDeletionBlockedError, accountDeletionBlockedMessage } from "../account_clubs";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
 import { DATA_EXPORT_RATE_LIMIT_MESSAGE, dataExportRateLimit } from "../lib/data-export-rate-limit";
 import type { User } from "../../drizzle/schema";
@@ -300,6 +301,8 @@ export const authRouter = router({
         return {
             requiresPassword: Boolean(user.passwordHash),
             loginMethod: user.loginMethod ?? "email",
+            // Clubs with other members: transferred first, or the deletion is refused.
+            blockingClubs: await db.getAccountDeletionBlockers(ctx.user.id),
         } as const;
     }),
 
@@ -366,7 +369,8 @@ export const authRouter = router({
             const otherUserIds = (otherUsersResult.rows as Array<{ id: number }>).map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
 
             for (const userId of otherUserIds) {
-                await db.deleteUserAccount(userId);
+                // Every club goes in this reset, shared or not.
+                await db.deleteUserAccount(userId, { ownedClubs: "delete" });
             }
 
             await dbConn.transaction(async (tx) => {
@@ -457,6 +461,12 @@ export const authRouter = router({
                 throw new TRPCError({ code: "NOT_FOUND", message: "Utente non trovato" });
             }
 
+            // A club with other active members is never deleted with its owner: transfer it first.
+            const blockingClubs = await db.getAccountDeletionBlockers(ctx.user.id);
+            if (blockingClubs.length > 0) {
+                throw new TRPCError({ code: "PRECONDITION_FAILED", message: accountDeletionBlockedMessage(blockingClubs) });
+            }
+
             // Local accounts require password confirmation.
             // OAuth/social accounts can be deleted directly from an authenticated session.
             if (user.passwordHash) {
@@ -471,7 +481,16 @@ export const authRouter = router({
             }
 
             const deletedAt = new Date();
-            const deletedUser = await db.deleteUserAccount(ctx.user.id);
+            let deletedUser: Awaited<ReturnType<typeof db.deleteUserAccount>>;
+            try {
+                deletedUser = await db.deleteUserAccount(ctx.user.id);
+            } catch (error) {
+                // A member joined one of the clubs meanwhile: nothing was deleted.
+                if (error instanceof AccountDeletionBlockedError) {
+                    throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
+                }
+                throw error;
+            }
             if (!deletedUser) {
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",

@@ -70,9 +70,22 @@ const textValues = (rows: Record<string, unknown>[], key: string) =>
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .map((value) => value.trim());
 
-/** The user's media references, read before the account rows are deleted. */
-export async function collectUserMediaRefs(db: SqlExecutor, userId: number): Promise<UserMediaRefs> {
+/**
+ * The user's media references, read before the account rows are deleted. The logo and cover of
+ * the clubs in `deletedClubIds` (deleted with the account) are not kept.
+ */
+export async function collectUserMediaRefs(
+  db: SqlExecutor,
+  userId: number,
+  deletedClubIds: number[] = [],
+): Promise<UserMediaRefs> {
   const ownClubFolder = `%/clubs/%/${userId}/%`;
+  const keptClubs = deletedClubIds.length
+    ? sql` AND id NOT IN (${sql.join(
+        deletedClubIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`
+    : sql``;
   const [stories, profile, posts, clubMedia, clubImages] = await Promise.all([
     readRows(db, sql`SELECT imagekit_file_id, media_url FROM stories WHERE user_id = ${userId}`),
     readRows(db, sql`SELECT avatar_url, cover_url FROM swimmer_profiles WHERE user_id = ${userId}`),
@@ -84,8 +97,8 @@ export async function collectUserMediaRefs(db: SqlExecutor, userId: number): Pro
     readRows(db, sql`SELECT media_url, thumbnail_url FROM club_media WHERE uploader_id = ${userId}`),
     readRows(
       db,
-      sql`SELECT logo_url AS url FROM community_clubs WHERE logo_url LIKE ${ownClubFolder}
-          UNION SELECT cover_image_url AS url FROM community_clubs WHERE cover_image_url LIKE ${ownClubFolder}`,
+      sql`SELECT logo_url AS url FROM community_clubs WHERE logo_url LIKE ${ownClubFolder}${keptClubs}
+          UNION SELECT cover_image_url AS url FROM community_clubs WHERE cover_image_url LIKE ${ownClubFolder}${keptClubs}`,
     ),
   ]);
 
