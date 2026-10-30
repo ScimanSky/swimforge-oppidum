@@ -1,10 +1,7 @@
 import { ENV } from "../_core/env";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import {
-  awardActionXp,
   detectImageType,
-  invalidateLeaderboardCache,
-  invalidateUserCache,
   logger,
   protectedProcedure,
   router,
@@ -374,16 +371,8 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         },
                     });
                 }
-                const actionXp = await awardActionXp({
-                    userId: ctx.user.id,
-                    actionType: "club_post",
-                    entityId: Number(postId ?? input.clubId),
-                });
-                if (actionXp.awardedXp > 0) {
-                    await invalidateUserCache(String(ctx.user.id));
-                    await invalidateLeaderboardCache();
-                }
-                return { success: true, postId, actionXp };
+                // XP comes only from swimming: a club post gives none.
+                return { success: true, postId };
             }),
 
         update: protectedProcedure
@@ -1825,19 +1814,8 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         userId: ctx.user.id,
                         status: input.status,
                     });
-                    let actionXp = null;
-                    if (input.status === "going" || input.status === "maybe") {
-                        actionXp = await awardActionXp({
-                            userId: ctx.user.id,
-                            actionType: "rsvp",
-                            entityId: input.eventId,
-                        });
-                        if (actionXp.awardedXp > 0) {
-                            await invalidateUserCache(String(ctx.user.id));
-                            await invalidateLeaderboardCache();
-                        }
-                    }
-                    return { success: true, attendee, actionXp };
+                    // XP comes only from swimming: an RSVP gives none.
+                    return { success: true, attendee };
                 }),
 
             attendees: protectedProcedure

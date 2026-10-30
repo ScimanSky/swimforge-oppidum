@@ -98,13 +98,10 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation();
 
   const createPostMutation = trpc.community.clubs.createPost.useMutation({
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       toast.success("Post pubblicato!");
       resetComposer();
       utils.community.clubs.feed.invalidate({ clubId });
-      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP`);
-      }
     },
     onError: (error) => {
       toast.error(errorToastMessage(error, "Errore nella pubblicazione"));
@@ -112,14 +109,11 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
   });
 
   const addCommentMutation = trpc.community.addComment.useMutation({
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       toast.success("Commento aggiunto!");
       setCommentTextByPost({});
       utils.community.comments.invalidate();
       utils.community.clubs.feed.invalidate({ clubId });
-      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP`);
-      }
     },
   });
 

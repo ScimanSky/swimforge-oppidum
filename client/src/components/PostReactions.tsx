@@ -82,15 +82,12 @@ export default function PostReactions({
   );
 
   const toggleReactionMutation = trpc.community.reactions.toggle.useMutation({
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       utils.community.reactions.list.invalidate({ postId });
       utils.community.reactions.userReaction.invalidate({ postId });
       utils.community.feed.invalidate();
       utils.community.clubs.feed.invalidate();
       if (onReactionChange) onReactionChange();
-      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${formatInteger(data.actionXp.awardedXp)} XP`);
-      }
     },
     onError: (error) => toast.error(errorToastMessage(error, "Reazione non riuscita, riprova")),
   });

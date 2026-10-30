@@ -2,12 +2,11 @@ import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import {
     protectedProcedure, router, z,
     TRPCError,
-    invalidateUserCache, invalidateLeaderboardCache,
+    invalidateUserCache,
     getSocialFeed, upsertActivityPost, setActivityShare,
     toggleSplash, addComment, getComments, deleteOwnPost,
     updateOwnPost, getOwnPostForEdit,
     hidePostForUser, unhidePostForUser, reportPost,
-    awardActionXp,
     detectImageType, logger,
 } from "./_shared";
 import { createHash } from "crypto";
@@ -328,20 +327,8 @@ export const communityRouter = router({
         }))
         .mutation(async ({ ctx, input }) => {
             await requirePostReadable(ctx.user.id, input.postId);
-            const splashResult = await toggleSplash(ctx.user.id, input.postId);
-            let actionXp = null;
-            if (splashResult?.splashed) {
-                actionXp = await awardActionXp({
-                    userId: ctx.user.id,
-                    actionType: "splash",
-                    entityId: input.postId,
-                });
-                if (actionXp.awardedXp > 0) {
-                    await invalidateUserCache(String(ctx.user.id));
-                    await invalidateLeaderboardCache();
-                }
-            }
-            return { ...splashResult, actionXp };
+            // XP comes only from swimming: a splash gives none.
+            return toggleSplash(ctx.user.id, input.postId);
         }),
 
     addComment: protectedProcedure
@@ -351,17 +338,9 @@ export const communityRouter = router({
         }))
         .mutation(async ({ ctx, input }) => {
             await requirePostReadable(ctx.user.id, input.postId);
+            // XP comes only from swimming: a comment gives none.
             const commentId = await addComment(ctx.user.id, input.postId, input.content);
-            const actionXp = await awardActionXp({
-                userId: ctx.user.id,
-                actionType: "comment",
-                entityId: input.postId,
-            });
-            if (actionXp.awardedXp > 0) {
-                await invalidateUserCache(String(ctx.user.id));
-                await invalidateLeaderboardCache();
-            }
-            return { success: true, commentId, actionXp };
+            return { success: true, commentId };
         }),
 
     comments: protectedProcedure

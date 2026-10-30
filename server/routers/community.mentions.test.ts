@@ -39,7 +39,6 @@ vi.mock("./_shared", async () => {
     upsertActivityPost: m.upsertActivityPost,
     updateOwnPost: m.updateOwnPost,
     getOwnPostForEdit: m.getOwnPostForEdit,
-    awardActionXp: vi.fn(async () => ({ awardedXp: 0 })),
   };
 });
 vi.mock("../db", async (importOriginal) => ({
@@ -105,8 +104,9 @@ describe("mentions when publishing", () => {
     expect(m.notifyMentionedUsers).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserIds: [5], postId: 71 }));
   });
 
-  it("club post: the same, linked to the club", async () => {
-    await caller().clubs.createPost({ clubId: 3, content: "Con @ada", taggedUserIds: [5] });
+  it("club post: the same, linked to the club; no XP for posting", async () => {
+    const answer = await caller().clubs.createPost({ clubId: 3, content: "Con @ada", taggedUserIds: [5] });
+    expect(answer).toEqual({ success: true, postId: 72 });
     expect(m.createClubPost).toHaveBeenCalledWith(42, 3, expect.objectContaining({ taggedUserIds: [5] }));
     expect(m.createClubPost.mock.calls[0][2]).not.toHaveProperty("hashtags");
     expect(m.notifyMentionedUsers).toHaveBeenCalledWith({

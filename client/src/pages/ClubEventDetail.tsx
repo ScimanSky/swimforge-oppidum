@@ -233,13 +233,9 @@ export default function ClubEventDetail() {
   );
 
   const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       utils.community.clubs.events.attendees.invalidate({ eventId });
       utils.community.clubs.events.list.invalidate();
-      const awardedXp = toFiniteNumber(data?.actionXp?.awardedXp) ?? 0;
-      if (awardedXp > 0) {
-        toast.success(`+${formatInteger(awardedXp)} XP`);
-      }
     },
     onError: (error) => toast.error(errorToastMessage(error, "Risposta non salvata")),
   });
