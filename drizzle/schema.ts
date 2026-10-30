@@ -295,6 +295,9 @@ export const socialPosts = pgTable("social_posts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   activityId: integer("activity_id"),
+  // FK community_clubs.id ON DELETE SET NULL (migration 0036 drops the duplicate CASCADE one).
+  // The app deletes a club's posts with the club (db_clubs.deleteClubRows): a post never
+  // outlives its club into the public feed.
   clubId: integer("club_id"),
   content: text("content"),
   mediaUrl: text("media_url"),
@@ -415,6 +418,8 @@ export const communityClubs = pgTable("community_clubs", {
   themeColor: varchar("theme_color", { length: 20 }).default("cyan"),
   logoUrl: text("logo_url"),
   tagline: varchar("tagline", { length: 200 }),
+  // FK users.id ON DELETE RESTRICT (migration 0036): an owner's account is deleted only after the
+  // club is transferred or, with no other active member, deleted with it.
   ownerId: integer("owner_id").notNull(),
   isPrivate: boolean("is_private").default(false).notNull(),
   visibility: varchar("visibility", { length: 20 }).default("public").notNull(),
@@ -438,7 +443,8 @@ export const communityClubMembers = pgTable("community_club_members", {
 export const communityClubInvites = pgTable("community_club_invites", {
   id: serial("id").primaryKey(),
   clubId: integer("club_id").notNull(),
-  inviterId: integer("inviter_id").notNull(),
+  // FK users.id ON DELETE SET NULL (migration 0036): the invite outlives its author's account.
+  inviterId: integer("inviter_id"),
   code: text("code").notNull().unique(),
   role: varchar("role", { length: 20 }).default("member").notNull(),
   status: varchar("status", { length: 20 }).default("active").notNull(),
@@ -642,7 +648,9 @@ export const clubHistoricalResults = pgTable("club_historical_results", {
 export const clubEvents = pgTable("club_events", {
   id: serial("id").primaryKey(),
   clubId: integer("club_id").notNull(),
-  creatorId: integer("creator_id").notNull(),
+  // FK users.id ON DELETE SET NULL (migration 0036): the event and its attendees outlive its
+  // creator's account.
+  creatorId: integer("creator_id"),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
   eventType: varchar("event_type", { length: 30 }).default("training").notNull(), // training, race, social, meeting

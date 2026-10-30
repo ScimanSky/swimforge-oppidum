@@ -5,7 +5,6 @@ import type { NextFunction, Request, Response } from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -201,9 +200,6 @@ async function startServer() {
   const requestBodyLimit = process.env.REQUEST_BODY_LIMIT ?? "5mb";
   app.use(express.json({ limit: requestBodyLimit }));
   app.use(express.urlencoded({ limit: requestBodyLimit, extended: true }));
-
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
 
   // Cron endpoint for external scheduler (Render/cron-job.org)
   app.post("/api/cron/complete-challenges", async (req, res) => {

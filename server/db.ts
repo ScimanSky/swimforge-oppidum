@@ -248,44 +248,6 @@ export async function registerUser(email: string, password: string, name?: strin
   }
 }
 
-// Login with email and password
-export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
-  }
-
-  try {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (result.length === 0) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    const user = result[0];
-    if (!user.passwordHash) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    // Update last signed in
-    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
-
-    return { success: true, user };
-  } catch (error) {
-    const { kind, message } = classifyAsyncError(error);
-    logger.error(`[Database] Failed to login user (${kind}): ${message}`, {
-      event: "auth:login_failed",
-      kind,
-      message,
-    });
-    return { success: false, error: "Login failed" };
-  }
-}
-
 // Get user by ID
 export async function getUserById(id: number): Promise<User | undefined> {
   const db = await getDb();
@@ -317,71 +279,6 @@ export async function updateUser(
   }
   if (Object.keys(updatePayload).length === 0) return;
   await db.update(users).set(updatePayload).where(eq(users.id, userId));
-}
-
-// Legacy: upsert user (for OAuth compatibility)
-export async function upsertUser(user: InsertUser): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    logger.warn("[Database] Cannot upsert user: database not available", {
-      event: "db:upsert_skipped",
-    });
-    return;
-  }
-
-  try {
-    await db.transaction(async (tx) => {
-      const values: InsertUser = { email: user.email || '' };
-      const updateSet: Record<string, unknown> = {};
-
-      if (user.openId) values.openId = user.openId;
-      if (user.name) {
-        values.name = user.name;
-        updateSet.name = user.name;
-      }
-      if (user.loginMethod) {
-        values.loginMethod = user.loginMethod;
-        updateSet.loginMethod = user.loginMethod;
-      }
-      if (user.lastSignedIn !== undefined) {
-        values.lastSignedIn = user.lastSignedIn;
-        updateSet.lastSignedIn = user.lastSignedIn;
-      }
-      if (user.role !== undefined) {
-        values.role = user.role;
-        updateSet.role = user.role;
-      }
-
-      if (!values.lastSignedIn) {
-        values.lastSignedIn = new Date();
-      }
-
-      if (Object.keys(updateSet).length === 0) {
-        updateSet.lastSignedIn = new Date();
-      }
-
-      const upserted = await tx.insert(users).values(values).onConflictDoUpdate({
-        target: users.email,
-        set: updateSet,
-      }).returning({ id: users.id });
-
-      const userId = upserted[0]?.id;
-      if (!userId) {
-        throw new Error("Failed to upsert user");
-      }
-
-      await tx.insert(swimmerProfiles).values({ userId }).onConflictDoNothing({
-        target: swimmerProfiles.userId,
-      });
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error(`[Database] Failed to upsert user: ${message}`, {
-      event: "db:upsert_failed",
-      message,
-    });
-    throw error;
-  }
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -1039,11 +936,35 @@ export async function exportUserData(userId: number) {
   return buildUserDataExport(db, userId);
 }
 
-export async function deleteUserAccount(userId: number): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
+export { AccountDeletionBlockedError } from "./account_clubs";
+
+/** The owned clubs that block the account deletion, with the members they can go to. */
+export async function getAccountDeletionBlockers(userId: number) {
   const db = await getDb();
   if (!db) {
     throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
+  const { listClubsBlockingDeletion } = await import("./account_clubs");
+  return listClubsBlockingDeletion(db, userId);
+}
+
+/**
+ * Deletes the account and everything that is only the user's. Clubs the user owns: one with other
+ * active members blocks the deletion (AccountDeletionBlockedError: transfer it first), one without
+ * is deleted with the account. `ownedClubs: "delete"` (dev launch reset only) deletes them all.
+ * Challenges, club events and invites the user created stay, without their author.
+ */
+export async function deleteUserAccount(
+  userId: number,
+  options: { ownedClubs?: "refuse" | "delete" } = {},
+): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
+  }
+  const ownedClubsMode = options.ownedClubs ?? "refuse";
+  const { AccountDeletionBlockedError, clubsBlockingDeletion, deleteClubRows, listOwnedClubs, lockOwnedClubs, releaseAuthoredRows } =
+    await import("./account_clubs");
 
   const userResult = await db.execute(sql`
     SELECT id, email, name, open_id
@@ -1057,12 +978,19 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
 
   if (!user) return null;
 
+  // Clubs with other members block the deletion: checked here first (no media read for nothing),
+  // then again under lock in the transaction.
+  const ownedClubs = await listOwnedClubs(db, userId);
+  const blocking = clubsBlockingDeletion(ownedClubs);
+  if (ownedClubsMode === "refuse" && blocking.length > 0) throw new AccountDeletionBlockedError(blocking);
+
   // Media references (avatar, posts, stories, club uploads) are read before the rows go: the
-  // files are deleted from the providers after the transaction.
+  // files are deleted from the providers after the transaction. The logo and cover of a club
+  // deleted with the account are not kept.
   const { collectUserMediaRefs, cleanupDeletedAccount } = await import("./account_cleanup");
   let mediaRefs: Awaited<ReturnType<typeof collectUserMediaRefs>>;
   try {
-    mediaRefs = await collectUserMediaRefs(db, userId);
+    mediaRefs = await collectUserMediaRefs(db, userId, ownedClubs.map((club) => club.id));
   } catch (error) {
     // The per-user folders are still deleted; only files referenced by URL elsewhere are missed.
     logger.warn("[Database] Could not read the media of the account to delete", {
@@ -1074,6 +1002,18 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
   }
 
   await db.transaction(async (tx) => {
+    // Owned clubs, under lock: one that gained a member meanwhile still blocks the deletion. The
+    // others go first and whole (posts, events, gallery, members...).
+    const lockedClubs = await lockOwnedClubs(tx, userId);
+    const stillBlocking = clubsBlockingDeletion(lockedClubs);
+    if (ownedClubsMode === "refuse" && stillBlocking.length > 0) throw new AccountDeletionBlockedError(stillBlocking);
+    await deleteClubRows(
+      tx,
+      lockedClubs.map((club) => club.id),
+    );
+    // Challenges, club events and invites the user created stay for the others.
+    await releaseAuthoredRows(tx, userId);
+
     // Legacy season engagement tables: created at runtime by the removed season
     // engine, so they may not exist.
     await deleteFromIfExists(tx, "public.season_activity_predictions", sql`user_id = ${userId}`);
@@ -1236,9 +1176,16 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
 
-  // Outside the transaction, best effort: media on ImageKit, Cloudinary and Supabase Storage,
-  // and the Garmin session on the garmin-service. Failures are logged, never thrown.
-  await cleanupDeletedAccount(mediaRefs);
+  // Outside the transaction, best effort and detached (the answer does not wait for it): media on
+  // ImageKit, Cloudinary and Supabase Storage, and the Garmin session on the garmin-service.
+  // Every provider call is bounded in time; failures are logged, never thrown.
+  void cleanupDeletedAccount(mediaRefs).catch((error: unknown) => {
+    logger.warn("[Database] External cleanup of the deleted account failed", {
+      event: "account:external_cleanup_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   return {
     id: user.id,

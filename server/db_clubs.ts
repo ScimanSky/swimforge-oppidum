@@ -3,6 +3,7 @@ import { and, eq, ilike, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getDb } from "./db";
 import { ensureUserPresenceSchema, getOnlineIntervalSql } from "./user_presence";
+import { deleteClubRows } from "./account_clubs";
 import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
 
 export type ClubScope = "all" | "mine";
@@ -548,6 +549,35 @@ export async function updateMemberRole(actorId: number, clubId: number, userId: 
   return { updated: true };
 }
 
+/**
+ * Hands the club to another active member: only its owner can, for instance before deleting their
+ * account. The new owner gets the owner role, the old owner stays as admin.
+ */
+export async function transferClubOwnership(actorId: number, clubId: number, newOwnerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
+
+  return db.transaction(async (tx) => {
+    const club = await tx.execute(sql`SELECT owner_id FROM community_clubs WHERE id = ${clubId} FOR UPDATE`);
+    const owner = club.rows[0] as { owner_id: unknown } | undefined;
+    if (!owner) throw new Error("Club not found");
+    if (Number(owner.owner_id) !== actorId) throw new Error("Forbidden");
+    if (newOwnerId === actorId) throw new Error("Target not an active member");
+
+    const target = await tx.execute(sql`
+      SELECT status, role FROM community_club_members
+      WHERE club_id = ${clubId} AND user_id = ${newOwnerId}
+      LIMIT 1`);
+    const membership = target.rows[0] as { status?: string } | undefined;
+    if (membership?.status !== "active") throw new Error("Target not an active member");
+
+    await tx.execute(sql`UPDATE community_clubs SET owner_id = ${newOwnerId}, updated_at = now() WHERE id = ${clubId}`);
+    await tx.execute(sql`UPDATE community_club_members SET role = 'owner' WHERE club_id = ${clubId} AND user_id = ${newOwnerId}`);
+    await tx.execute(sql`UPDATE community_club_members SET role = 'admin' WHERE club_id = ${clubId} AND user_id = ${actorId}`);
+    return { transferred: true, clubId, ownerId: newOwnerId } as const;
+  });
+}
+
 export async function listClubInvites(actorId: number, clubId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -742,17 +772,17 @@ export async function deleteClub(userId: number, clubId: number) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
-  const club = await db
-    .select({ id: communityClubs.id, ownerId: communityClubs.ownerId })
-    .from(communityClubs)
-    .where(eq(communityClubs.id, clubId))
-    .limit(1);
+  return db.transaction(async (tx) => {
+    const club = await tx.execute(sql`SELECT owner_id FROM community_clubs WHERE id = ${clubId} FOR UPDATE`);
+    const owner = club.rows[0] as { owner_id: unknown } | undefined;
+    if (!owner) throw new Error("Club not found");
+    if (Number(owner.owner_id) !== userId) throw new Error("Forbidden");
 
-  if (!club.length) throw new Error("Club not found");
-  if (club[0].ownerId !== userId) throw new Error("Forbidden");
-
-  await db.delete(communityClubs).where(eq(communityClubs.id, clubId));
-  return { success: true };
+    // Every row of the club, explicitly: its posts must not outlive it into the public feed
+    // (social_posts.club_id only sets null).
+    await deleteClubRows(tx, [clubId]);
+    return { success: true };
+  });
 }
 
 export async function getClubWeeklyStats(clubId: number) {

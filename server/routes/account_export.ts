@@ -2,17 +2,28 @@ import { Router, type Response } from "express";
 import { sdk } from "../_core/sdk";
 import { writeUserDataExport } from "../account_export";
 import { getDb } from "../db";
-import { createUserRateLimit } from "../lib/ai-rate-limit";
+import { DATA_EXPORT_RATE_LIMIT_MESSAGE, dataExportRateLimit } from "../lib/data-export-rate-limit";
 import { logger } from "../middleware/logger";
 
 const log = logger.child({ component: "account_export_route" });
 
-/** A heavy read of the whole account: a few downloads an hour are plenty. */
-export const dataExportRateLimit = createUserRateLimit({ prefix: "rl:data-export:", windowMs: 60 * 60 * 1000, max: 5 });
+export class ExportClientClosedError extends Error {
+  constructor() {
+    super("Client closed the connection");
+    this.name = "ExportClientClosedError";
+  }
+}
 
-/** Writes a chunk, waiting for the socket to drain when its buffer is full. */
-function writeChunk(res: Response, chunk: string): Promise<void> | void {
+const isGone = (res: Response) => res.destroyed || res.writableEnded;
+
+/**
+ * Writes a chunk, waiting for the socket to drain when its buffer is full. Once the client is gone
+ * it rejects at once: a closed socket never drains, and its `close` has already been emitted.
+ */
+export function writeExportChunk(res: Response, chunk: string): Promise<void> | void {
+  if (isGone(res)) return Promise.reject(new ExportClientClosedError());
   if (res.write(chunk)) return;
+  if (isGone(res)) return Promise.reject(new ExportClientClosedError());
   return new Promise((resolve, reject) => {
     const cleanup = () => {
       res.off("drain", onDrain);
@@ -24,7 +35,7 @@ function writeChunk(res: Response, chunk: string): Promise<void> | void {
     };
     const onClose = () => {
       cleanup();
-      reject(new Error("Client closed the connection"));
+      reject(new ExportClientClosedError());
     };
     res.on("drain", onDrain);
     res.on("close", onClose);
@@ -48,7 +59,7 @@ accountExportRouter.get("/api/account/export", async (req, res) => {
   }
 
   if (!(await dataExportRateLimit.consume(userId))) {
-    res.status(429).json({ error: "Troppe esportazioni. Riprova tra un'ora." });
+    res.status(429).json({ error: DATA_EXPORT_RATE_LIMIT_MESSAGE });
     return;
   }
 
@@ -67,10 +78,18 @@ accountExportRouter.get("/api/account/export", async (req, res) => {
         res.setHeader("Content-Disposition", `attachment; filename="swimforge-dati-${day}.json"`);
         res.setHeader("Cache-Control", "no-store");
       }
-      return writeChunk(res, chunk);
+      return writeExportChunk(res, chunk);
     });
     res.end();
   } catch (error) {
+    if (error instanceof ExportClientClosedError) {
+      // The download was abandoned: nothing more is read, nothing to answer.
+      log.info("[Account export] Client closed the connection, export stopped", {
+        event: "account:export_client_closed",
+        userId,
+      });
+      return;
+    }
     log.error("[Account export] Export failed", {
       event: "account:export_failed",
       userId,

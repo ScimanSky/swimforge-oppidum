@@ -46,7 +46,8 @@ import { homePathForPlatform } from "@/lib/navigation"
 import { isNativePlatform } from "@/lib/platform"
 import { formatInteger } from "@/lib/format"
 import { errorToastMessage } from "@/lib/trpc-errors"
-import { downloadDataExport } from "@/lib/data-export"
+import { NATIVE_DATA_EXPORT_MESSAGE, canDownloadDataExportHere, downloadDataExport } from "@/lib/data-export"
+import { ClubTransferList, type BlockingClub } from "@/components/settings/ClubTransferList"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
@@ -269,6 +270,8 @@ export default function Settings() {
 
   const displayName = me?.name || me?.email || "Utente"
   const deleteRequiresPassword = deleteAccountStatusQuery.data?.requiresPassword ?? true
+  // Owned clubs with other members: transferred first, the server refuses the deletion meanwhile.
+  const blockingClubs: BlockingClub[] = deleteAccountStatusQuery.data?.blockingClubs ?? []
   const initials = displayName
     .split(" ")
     .map((part) => part[0])
@@ -454,6 +457,11 @@ export default function Settings() {
         return
       }
       toast.error(errorToastMessage(error, "Impossibile eliminare l'account."))
+      // A club still has other members (e.g. one joined meanwhile): back to the transfer list.
+      if (error.data?.code === "PRECONDITION_FAILED") {
+        setDeleteDialogOpen(false)
+        void deleteAccountStatusQuery.refetch()
+      }
     },
   })
   const setConsentMutation = trpc.consent.set.useMutation({
@@ -1416,16 +1424,21 @@ export default function Settings() {
 
             <Section title="Dati e account">
               <div className="mt-2 divide-y divide-border">
-                <ActionRow
-                  title="Esporta i dati"
-                  description="Scarica tutti i tuoi dati in formato JSON"
-                  action={
-                    <Button variant="outline" onClick={handleExportData} disabled={isExporting}>
-                      <Download aria-hidden />
-                      {isExporting ? "Esportazione…" : "Esporta"}
-                    </Button>
-                  }
-                />
+                {canDownloadDataExportHere() ? (
+                  <ActionRow
+                    title="Esporta i dati"
+                    description="Scarica tutti i tuoi dati in formato JSON"
+                    action={
+                      <Button variant="outline" onClick={handleExportData} disabled={isExporting}>
+                        <Download aria-hidden />
+                        {isExporting ? "Esportazione…" : "Esporta"}
+                      </Button>
+                    }
+                  />
+                ) : (
+                  // The Android WebView cannot save the file: the website can.
+                  <ActionRow title="Esporta i dati" description={NATIVE_DATA_EXPORT_MESSAGE} action={null} />
+                )}
                 <ActionRow
                   title="Esci da tutti i dispositivi"
                   description="Disconnetti tutte le sessioni attive"
@@ -1441,17 +1454,28 @@ export default function Settings() {
                     </Button>
                   }
                 />
-                <ActionRow
-                  title="Elimina account"
-                  titleClassName="text-danger"
-                  description="Elimina per sempre il tuo account e tutti i dati"
-                  action={
-                    <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-                      <Trash2 aria-hidden />
-                      Elimina
-                    </Button>
-                  }
-                />
+                <div>
+                  <ActionRow
+                    title="Elimina account"
+                    titleClassName="text-danger"
+                    description={
+                      blockingClubs.length > 0
+                        ? "Trasferisci prima i club di cui sei proprietario"
+                        : "Elimina per sempre il tuo account e tutti i dati"
+                    }
+                    action={
+                      <Button
+                        variant="destructive"
+                        onClick={() => setDeleteDialogOpen(true)}
+                        disabled={blockingClubs.length > 0}
+                      >
+                        <Trash2 aria-hidden />
+                        Elimina
+                      </Button>
+                    }
+                  />
+                  <ClubTransferList clubs={blockingClubs} onTransferred={() => void deleteAccountStatusQuery.refetch()} />
+                </div>
                 {isDevResetAccount ? (
                   <ActionRow
                     title="Reset dell'app per il lancio (solo dev)"

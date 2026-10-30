@@ -25,7 +25,7 @@ function render(query: any): { text: string; params: unknown[] } {
  * A database with the user 9: two Garmin swims, `laps` laps and `lengths` lengths, read the way
  * the export pages them (id > afterId ORDER BY id LIMIT n).
  */
-function fakeDb(options: { laps?: number; lengths?: number; missing?: RegExp } = {}) {
+function fakeDb(options: { laps?: number; lengths?: number; activities?: number; missing?: RegExp } = {}) {
   const laps: Row[] = Array.from({ length: options.laps ?? 3 }, (_, i) => ({
     id: i + 1,
     activity_id: 11,
@@ -75,7 +75,11 @@ function fakeDb(options: { laps?: number; lengths?: number; missing?: RegExp } =
       if (text.includes("FROM garmin_activity_laps")) return { rows: page(laps, params) };
       if (text.includes("FROM garmin_activity_lengths")) return { rows: page(lengths, params) };
       if (text.includes("FROM swimming_activities")) {
-        return { rows: page([{ id: 11, user_id: 9, distance_meters: 1500, raw_data: { activity: { activityId: 1 } } }, { id: 12, user_id: 9, distance_meters: 1000 }], params) };
+        const swims: Row[] =
+          options.activities === undefined
+            ? [{ id: 11, user_id: 9, distance_meters: 1500, raw_data: { activity: { activityId: 1 } } }, { id: 12, user_id: 9, distance_meters: 1000 }]
+            : Array.from({ length: options.activities }, (_, i) => ({ id: i + 1, user_id: 9, raw_data: { activity: { activityId: i } } }));
+        return { rows: page(swims, params) };
       }
       if (text.includes("FROM activity_ai_insights")) return { rows: [{ id: 1, user_id: 9, activity_id: 11, title: "Ritmo costante" }] };
       if (text.includes("FROM ai_insights_cache")) return { rows: [{ id: 2, user_id: 9, insights: ["📈 Progressione: bene"] }] };
@@ -141,6 +145,50 @@ describe("data export", () => {
     expect(queries.filter((text) => text.includes("FROM garmin_activity_lengths"))).toHaveLength(19);
     // Each chunk is at most one page: about 100 bytes a row here, so well under 200 KB.
     expect(Math.max(...chunks.map((chunk) => chunk.length))).toBeLessThan(200_000);
+  });
+
+  it("reads the swims 50 at a time: each one carries its whole Garmin payload", async () => {
+    const { db, queries } = fakeDb({ activities: 120 });
+    const limits: unknown[] = [];
+    const execute = db.execute;
+    const spy = {
+      execute: vi.fn(async (query: any) => {
+        const { text, params } = render(query);
+        if (text.includes("FROM swimming_activities WHERE user_id")) limits.push(params[2]);
+        return execute(query);
+      }),
+    };
+    const { json } = await writtenExport(spy, 1000);
+    expect(json.data.activities).toHaveLength(120);
+    expect(json.data.activities[119]).toMatchObject({ id: 120, raw_data: { activity: { activityId: 119 } } });
+    expect(limits).toEqual([50, 50, 50]);
+    // The other big sections keep their page size.
+    expect(queries.filter((text) => text.includes("FROM garmin_activity_laps"))).toHaveLength(1);
+  });
+
+  it("serializes each row once, without a JSON round trip per page", async () => {
+    const { db } = fakeDb({ laps: 300, lengths: 900 });
+    const parse = vi.spyOn(JSON, "parse");
+    try {
+      const chunks: string[] = [];
+      await writeUserDataExport(db, 9, (chunk) => void chunks.push(chunk), 100);
+      // Only the text preferences of the profile are parsed.
+      expect(parse).toHaveBeenCalledTimes(1);
+      parse.mockRestore();
+      const json = JSON.parse(chunks.join(""));
+      expect(json.data.lengths).toHaveLength(900);
+      expect(json.user.created_at).toBe("2026-01-01T00:00:00.000Z");
+    } finally {
+      parse.mockRestore();
+    }
+  });
+
+  it("exports only the reports the user filed, never the ones of others they handled", async () => {
+    const { db, queries } = fakeDb();
+    await writtenExport(db);
+    const reports = queries.find((text) => text.includes("FROM social_post_reports"));
+    expect(reports).toContain("WHERE reporter_user_id = $1");
+    expect(reports).not.toContain("handled_by");
   });
 
   it("builds the same document in memory for the tRPC endpoint", async () => {

@@ -47,7 +47,7 @@ cp .env.oracle.example .env.oracle
 
 Aggiorna `.env.oracle` con almeno:
 - Core: `DATABASE_URL`, `DB_SSL_REJECT_UNAUTHORIZED`, `DB_SSL_ALLOW_INSECURE_FALLBACK`, `DB_SSL_CA_CERT_BASE64`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- Security: `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`, `OAUTH_ALLOWED_REDIRECT_ORIGINS`
+- Security: `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`
 - Integrations: `GARMIN_SERVICE_SECRET`, `STRAVA_SERVICE_URL`, `STRAVA_SERVICE_SECRET`, `OPENAI_API_KEY` (se usato)
 - Garmin service: `GARMIN_STATE_KEY` (chiave Fernet che cifra su disco lo stato MFA pendente; vuota = solo in memoria), `GARMIN_SERVICE_TIMEOUT_MS=60000` (le strategie di login Garmin possono attendere fino a 20 s ciascuna)
 - Garmin hardening (opzionale, raccomandato): `GARMIN_CORS_ALLOW_ORIGINS`, `GARMIN_CORS_ALLOW_CREDENTIALS=false`

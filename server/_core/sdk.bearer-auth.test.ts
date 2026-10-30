@@ -10,14 +10,12 @@ const m = vi.hoisted(() => {
     previousEnv,
     getUserById: vi.fn(),
     getUserByOpenId: vi.fn(),
-    upsertUser: vi.fn(),
   };
 });
 
 vi.mock("../db", () => ({
   getUserById: m.getUserById,
   getUserByOpenId: m.getUserByOpenId,
-  upsertUser: m.upsertUser,
 }));
 
 import { COOKIE_NAME } from "@shared/const";

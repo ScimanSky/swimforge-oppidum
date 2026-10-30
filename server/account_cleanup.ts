@@ -26,6 +26,8 @@ import { logger } from "./middleware/logger";
 const log = logger.child({ component: "account_cleanup" });
 
 const PROVIDER_TIMEOUT_MS = 15_000;
+/** ImageKit answers 429 to bursts: a user with hundreds of club uploads is deleted 4 files at a time. */
+const IMAGEKIT_CONCURRENCY = 4;
 const PROFILE_MEDIA_BUCKET = "profile-media";
 /** Cloudinary deletes at most 1,000 resources per call by prefix: a few rounds at most. */
 const MAX_CLOUDINARY_PREFIX_ROUNDS = 10;
@@ -68,9 +70,22 @@ const textValues = (rows: Record<string, unknown>[], key: string) =>
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .map((value) => value.trim());
 
-/** The user's media references, read before the account rows are deleted. */
-export async function collectUserMediaRefs(db: SqlExecutor, userId: number): Promise<UserMediaRefs> {
+/**
+ * The user's media references, read before the account rows are deleted. The logo and cover of
+ * the clubs in `deletedClubIds` (deleted with the account) are not kept.
+ */
+export async function collectUserMediaRefs(
+  db: SqlExecutor,
+  userId: number,
+  deletedClubIds: number[] = [],
+): Promise<UserMediaRefs> {
   const ownClubFolder = `%/clubs/%/${userId}/%`;
+  const keptClubs = deletedClubIds.length
+    ? sql` AND id NOT IN (${sql.join(
+        deletedClubIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`
+    : sql``;
   const [stories, profile, posts, clubMedia, clubImages] = await Promise.all([
     readRows(db, sql`SELECT imagekit_file_id, media_url FROM stories WHERE user_id = ${userId}`),
     readRows(db, sql`SELECT avatar_url, cover_url FROM swimmer_profiles WHERE user_id = ${userId}`),
@@ -82,8 +97,8 @@ export async function collectUserMediaRefs(db: SqlExecutor, userId: number): Pro
     readRows(db, sql`SELECT media_url, thumbnail_url FROM club_media WHERE uploader_id = ${userId}`),
     readRows(
       db,
-      sql`SELECT logo_url AS url FROM community_clubs WHERE logo_url LIKE ${ownClubFolder}
-          UNION SELECT cover_image_url AS url FROM community_clubs WHERE cover_image_url LIKE ${ownClubFolder}`,
+      sql`SELECT logo_url AS url FROM community_clubs WHERE logo_url LIKE ${ownClubFolder}${keptClubs}
+          UNION SELECT cover_image_url AS url FROM community_clubs WHERE cover_image_url LIKE ${ownClubFolder}${keptClubs}`,
     ),
   ]);
 
@@ -252,18 +267,49 @@ async function cloudinaryDeletePublicIds(resourceType: string, publicIds: string
   }
 }
 
+// The Supabase client has no request timeout of its own: every call is bounded here.
 async function supabaseRemove(bucket: string, paths: string[]): Promise<void> {
   if (paths.length === 0) return;
-  const { error } = await getSupabaseAdminClient().storage.from(bucket).remove(paths);
+  const { error } = await withTimeout(
+    getSupabaseAdminClient().storage.from(bucket).remove(paths),
+    PROVIDER_TIMEOUT_MS,
+    "supabase storage remove",
+  );
   if (error) throw new Error(`Supabase Storage remove failed: ${error.message}`);
 }
 
 async function supabaseRemoveFolder(bucket: string, folder: string): Promise<void> {
   const storage = getSupabaseAdminClient().storage.from(bucket);
-  const { data, error } = await storage.list(folder, { limit: 1000 });
+  const { data, error } = await withTimeout(
+    storage.list(folder, { limit: 1000 }),
+    PROVIDER_TIMEOUT_MS,
+    "supabase storage list",
+  );
   if (error) throw new Error(`Supabase Storage list failed: ${error.message}`);
   const files = (data ?? []).filter((item) => item.id !== null).map((item) => `${folder}/${item.name}`);
   await supabaseRemove(bucket, files);
+}
+
+/** Runs the tasks, at most `concurrency` at a time, settling each (never rejects). */
+async function settleWithConcurrency(
+  tasks: Array<() => Promise<void>>,
+  concurrency: number,
+): Promise<PromiseSettledResult<void>[]> {
+  const results: PromiseSettledResult<void>[] = new Array(tasks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const index = next++;
+      try {
+        await tasks[index]();
+        results[index] = { status: "fulfilled", value: undefined };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+  return results;
 }
 
 /** Runs every task, counting the failures (logged with the provider and the user). */
@@ -271,8 +317,9 @@ async function runAll(
   provider: keyof Omit<AccountCleanupReport, "garmin">,
   userId: number,
   tasks: Array<() => Promise<void>>,
+  concurrency: number = Number.POSITIVE_INFINITY,
 ): Promise<ProviderCleanup> {
-  const results = await Promise.allSettled(tasks.map((task) => task()));
+  const results = await settleWithConcurrency(tasks, concurrency);
   const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
   if (failures.length > 0) {
     log.warn(`[Account cleanup] ${failures.length}/${tasks.length} ${provider} deletions failed`, {
@@ -335,7 +382,7 @@ export async function deleteUserMedia(refs: UserMediaRefs): Promise<Omit<Account
   }
 
   const [imagekit, cloudinary, supabase] = await Promise.all([
-    runAll("imagekit", userId, imageKitTasks),
+    runAll("imagekit", userId, imageKitTasks, IMAGEKIT_CONCURRENCY),
     runAll("cloudinary", userId, cloudinaryTasks),
     runAll("supabase", userId, supabaseTasks),
   ]);
@@ -362,7 +409,8 @@ async function logoutGarmin(userId: number): Promise<AccountCleanupReport["garmi
 
 /**
  * Everything outside the database of a deleted account: media and the Garmin session. Run after
- * the database transaction, never inside it. Never throws.
+ * the database transaction, never inside it; deleteUserAccount starts it detached, so the answer
+ * never waits for the providers. Every provider call is bounded (15 s). Never throws.
  */
 export async function cleanupDeletedAccount(refs: UserMediaRefs): Promise<AccountCleanupReport> {
   const [media, garmin] = await Promise.all([

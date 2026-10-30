@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ inserted: [] as Array<Record<string, unknown>> }));
+const m = vi.hoisted(() => ({ inserted: [] as Array<Record<string, unknown>>, noDb: false }));
 
 vi.mock("./db", () => {
   // No consent recorded yet.
@@ -23,7 +23,7 @@ vi.mock("./db", () => {
       };
     },
   });
-  return { getDb: async () => ({ select, insert }) };
+  return { getDb: async () => (m.noDb ? null : { select, insert }) };
 });
 
 import { CONSENT_TYPES, CONSENT_VERSION, recordLegalAcceptance } from "./consent";
@@ -31,6 +31,7 @@ import { CONSENT_TYPES, CONSENT_VERSION, recordLegalAcceptance } from "./consent
 describe("registration consents", () => {
   beforeEach(() => {
     m.inserted.length = 0;
+    m.noDb = false;
   });
 
   it("know the «almeno 14 anni» declaration", () => {
@@ -45,5 +46,10 @@ describe("registration consents", () => {
       ["privacy_policy", true],
       ["age_confirmation", true],
     ]);
+  });
+
+  it("throws when the acceptance could not be stored (the caller then issues no session)", async () => {
+    m.noDb = true;
+    await expect(recordLegalAcceptance(8)).rejects.toThrow(/not recorded/);
   });
 });

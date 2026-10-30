@@ -1,9 +1,9 @@
 import {
     publicProcedure, protectedProcedure, router, z, db,
     TRPCError, sdk, verifySupabaseAccessToken,
-    loginLimiter, registrationLimiter,
+    registrationLimiter,
     COOKIE_NAME, getSessionCookieOptions, issueCsrfCookie,
-    applyRateLimit, sql,
+    applyRateLimit, sql, logger,
 } from "./_shared";
 import { CSRF_COOKIE_NAME } from "@shared/const";
 import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
@@ -13,7 +13,9 @@ import { ENV } from "../_core/env";
 import { hasRequiredLegalConsents, recordLegalAcceptance } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
+import { AccountDeletionBlockedError, accountDeletionBlockedMessage } from "../account_clubs";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
+import { DATA_EXPORT_RATE_LIMIT_MESSAGE, dataExportRateLimit } from "../lib/data-export-rate-limit";
 import type { User } from "../../drizzle/schema";
 
 // What auth.me hands to the client about the caller: never the password hash
@@ -43,6 +45,9 @@ const REGISTRATION_PASSWORD_SCHEMA = z
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
+
+/** The acceptance could not be stored: no session is issued without it. */
+const ACCEPTANCE_NOT_RECORDED_MESSAGE = "Non è stato possibile registrare l'accettazione di Termini e Privacy. Riprova.";
 
 /**
  * The registration checkboxes, ticked by the user: Termini, Privacy and «Dichiaro di avere almeno
@@ -76,37 +81,18 @@ export const authRouter = router({
                 });
             }
 
-            // Create session token
-            const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
-                name: result.user.name || "",
-                expiresInMs: ENV.sessionMaxAgeMs,
-                tokenVersion: result.user.sessionTokenVersion ?? 1,
-            });
-
-            const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
-            issueCsrfCookie(ctx.req, ctx.res);
-
-            await recordLegalAcceptance(result.user.id, ctx.req);
-
-            return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
-        }),
-
-    // Login with email and password
-    login: publicProcedure
-        .input(z.object({
-            email: z.string().email(),
-            password: z.string().min(1, "Password is required"),
-        }))
-        .mutation(async ({ ctx, input }) => {
-            await applyRateLimit(loginLimiter, ctx.req, ctx.res);
-            const result = await db.loginUser(input.email, input.password);
-
-            if (!result.success || !result.user) {
-                throw new TRPCError({
-                    code: "UNAUTHORIZED",
-                    message: result.error || "Invalid credentials"
+            // The acceptance is recorded before any session exists. If it cannot be, the account
+            // just created goes away again: no account, no session without the acceptance.
+            try {
+                await recordLegalAcceptance(result.user.id, ctx.req);
+            } catch (error) {
+                logger.error("[Auth] Legal acceptance not recorded at registration", {
+                    event: "auth:legal_acceptance_record_failed",
+                    userId: result.user.id,
+                    message: error instanceof Error ? error.message : String(error),
                 });
+                await db.deleteUserAccount(result.user.id).catch(() => null);
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: ACCEPTANCE_NOT_RECORDED_MESSAGE });
             }
 
             // Create session token
@@ -232,6 +218,21 @@ export const authRouter = router({
                 await db.updateUserLastSignedIn(user.id);
             }
 
+            // Right after the account exists and before any session: if the acceptance cannot be
+            // recorded, no cookie and no token (the next sign-in asks for it again).
+            if (!hasAccepted) {
+                try {
+                    await recordLegalAcceptance(user.id, ctx.req);
+                } catch (error) {
+                    logger.error("[Auth] Legal acceptance not recorded at sign-in", {
+                        event: "auth:legal_acceptance_record_failed",
+                        userId: user.id,
+                        message: error instanceof Error ? error.message : String(error),
+                    });
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: ACCEPTANCE_NOT_RECORDED_MESSAGE });
+                }
+            }
+
             // Crea session token
             const sessionToken = await sdk.createSessionToken(user.id.toString(), {
                 name: user.name || "",
@@ -242,7 +243,6 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
-            if (!hasAccepted) await recordLegalAcceptance(user.id, ctx.req);
             const clientHeader = ctx.req.headers[NATIVE_CLIENT_HEADER];
             const isNativeClient = (Array.isArray(clientHeader) ? clientHeader[0] : clientHeader) === NATIVE_CLIENT_VALUE;
             return {
@@ -254,6 +254,10 @@ export const authRouter = router({
         }),
 
     exportMyData: protectedProcedure.query(async ({ ctx }) => {
+        // Same per-user budget as GET /api/account/export: a heavy read of the whole account.
+        if (!(await dataExportRateLimit.consume(ctx.user.id))) {
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: DATA_EXPORT_RATE_LIMIT_MESSAGE });
+        }
         const payload = await db.exportUserData(ctx.user.id);
         return payload;
     }),
@@ -267,6 +271,8 @@ export const authRouter = router({
         return {
             requiresPassword: Boolean(user.passwordHash),
             loginMethod: user.loginMethod ?? "email",
+            // Clubs with other members: transferred first, or the deletion is refused.
+            blockingClubs: await db.getAccountDeletionBlockers(ctx.user.id),
         } as const;
     }),
 
@@ -333,7 +339,8 @@ export const authRouter = router({
             const otherUserIds = (otherUsersResult.rows as Array<{ id: number }>).map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
 
             for (const userId of otherUserIds) {
-                await db.deleteUserAccount(userId);
+                // Every club goes in this reset, shared or not.
+                await db.deleteUserAccount(userId, { ownedClubs: "delete" });
             }
 
             await dbConn.transaction(async (tx) => {
@@ -424,6 +431,12 @@ export const authRouter = router({
                 throw new TRPCError({ code: "NOT_FOUND", message: "Utente non trovato" });
             }
 
+            // A club with other active members is never deleted with its owner: transfer it first.
+            const blockingClubs = await db.getAccountDeletionBlockers(ctx.user.id);
+            if (blockingClubs.length > 0) {
+                throw new TRPCError({ code: "PRECONDITION_FAILED", message: accountDeletionBlockedMessage(blockingClubs) });
+            }
+
             // Local accounts require password confirmation.
             // OAuth/social accounts can be deleted directly from an authenticated session.
             if (user.passwordHash) {
@@ -438,7 +451,16 @@ export const authRouter = router({
             }
 
             const deletedAt = new Date();
-            const deletedUser = await db.deleteUserAccount(ctx.user.id);
+            let deletedUser: Awaited<ReturnType<typeof db.deleteUserAccount>>;
+            try {
+                deletedUser = await db.deleteUserAccount(ctx.user.id);
+            } catch (error) {
+                // A member joined one of the clubs meanwhile: nothing was deleted.
+                if (error instanceof AccountDeletionBlockedError) {
+                    throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
+                }
+                throw error;
+            }
             if (!deletedUser) {
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
