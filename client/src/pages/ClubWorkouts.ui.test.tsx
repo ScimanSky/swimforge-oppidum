@@ -213,8 +213,29 @@ describe("Allenamenti del club (Corsia)", () => {
     renderAt("/community/club/7/workouts/11", ClubWorkoutDetailPage);
     expect(screen.getByText("Completato 2h fa")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Segna completato" })).toBeNull();
-    await userEvent.setup({ delay: null }).click(screen.getByRole("button", { name: "Annulla completato" }));
+    await userEvent.setup({ delay: null }).click(screen.getByRole("button", { name: "Annulla completamento" }));
     expect(state.calls.markCompleted).toEqual([{ clubId: 7, workoutId: 11, completed: false }]);
+  });
+
+  it("dettaglio: dopo «Segna completato» il focus resta sul pulsante, che diventa «Annulla completamento»", async () => {
+    state.workout = { workout: { id: 11, sessionDate: "2020-03-02", workoutJson: plan("Soglia lunga") } };
+    const location = memoryLocation({ path: "/community/club/7/workouts/11", record: true });
+    const tree = () => (
+      <Router hook={location.hook}>
+        <ClubWorkoutDetailPage />
+      </Router>
+    );
+    const { rerender } = render(tree());
+    const toggle = screen.getByRole("button", { name: "Segna completato" });
+    await userEvent.setup({ delay: null }).click(toggle);
+    expect(toggle).toHaveFocus();
+
+    // The server answers: completed.
+    state.completion = { completed: true, completedAt: new Date().toISOString(), coach: null };
+    rerender(tree());
+    expect(toggle).toHaveAccessibleName("Annulla completamento");
+    expect(toggle).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent(/^Completato/);
   });
 
   it("dettaglio: il coach vede «Fatto da N su M» e chi l'ha fatto", () => {

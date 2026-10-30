@@ -43,7 +43,12 @@ export default function ClubWorkoutDetailPage() {
   );
   const utils = trpc.useUtils();
   const markCompletedMutation = trpc.community.clubs.workouts.markCompleted.useMutation({
-    onSuccess: async (_data, vars) => {
+    onSuccess: async (data, vars) => {
+      // The answer is the new state: the button changes at once (and keeps the focus).
+      utils.community.clubs.workouts.completion.setData(
+        { clubId, workoutId },
+        { completed: data.completed, completedAt: data.completedAt, coach: data.coach }
+      );
       await utils.community.clubs.workouts.completion.invalidate({ clubId, workoutId });
       toast.success(vars.completed === false ? "Completamento annullato." : "Allenamento segnato come completato.");
     },
@@ -72,6 +77,7 @@ export default function ClubWorkoutDetailPage() {
     markCompletedMutation.mutate({ clubId, workoutId, completed });
   };
   const completion = completionQuery.data;
+  const completionPending = markCompletedMutation.isPending || completionQuery.isPending;
 
   if (!match || !Number.isFinite(clubId)) return null;
 
@@ -268,36 +274,35 @@ export default function ClubWorkoutDetailPage() {
           ) : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-2 workout-print-hide">
-            {completion?.completed ? (
-              <>
-                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-success">
+            {/* Announced when it changes; empty until the athlete has done it. */}
+            <p role="status" className="inline-flex items-center gap-1.5 text-sm font-semibold text-success empty:hidden">
+              {completion?.completed ? (
+                <>
                   <CheckCircle2 className="size-4" aria-hidden />
-                  {completion.completedAt
-                    ? `Completato ${formatTimeAgo(completion.completedAt)}`
-                    : "Completato"}
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setCompleted(false)}
-                  disabled={markCompletedMutation.isPending}
-                >
-                  <Undo2 aria-hidden />
-                  {markCompletedMutation.isPending ? "Salvataggio…" : "Annulla completato"}
-                </Button>
-              </>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setCompleted(true)}
-                disabled={markCompletedMutation.isPending || completionQuery.isPending}
-              >
-                <CheckCircle2 aria-hidden />
-                {markCompletedMutation.isPending ? "Salvataggio…" : "Segna completato"}
-              </Button>
-            )}
+                  {completion.completedAt ? `Completato ${formatTimeAgo(completion.completedAt)}` : "Completato"}
+                </>
+              ) : null}
+            </p>
+            {/* One button that changes label, so the focus stays on it after the tap; while saving
+                it is aria-disabled, not disabled (a disabled button would drop the focus). */}
+            <Button
+              type="button"
+              size="sm"
+              variant={completion?.completed ? "ghost" : "default"}
+              onClick={() => {
+                if (completionPending) return;
+                setCompleted(!completion?.completed);
+              }}
+              aria-disabled={completionPending || undefined}
+              className={completionPending ? "opacity-50" : undefined}
+            >
+              {completion?.completed ? <Undo2 aria-hidden /> : <CheckCircle2 aria-hidden />}
+              {markCompletedMutation.isPending
+                ? "Salvataggio…"
+                : completion?.completed
+                  ? "Annulla completamento"
+                  : "Segna completato"}
+            </Button>
             <Button type="button" size="sm" variant="outline" onClick={handlePrintWorkout}>
               <Printer aria-hidden />
               Stampa
