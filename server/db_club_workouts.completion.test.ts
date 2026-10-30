@@ -108,6 +108,23 @@ describe("club workout completion", () => {
     });
   });
 
+  it("a coach of another club cannot read a workout of a club it does not own (404)", async () => {
+    m.state.role = "coach";
+    m.state.published = false; // workout 3 is not a published workout of club 1
+    m.state.completions.set(7, "2026-10-29T06:00:00.000Z");
+    await expect(getClubWorkoutCompletion({ userId: ME, clubId: 1, workoutId: 3 })).rejects.toThrow("Workout not found");
+    expect(m.executed.some((t) => t.includes("FROM club_workout_completions"))).toBe(false);
+  });
+
+  it("both completion reads are limited to the club", async () => {
+    m.state.role = "coach";
+    await getClubWorkoutCompletion({ userId: ME, clubId: 1, workoutId: 3 });
+    const reads = m.executed.filter((t) => t.includes("FROM club_workout_completions"));
+    expect(reads).toHaveLength(2);
+    for (const text of reads) expect(text).toMatch(/club_id = \$\d+/);
+    expect(m.executed.filter((t) => t.includes("FROM club_pool_workouts"))).toHaveLength(1);
+  });
+
   it("only published workouts of that club", async () => {
     m.state.published = false;
     await expect(setClubWorkoutCompletion({ userId: ME, clubId: 1, workoutId: 3, completed: true })).rejects.toThrow(

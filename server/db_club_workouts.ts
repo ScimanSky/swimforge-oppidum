@@ -336,7 +336,7 @@ export async function setClubWorkoutCompletion(params: {
   workoutId: number;
   completed: boolean;
 }) {
-  await assertReadableRole(params.userId, params.clubId);
+  const membership = await assertReadableRole(params.userId, params.clubId);
   await requirePublishedWorkout(params.clubId, params.workoutId);
   const db = await requireDb();
 
@@ -352,7 +352,7 @@ export async function setClubWorkoutCompletion(params: {
       WHERE user_id = ${params.userId} AND workout_id = ${params.workoutId}
     `);
   }
-  return getClubWorkoutCompletion(params);
+  return readClubWorkoutCompletion(membership, params);
 }
 
 type CompletionRow = {
@@ -369,11 +369,22 @@ type CompletionRow = {
  */
 export async function getClubWorkoutCompletion(params: { userId: number; clubId: number; workoutId: number }) {
   const membership = await assertReadableRole(params.userId, params.clubId);
+  // The role is checked in clubId: the workout must belong to that club too, or a coach of
+  // another club could read who did a private club's workout.
+  await requirePublishedWorkout(params.clubId, params.workoutId);
+  return readClubWorkoutCompletion(membership, params);
+}
+
+/** Callers have checked the membership and that the workout is a published one of clubId. */
+async function readClubWorkoutCompletion(
+  membership: { role: string | null },
+  params: { userId: number; clubId: number; workoutId: number },
+) {
   const db = await requireDb();
 
   const own = await db.execute(sql`
     SELECT completed_at FROM club_workout_completions
-    WHERE user_id = ${params.userId} AND workout_id = ${params.workoutId}
+    WHERE user_id = ${params.userId} AND workout_id = ${params.workoutId} AND club_id = ${params.clubId}
     LIMIT 1
   `);
   const ownRow = own.rows[0] as { completed_at: Date | string } | undefined;
@@ -396,7 +407,7 @@ export async function getClubWorkoutCompletion(params: { userId: number; clubId:
         ON m.user_id = c.user_id AND m.club_id = ${params.clubId} AND m.status = 'active'
       JOIN users u ON u.id = c.user_id
       LEFT JOIN swimmer_profiles sp ON sp.user_id = c.user_id
-      WHERE c.workout_id = ${params.workoutId}
+      WHERE c.workout_id = ${params.workoutId} AND c.club_id = ${params.clubId}
       ORDER BY c.completed_at DESC
     `),
     db.execute(sql`

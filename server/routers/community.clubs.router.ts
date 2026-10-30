@@ -1009,9 +1009,15 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                             workoutId: input.workoutId,
                         });
                     } catch (error) {
-                        const message = error instanceof Error ? error.message : "Impossibile leggere il completamento";
+                        const message = error instanceof Error ? error.message : "";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
-                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND", message: "Allenamento non trovato." });
+                        logger.error("[club_workouts] completion read failed", {
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                            error: message || String(error),
+                        });
+                        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Impossibile leggere il completamento. Riprova." });
                     }
                 }),
 
@@ -1048,10 +1054,15 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                         return { success: true, workoutId: input.workoutId, ...state };
                     } catch (error) {
-                        const message = error instanceof Error ? error.message : "Impossibile registrare completamento workout";
+                        const message = error instanceof Error ? error.message : "";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
-                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND" });
-                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND", message: "Allenamento non trovato." });
+                        logger.error("[club_workouts] completion write failed", {
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                            error: message || String(error),
+                        });
+                        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Impossibile salvare il completamento. Riprova." });
                     }
                 }),
 

@@ -63,10 +63,44 @@ describe("community.clubs.workouts.markCompleted", () => {
     expect(m.trackProductEvent).not.toHaveBeenCalled();
   });
 
+  it("a workout of another club: NOT_FOUND", async () => {
+    m.setClubWorkoutCompletion.mockRejectedValue(new Error("Workout not found"));
+    await expect(
+      communityRouter.createCaller(ctx()).clubs.workouts.markCompleted({ clubId: 1, workoutId: 99, completed: true }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("an unexpected error does not reach the client", async () => {
+    m.setClubWorkoutCompletion.mockRejectedValue(new Error('relation "club_workout_completions" does not exist'));
+    const error = await communityRouter
+      .createCaller(ctx())
+      .clubs.workouts.markCompleted({ clubId: 1, workoutId: 3, completed: true })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "Impossibile salvare il completamento. Riprova." });
+  });
+
   it("not a member: FORBIDDEN", async () => {
     m.setClubWorkoutCompletion.mockRejectedValue(new Error("Forbidden"));
     await expect(
       communityRouter.createCaller(ctx()).clubs.workouts.markCompleted({ clubId: 1, workoutId: 3, completed: true }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+describe("community.clubs.workouts.completion", () => {
+  it("a workout of another club: NOT_FOUND", async () => {
+    m.getClubWorkoutCompletion.mockRejectedValue(new Error("Workout not found"));
+    await expect(
+      communityRouter.createCaller(ctx()).clubs.workouts.completion({ clubId: 1, workoutId: 99 }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("an unexpected error does not reach the client", async () => {
+    m.getClubWorkoutCompletion.mockRejectedValue(new Error("connection terminated unexpectedly"));
+    const error = await communityRouter
+      .createCaller(ctx())
+      .clubs.workouts.completion({ clubId: 1, workoutId: 3 })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "Impossibile leggere il completamento. Riprova." });
   });
 });
