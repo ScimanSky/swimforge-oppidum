@@ -5,7 +5,7 @@ import {
     sql, logger,
 } from "./_shared";
 import { CSRF_COOKIE_NAME } from "@shared/const";
-import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
+import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE, NATIVE_DATA_EXPORT_MESSAGE } from "@shared/native";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
@@ -42,6 +42,12 @@ function pgErrorCode(error: unknown): string | undefined {
     const shaped = error as { code?: unknown; cause?: { code?: unknown } } | null;
     const code = shaped?.code ?? shaped?.cause?.code;
     return typeof code === "string" ? code : undefined;
+}
+
+/** The request comes from the Android app (header set by its tRPC client). */
+function isNativeClient(req: { headers: Record<string, string | string[] | undefined> }): boolean {
+    const header = req.headers[NATIVE_CLIENT_HEADER];
+    return (Array.isArray(header) ? header[0] : header) === NATIVE_CLIENT_VALUE;
 }
 
 /** A Supabase Auth user id (UUID) in users.open_id: the account signs in through Supabase. */
@@ -230,17 +236,21 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
-            const clientHeader = ctx.req.headers[NATIVE_CLIENT_HEADER];
-            const isNativeClient = (Array.isArray(clientHeader) ? clientHeader[0] : clientHeader) === NATIVE_CLIENT_VALUE;
             return {
                 success: true,
                 isNewUser,
                 user: { id: user.id, email: user.email, name: user.name },
-                ...(isNativeClient ? { sessionToken } : {}),
+                ...(isNativeClient(ctx.req) ? { sessionToken } : {}),
             };
         }),
 
     exportMyData: protectedProcedure.query(async ({ ctx }) => {
+        // Older Android builds call this and save the result through <a download>, which the
+        // WebView ignores, then report «Esportazione completata»: they get the website guidance
+        // instead, and the export is never built for nothing.
+        if (isNativeClient(ctx.req)) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: NATIVE_DATA_EXPORT_MESSAGE });
+        }
         // Same per-user budget as GET /api/account/export: a heavy read of the whole account.
         if (!(await dataExportRateLimit.consume(ctx.user.id))) {
             throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: DATA_EXPORT_RATE_LIMIT_MESSAGE });

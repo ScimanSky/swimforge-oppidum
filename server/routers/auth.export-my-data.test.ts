@@ -10,12 +10,13 @@ vi.mock("./_shared", async () => {
   return { ...actual, db: { ...actual.db, exportUserData: m.exportUserData } };
 });
 
+import { NATIVE_DATA_EXPORT_MESSAGE } from "@shared/native";
 import { authRouter } from "./auth.router";
 
-const caller = () =>
+const caller = (headers: Record<string, string> = {}) =>
   authRouter.createCaller({
     user: { id: 42, email: "ada@example.com" } as any,
-    req: { protocol: "https", headers: {} } as any,
+    req: { protocol: "https", headers } as any,
     res: { cookie: vi.fn(), clearCookie: vi.fn() } as any,
   });
 
@@ -40,4 +41,15 @@ describe("auth.exportMyData", () => {
     });
     expect(m.exportUserData).not.toHaveBeenCalled();
   });
+
+  it("from the Android app (old builds call it): the website guidance, never an in-memory export", async () => {
+    await expect(caller({ "x-swimforge-client": "native" }).exportMyData()).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: NATIVE_DATA_EXPORT_MESSAGE,
+    });
+    expect(NATIVE_DATA_EXPORT_MESSAGE).toContain("Scarica i tuoi dati dal sito swimforge.it");
+    expect(m.exportUserData).not.toHaveBeenCalled();
+    expect(m.consume).not.toHaveBeenCalled();
+  });
 });
+
