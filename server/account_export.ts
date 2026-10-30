@@ -12,6 +12,8 @@ import type { SqlExecutor } from "./lib/relation-exists";
 /** 2: laps, lengths, swim settings (CSS test, pace zones) and the AI coach rows. */
 export const DATA_EXPORT_VERSION = 2;
 export const DATA_EXPORT_PAGE_SIZE = 1000;
+/** Each swim row carries its whole Garmin payload (raw_data): fewer of them per page. */
+export const DATA_EXPORT_ACTIVITY_PAGE_SIZE = 50;
 
 type Row = Record<string, unknown>;
 
@@ -20,12 +22,16 @@ const SECRET_PROFILE_COLUMNS = ["garmin_token_encrypted"];
 
 type Section =
   | { key: string; query: (userId: number) => SQL }
-  /** Read in id order, `limit` rows after `afterId`; the rows must carry `id`. */
-  | { key: string; page: (userId: number, afterId: number, limit: number) => SQL };
+  /**
+   * Read in id order, `limit` rows after `afterId`; the rows must carry `id`. `pageSize` caps the
+   * page for sections with heavy rows.
+   */
+  | { key: string; page: (userId: number, afterId: number, limit: number) => SQL; pageSize?: number };
 
 const SECTIONS: Section[] = [
   {
     key: "activities",
+    pageSize: DATA_EXPORT_ACTIVITY_PAGE_SIZE,
     page: (userId, afterId, limit) =>
       sql`SELECT * FROM swimming_activities WHERE user_id = ${userId} AND id > ${afterId} ORDER BY id LIMIT ${limit}`,
   },
@@ -111,12 +117,15 @@ function isMissingRelation(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42P01");
 }
 
-/** Rows as plain JSON values (dates as ISO strings), the same in the file and in tRPC. */
-const plain = (rows: unknown[]): Row[] => JSON.parse(JSON.stringify(rows)) as Row[];
+/**
+ * A value as plain JSON (dates as ISO strings): what the file holds, for the in-memory document.
+ * The streamed file is serialized once, straight from the database rows.
+ */
+const plain = <T>(value: T): T => (value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T));
 
 async function readRows(db: SqlExecutor, query: SQL): Promise<Row[]> {
   try {
-    return plain((await db.execute(query)).rows);
+    return (await db.execute(query)).rows as Row[];
   } catch (error) {
     // A table missing on an older database: an empty section.
     if (isMissingRelation(error)) return [];
@@ -170,11 +179,12 @@ export async function* userDataExportEvents(
       const rows = await readRows(db, section.query(userId));
       if (rows.length) yield { type: "rows", rows };
     } else {
+      const limit = Math.min(section.pageSize ?? pageSize, pageSize);
       let afterId = 0;
       for (;;) {
-        const rows = await readRows(db, section.page(userId, afterId, pageSize));
+        const rows = await readRows(db, section.page(userId, afterId, limit));
         if (rows.length) yield { type: "rows", rows };
-        if (rows.length < pageSize) break;
+        if (rows.length < limit) break;
         const lastId = Number(rows[rows.length - 1].id);
         if (!Number.isFinite(lastId) || lastId <= afterId) break;
         afterId = lastId;
@@ -190,9 +200,9 @@ export async function buildUserDataExport(db: SqlExecutor, userId: number): Prom
   const data: Record<string, Row[]> = {};
   let current: Row[] | null = null;
   for await (const event of userDataExportEvents(db, userId)) {
-    if (event.type === "field") result[event.key] = event.value;
+    if (event.type === "field") result[event.key] = plain(event.value);
     else if (event.type === "section") current = data[event.key] = [];
-    else if (event.type === "rows") current?.push(...event.rows);
+    else if (event.type === "rows") current?.push(...plain(event.rows));
     else current = null;
   }
   result.data = data;

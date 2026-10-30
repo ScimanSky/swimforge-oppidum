@@ -14,6 +14,7 @@ import { hasRequiredLegalConsents, recordLegalAcceptance } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
+import { DATA_EXPORT_RATE_LIMIT_MESSAGE, dataExportRateLimit } from "../lib/data-export-rate-limit";
 import type { User } from "../../drizzle/schema";
 
 // What auth.me hands to the client about the caller: never the password hash
@@ -282,6 +283,10 @@ export const authRouter = router({
         }),
 
     exportMyData: protectedProcedure.query(async ({ ctx }) => {
+        // Same per-user budget as GET /api/account/export: a heavy read of the whole account.
+        if (!(await dataExportRateLimit.consume(ctx.user.id))) {
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: DATA_EXPORT_RATE_LIMIT_MESSAGE });
+        }
         const payload = await db.exportUserData(ctx.user.id);
         return payload;
     }),
