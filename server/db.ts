@@ -981,6 +981,8 @@ export async function deleteUserAccount(
     mediaRefs = { userId, imageKitFileIds: [], urls: [], keepUrls: [] };
   }
 
+  // The clubs the transaction deletes: their whole provider folder goes after the commit.
+  let deletedClubIds: number[] = [];
   await db.transaction(async (tx) => {
     // The user row first: a concurrent transfer of a club to this user, or a new club or challenge
     // of theirs, checks its foreign key against this row, so it waits and then fails instead of
@@ -992,10 +994,8 @@ export async function deleteUserAccount(
     const lockedClubs = await lockOwnedClubs(tx, userId);
     const stillBlocking = clubsBlockingDeletion(lockedClubs);
     if (ownedClubsMode === "refuse" && stillBlocking.length > 0) throw new AccountDeletionBlockedError(stillBlocking);
-    await deleteClubRows(
-      tx,
-      lockedClubs.map((club) => club.id),
-    );
+    deletedClubIds = lockedClubs.map((club) => club.id);
+    await deleteClubRows(tx, deletedClubIds);
     // Challenges, club events and invites the user created stay for the others; the club AI
     // automations that post as the user stop.
     await releaseAuthoredRows(tx, userId);
@@ -1170,7 +1170,7 @@ export async function deleteUserAccount(
   // Outside the transaction, best effort and detached (the answer does not wait for it): media on
   // ImageKit, Cloudinary and Supabase Storage, and the Garmin session on the garmin-service.
   // Every provider call is bounded in time; failures are logged, never thrown.
-  void cleanupDeletedAccount(mediaRefs).catch((error: unknown) => {
+  void cleanupDeletedAccount({ ...mediaRefs, deletedClubIds }).catch((error: unknown) => {
     reportAccountCleanupFailure("account:external_cleanup_failed", "[Database] External cleanup of the deleted account failed", {
       userId,
       message: error instanceof Error ? error.message : String(error),

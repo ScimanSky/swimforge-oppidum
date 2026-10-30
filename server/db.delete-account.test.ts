@@ -171,7 +171,7 @@ describe("deleteUserAccount", () => {
     const { deleteUserAccount } = await import("./db");
     await deleteUserAccount(9);
     expect(m.collectUserMediaRefs).toHaveBeenCalledWith(m.db, 9, []);
-    expect(m.cleanupDeletedAccount).toHaveBeenCalledWith(m.refs);
+    expect(m.cleanupDeletedAccount).toHaveBeenCalledWith({ ...m.refs, deletedClubIds: [] });
     expect(m.order).toEqual(["collect", "transaction", "cleanup"]);
   });
 
@@ -179,7 +179,7 @@ describe("deleteUserAccount", () => {
     m.cleanupDeletedAccount.mockImplementation(() => new Promise(() => {}));
     const { deleteUserAccount } = await import("./db");
     await expect(deleteUserAccount(9)).resolves.toMatchObject({ id: 9 });
-    expect(m.cleanupDeletedAccount).toHaveBeenCalledWith(m.refs);
+    expect(m.cleanupDeletedAccount).toHaveBeenCalledWith({ ...m.refs, deletedClubIds: [] });
   });
 
   it("logs a failed provider cleanup instead of throwing it", async () => {
@@ -209,7 +209,7 @@ describe("deleteUserAccount", () => {
     m.collectUserMediaRefs.mockRejectedValueOnce(new Error("timeout"));
     const { deleteUserAccount } = await import("./db");
     await expect(deleteUserAccount(9)).resolves.toMatchObject({ id: 9 });
-    expect(m.cleanupDeletedAccount).toHaveBeenCalledWith({ userId: 9, imageKitFileIds: [], urls: [], keepUrls: [] });
+    expect(m.cleanupDeletedAccount).toHaveBeenCalledWith({ userId: 9, imageKitFileIds: [], urls: [], keepUrls: [], deletedClubIds: [] });
   });
 
   describe("clubs and challenges of the deleted user", () => {
@@ -284,8 +284,9 @@ describe("deleteUserAccount", () => {
       }
       expect(wheresFor("public.event_attendees")).toContain("event_id IN (SELECT id FROM club_events WHERE club_id IN ($))");
       expect(m.steps.indexOf("delete:public.event_attendees")).toBeLessThan(m.steps.indexOf("delete:public.club_events"));
-      // Its logo and cover are not kept on the providers.
+      // Its logo and cover are not kept on the providers, and its whole folder goes after the commit.
       expect(m.collectUserMediaRefs).toHaveBeenCalledWith(m.db, 9, [4]);
+      expect(m.cleanupDeletedAccount).toHaveBeenCalledWith({ ...m.refs, deletedClubIds: [4] });
     });
 
     it("keeps the challenges the user created, with the creator set to null", async () => {

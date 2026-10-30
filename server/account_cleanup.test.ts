@@ -283,6 +283,53 @@ describe("cleanupDeletedAccount", () => {
     expect(m.captureError).not.toHaveBeenCalled();
   });
 
+  describe("clubs deleted with the account", () => {
+    beforeEach(() => {
+      m.storage.list.mockReset().mockImplementation(async (folder: string) => {
+        const tree: Record<string, Array<{ id: string | null; name: string }>> = {
+          "clubs/4": [
+            { id: null, name: "9" },
+            { id: null, name: "12" },
+            { id: null, name: "branding" },
+          ],
+          "clubs/4/9": [{ id: null, name: "docs" }],
+          "clubs/4/9/docs": [{ id: "a", name: "regole.pdf" }],
+          "clubs/4/12": [{ id: "b", name: "gallery-12.jpg" }],
+          "clubs/4/branding": [{ id: "c", name: "logo-ai.png" }],
+          "profiles/9": [{ id: "d", name: "avatar.png" }],
+        };
+        return { data: tree[folder] ?? [], error: null };
+      });
+    });
+
+    it("removes the club's whole folder on the three providers: logo, cover, gallery and files of every member", async () => {
+      await cleanupDeletedAccount(refs({ deletedClubIds: [4] }));
+      const imageKitFolders = fetchCalls
+        .filter((call) => call.url.endsWith("/v1/folder"))
+        .map((call) => JSON.parse(call.body ?? "{}").folderPath);
+      expect(imageKitFolders).toContain("/clubs/4");
+      const cloudinary = fetchCalls
+        .filter((call) => call.url.startsWith("https://api.cloudinary.com/"))
+        .map((call) => decodeURIComponent(call.url.replace("https://api.cloudinary.com/v1_1/swimcloud/resources/", "")));
+      expect(cloudinary).toEqual(expect.arrayContaining(["image/upload?prefix=clubs/4/", "video/upload?prefix=clubs/4/"]));
+      expect(m.storage.remove).toHaveBeenCalledWith(["clubs/4/9/docs/regole.pdf", "clubs/4/12/gallery-12.jpg", "clubs/4/branding/logo-ai.png"]);
+    });
+
+    it("never touches the folder of a club that goes on", async () => {
+      await cleanupDeletedAccount(refs({ deletedClubIds: [4] }));
+      expect(fetchCalls.some((call) => /clubs(\/|%2F)3(\/|%2F|")/.test(call.url + (call.body ?? "")) && call.url.endsWith("/v1/folder"))).toBe(false);
+      expect(fetchCalls.some((call) => decodeURIComponent(call.url).includes("prefix=clubs/3"))).toBe(false);
+      // The logo kept by club 3 is never deleted.
+      expect(fetchCalls.some((call) => call.url.includes("logo-1"))).toBe(false);
+    });
+
+    it("without deleted clubs: no club folder is removed", async () => {
+      await cleanupDeletedAccount(refs());
+      expect(fetchCalls.some((call) => call.url.endsWith("/v1/folder") && (call.body ?? "").includes("/clubs/"))).toBe(false);
+      expect(fetchCalls.some((call) => decodeURIComponent(call.url).includes("prefix=clubs/"))).toBe(false);
+    });
+  });
+
   describe("never hangs", () => {
     afterEach(() => {
       vi.useRealTimers();

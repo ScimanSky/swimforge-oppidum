@@ -14,6 +14,13 @@
  *   rows are removed there, never one the club still shows;
  * - stories (legacy): ImageKit file IDs.
  * Direct messages carry no uploaded media: forwards point at posts.
+ *
+ * A club deleted with the account (no other active member) loses its whole folder clubs/{clubId}/
+ * on the three providers: logo and cover (uploaded, or generated under branding/), gallery photos,
+ * videos and PDFs of every uploader, AI post images (ai-posts/). Club ids are never reused, so the
+ * folder holds that club's files only. The images and videos of the club's posts written by other
+ * members stay: they live in each author's posts/{userId}/ folder, where their other posts may use
+ * the same file.
  */
 import { sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
@@ -51,6 +58,8 @@ export type UserMediaRefs = {
   urls: string[];
   /** Club logos and covers in the user's club folders: the club still uses them. */
   keepUrls: string[];
+  /** Clubs deleted with the account: their whole folder goes. */
+  deletedClubIds?: number[];
 };
 
 export type ProviderCleanup = { attempted: number; failed: number };
@@ -289,6 +298,32 @@ async function supabaseRemove(bucket: string, paths: string[]): Promise<void> {
   if (error) throw new Error(`Supabase Storage remove failed: ${error.message}`);
 }
 
+/** Every file under `folder`, subfolders included (a few levels: clubs/{id}/{userId}/docs/). */
+async function supabaseListTree(bucket: string, folder: string, depth = 4): Promise<string[]> {
+  const storage = getSupabaseAdminClient().storage.from(bucket);
+  const { data, error } = await withTimeout(
+    storage.list(folder, { limit: 1000 }),
+    PROVIDER_TIMEOUT_MS,
+    "supabase storage list",
+  );
+  if (error) throw new Error(`Supabase Storage list failed: ${error.message}`);
+  const files: string[] = [];
+  for (const item of data ?? []) {
+    const path = `${folder}/${item.name}`;
+    // Folders come back without an id.
+    if (item.id !== null) files.push(path);
+    else if (depth > 0) files.push(...(await supabaseListTree(bucket, path, depth - 1)));
+  }
+  return files;
+}
+
+async function supabaseRemoveTree(bucket: string, folder: string): Promise<void> {
+  const files = await supabaseListTree(bucket, folder);
+  for (let start = 0; start < files.length; start += 1000) {
+    await supabaseRemove(bucket, files.slice(start, start + 1000));
+  }
+}
+
 async function supabaseRemoveFolder(bucket: string, folder: string): Promise<void> {
   const storage = getSupabaseAdminClient().storage.from(bucket);
   const { data, error } = await withTimeout(
@@ -350,9 +385,12 @@ async function runAll(
 /** Deletes the user's media on the three providers (the ones configured). Never throws. */
 export async function deleteUserMedia(refs: UserMediaRefs): Promise<Omit<AccountCleanupReport, "garmin">> {
   const { userId } = refs;
+  const deletedClubIds = refs.deletedClubIds ?? [];
   const keep = new Set(refs.keepUrls);
   // Outside the user's own folders (deleted whole) only the club uploads among the user's rows,
-  // never a logo or cover the club still shows.
+  // never a logo or cover the club still shows. The files of a deleted club go with its folder.
+  const inDeletedClub = (path: string) =>
+    deletedClubIds.some((clubId) => new RegExp(`^/?clubs/${clubId}/`).test(path));
   const clubUploads = refs.urls.filter((url) => !keep.has(url));
 
   const imageKitTasks: Array<() => Promise<void>> = [];
@@ -361,9 +399,12 @@ export async function deleteUserMedia(refs: UserMediaRefs): Promise<Omit<Account
     for (const folder of [`/profiles/${userId}`, `/posts/${userId}`]) {
       imageKitTasks.push(() => imageKitDeleteFolder(folder));
     }
+    for (const clubId of deletedClubIds) imageKitTasks.push(() => imageKitDeleteFolder(`/clubs/${clubId}`));
     for (const url of clubUploads) {
       const path = imageKitPathFromUrl(url);
-      if (path && isOwnClubUploadPath(path, userId)) imageKitTasks.push(() => imageKitDeleteByPath(path));
+      if (path && isOwnClubUploadPath(path, userId) && !inDeletedClub(path)) {
+        imageKitTasks.push(() => imageKitDeleteByPath(path));
+      }
     }
   }
 
@@ -372,10 +413,14 @@ export async function deleteUserMedia(refs: UserMediaRefs): Promise<Omit<Account
     cloudinaryTasks.push(() => cloudinaryDeletePrefix("image", `profiles/${userId}/`));
     cloudinaryTasks.push(() => cloudinaryDeletePrefix("image", `posts/${userId}/`));
     cloudinaryTasks.push(() => cloudinaryDeletePrefix("video", `posts/${userId}/`));
+    for (const clubId of deletedClubIds) {
+      cloudinaryTasks.push(() => cloudinaryDeletePrefix("image", `clubs/${clubId}/`));
+      cloudinaryTasks.push(() => cloudinaryDeletePrefix("video", `clubs/${clubId}/`));
+    }
     const byType = new Map<string, string[]>();
     for (const url of clubUploads) {
       const asset = cloudinaryAssetFromUrl(url);
-      if (!asset || !isOwnClubUploadPath(asset.publicId, userId)) continue;
+      if (!asset || !isOwnClubUploadPath(asset.publicId, userId) || inDeletedClub(asset.publicId)) continue;
       byType.set(asset.resourceType, [...(byType.get(asset.resourceType) ?? []), asset.publicId]);
     }
     for (const [resourceType, publicIds] of Array.from(byType)) {
@@ -386,10 +431,13 @@ export async function deleteUserMedia(refs: UserMediaRefs): Promise<Omit<Account
   const supabaseTasks: Array<() => Promise<void>> = [];
   if (ENV.supabaseUrl && ENV.supabaseServiceRoleKey) {
     supabaseTasks.push(() => supabaseRemoveFolder(PROFILE_MEDIA_BUCKET, `profiles/${userId}`));
+    for (const clubId of deletedClubIds) {
+      supabaseTasks.push(() => supabaseRemoveTree(PROFILE_MEDIA_BUCKET, `clubs/${clubId}`));
+    }
     const byBucket = new Map<string, string[]>();
     for (const url of clubUploads) {
       const object = supabaseObjectFromUrl(url);
-      if (!object || !isOwnClubUploadPath(object.path, userId)) continue;
+      if (!object || !isOwnClubUploadPath(object.path, userId) || inDeletedClub(object.path)) continue;
       byBucket.set(object.bucket, [...(byBucket.get(object.bucket) ?? []), object.path]);
     }
     for (const [bucket, paths] of Array.from(byBucket)) supabaseTasks.push(() => supabaseRemove(bucket, paths));
