@@ -42,7 +42,7 @@ export function activityCardSql() {
           WHERE p.activity_id IS NOT NULL
             AND pr.activity_id = p.activity_id
             AND pr.user_id = p.user_id
-            AND pr.record_type LIKE 'pb\_%\_t'
+            AND pr.record_type ~ '^pb_[0-9]+_[0-9]+_t$'
         ),
         '[]'::json
       ) AS activity_records`;
@@ -594,7 +594,7 @@ export async function upsertActivityPost(
   // A swim with a training record tells the followers so.
   const recordCount = await db.execute(sql`
     SELECT COUNT(*)::int AS n FROM personal_records
-    WHERE activity_id = ${activityId} AND user_id = ${userId} AND record_type LIKE 'pb\_%\_t'
+    WHERE activity_id = ${activityId} AND user_id = ${userId} AND record_type ~ '^pb_[0-9]+_[0-9]+_t$'
   `);
   const hasRecord = Number((recordCount.rows[0] as { n?: number } | undefined)?.n ?? 0) > 0;
   const notificationTitle = hasRecord ? "Nuovo record nel feed" : "Nuova attività nel feed";

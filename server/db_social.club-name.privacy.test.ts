@@ -113,6 +113,8 @@ describe("feed swim card", () => {
     expect(text).toMatch(/FROM personal_records pr/);
     expect(text).toMatch(/pr\.activity_id = p\.activity_id/);
     expect(text).toMatch(/pr\.user_id = p\.user_id/);
+    // A regex: in the sql template a LIKE escape (pb\_%\_t) loses its backslashes.
+    expect(text).toContain("pr.record_type ~ '^pb_[0-9]+_[0-9]+_t$'");
     expect(text).toMatch(/'previous_value', pr\.previous_value/);
     expect(text).toMatch(/AS activity_records/);
   });

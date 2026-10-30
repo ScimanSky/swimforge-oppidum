@@ -218,6 +218,8 @@ describe("upsertActivityPost follower notification", () => {
     await upsertActivityPost(42, 99, { content: "Che nuotata" });
     const notify = m.executed.map((q) => render(q)).find((q) => q.sql.includes("INSERT INTO user_notifications"));
     expect(notify?.params).toContain("Nuovo record nel feed");
+    const records = m.executed.map((q) => render(q).sql).find((q) => q.includes("FROM personal_records"));
+    expect(records).toContain("record_type ~ '^pb_[0-9]+_[0-9]+_t$'");
     expect(notify?.params).toContain(" ha condiviso una nuotata con un nuovo record.");
   });
 
