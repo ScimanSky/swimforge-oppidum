@@ -8,6 +8,7 @@ import Leaderboard from "./Leaderboard";
 const state = vi.hoisted(() => ({
   rows: [] as any[],
   queries: [] as any[],
+  options: [] as any[],
   user: { id: 4 } as any,
   pending: false,
   error: false,
@@ -18,8 +19,9 @@ vi.mock("@/lib/trpc", () => ({
   trpc: {
     leaderboard: {
       get: {
-        useQuery: (input: any) => {
+        useQuery: (input: any, options?: any) => {
           state.queries.push(input);
+          state.options.push(options);
           if (state.pending) return { data: undefined, isPending: true, isLoading: true, refetch: state.refetch };
           if (state.error) return { data: undefined, isPending: false, isError: true, refetch: state.refetch };
           return { data: state.rows, isLoading: false, isPending: false, refetch: state.refetch };
@@ -57,10 +59,18 @@ describe("Classifiche (Corsia)", () => {
   beforeEach(() => {
     state.rows = [];
     state.queries.length = 0;
+    state.options.length = 0;
     state.user = { id: 4 };
     state.pending = false;
     state.error = false;
     state.refetch.mockClear();
+  });
+
+  it("is fetched on opening and on returning to the app, never on a timer", () => {
+    state.rows = [row(4, 100)];
+    renderLeaderboard();
+    expect(state.options.length).toBeGreaterThan(0);
+    for (const options of state.options) expect(options?.refetchInterval).toBeFalsy();
   });
 
   it("in caricamento: scheletri, non lo stato vuoto", () => {

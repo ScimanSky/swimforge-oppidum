@@ -8,6 +8,7 @@ import Challenges from "./Challenges";
 const state = vi.hoisted(() => ({
   challenges: [] as any[],
   leaderboard: [] as any[],
+  leaderboardOptions: [] as any[],
   joinCalls: [] as any[],
   leaveCalls: [] as any[],
   createCalls: [] as any[],
@@ -51,7 +52,14 @@ vi.mock("@/lib/trpc", () => ({
       join: { useMutation: mutation("join", state.joinCalls) },
       leave: { useMutation: mutation("leave", state.leaveCalls) },
     },
-    leaderboard: { get: { useQuery: () => ({ data: state.leaderboard }) } },
+    leaderboard: {
+      get: {
+        useQuery: (_input: unknown, options?: any) => {
+          state.leaderboardOptions.push(options);
+          return { data: state.leaderboard };
+        },
+      },
+    },
   },
 }));
 
@@ -119,6 +127,7 @@ describe("Sfide (Corsia)", () => {
   beforeEach(() => {
     state.challenges = [];
     state.leaderboard = [];
+    state.leaderboardOptions.length = 0;
     state.joinCalls.length = 0;
     state.leaveCalls.length = 0;
     state.createCalls.length = 0;
@@ -128,6 +137,12 @@ describe("Sfide (Corsia)", () => {
     state.refetch.mockClear();
     state.mutating = {};
     toast.error.mockClear();
+  });
+
+  it("la classifica si aggiorna all'apertura e al ritorno nell'app, mai a tempo", () => {
+    renderChallenges();
+    expect(state.leaderboardOptions.length).toBeGreaterThan(0);
+    for (const options of state.leaderboardOptions) expect(options?.refetchInterval).toBeFalsy();
   });
 
   it("in caricamento: scheletri, non «Attive (0)» né lo stato vuoto", () => {

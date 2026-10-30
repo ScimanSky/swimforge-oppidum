@@ -170,7 +170,6 @@ export default function Challenges() {
     },
     {
       staleTime: 15_000,
-      refetchInterval: 30_000,
       refetchOnWindowFocus: true,
       refetchOnMount: "always",
     }
