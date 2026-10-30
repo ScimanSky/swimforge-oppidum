@@ -111,6 +111,74 @@ describe("updateOwnPost", () => {
       "Cannot edit other users posts",
     );
   });
+
+  it("a field left out stays as it is", async () => {
+    respondWith((text) =>
+      text.includes("SELECT")
+        ? {
+            rows: [
+              {
+                ...OLD_POST,
+                content: "Testo salvato",
+                media_url: "https://cdn.example/a.jpg",
+                media_urls: ["https://cdn.example/a.jpg", "https://cdn.example/b.jpg"],
+                tagged_user_ids: [5],
+              },
+            ],
+          }
+        : { rows: [] },
+    );
+    await updateOwnPost(42, 7, {});
+    const update = m.executed.map((q) => render(q)).find((q) => q.sql.includes("UPDATE social_posts"));
+    expect(update?.params).toContain("Testo salvato");
+    expect(update?.params).toEqual(
+      expect.arrayContaining(["https://cdn.example/a.jpg", "https://cdn.example/b.jpg", 5]),
+    );
+  });
+
+  it("an old post with only media_url keeps it when media are left out", async () => {
+    respondWith((text) =>
+      text.includes("SELECT")
+        ? { rows: [{ ...OLD_POST, content: "Testo", media_url: "https://cdn.example/old.jpg", media_urls: null }] }
+        : { rows: [] },
+    );
+    await updateOwnPost(42, 7, { content: "Nuovo testo" });
+    const update = m.executed.map((q) => render(q)).find((q) => q.sql.includes("UPDATE social_posts"));
+    expect(update?.params).toContain("Nuovo testo");
+    expect(update?.params).toContain("https://cdn.example/old.jpg");
+  });
+
+  it("a club post: only while the author is an active member", async () => {
+    const CLUB_POST = { ...OLD_POST, activity_id: null, club_id: 3, content: "Ciao club" };
+    respondWith((text) =>
+      text.includes("SELECT") ? { rows: [{ ...CLUB_POST, author_is_club_member: false }] } : { rows: [] },
+    );
+    await expect(updateOwnPost(42, 7, { content: "Ancora qui" })).rejects.toThrow("Not a club member");
+    expect(m.executed.map((q) => render(q).sql).some((s) => s.includes("UPDATE social_posts"))).toBe(false);
+    const select = render(m.executed[0]).sql;
+    expect(select).toMatch(/community_club_members m\s+WHERE m\.club_id = p\.club_id AND m\.user_id = p\.user_id AND m\.status = 'active'/);
+
+    // Deleting stays allowed.
+    m.executed.length = 0;
+    await expect(deleteOwnPost(42, 7)).resolves.toEqual({ deleted: true });
+
+    m.executed.length = 0;
+    respondWith((text) =>
+      text.includes("SELECT") ? { rows: [{ ...CLUB_POST, author_is_club_member: true }] } : { rows: [] },
+    );
+    await expect(updateOwnPost(42, 7, { content: "Ancora qui" })).resolves.toMatchObject({ postId: 7, clubId: 3 });
+  });
+
+  it("a club post keeps the 1000 characters of club posts; other posts 2000", async () => {
+    const CLUB_POST = { ...OLD_POST, activity_id: null, club_id: 3, author_is_club_member: true };
+    respondWith((text) => (text.includes("SELECT") ? { rows: [CLUB_POST] } : { rows: [] }));
+    await expect(updateOwnPost(42, 7, { content: "x".repeat(1001) })).rejects.toThrow("Content too long");
+    await expect(updateOwnPost(42, 7, { content: "x".repeat(1000) })).resolves.toMatchObject({ postId: 7 });
+
+    respondWith((text) => (text.includes("SELECT") ? { rows: [OLD_POST] } : { rows: [] }));
+    await expect(updateOwnPost(42, 7, { content: "x".repeat(2000) })).resolves.toMatchObject({ postId: 7 });
+    await expect(updateOwnPost(42, 7, { content: "x".repeat(2001) })).rejects.toThrow("Content too long");
+  });
 });
 
 describe("setActivityShare", () => {

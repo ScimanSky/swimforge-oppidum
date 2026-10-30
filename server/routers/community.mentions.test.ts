@@ -27,8 +27,8 @@ const m = vi.hoisted(() => {
   };
 });
 
-vi.mock("../lib/mentions", () => ({
-  MAX_MENTIONS_PER_POST: 10,
+vi.mock("../lib/mentions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/mentions")>()),
   resolveMentionedUserIds: m.resolveMentionedUserIds,
   notifyMentionedUsers: m.notifyMentionedUsers,
 }));
@@ -128,8 +128,8 @@ describe("mentions when editing", () => {
   it("stores the mentions of the new text and tells only the new ones", async () => {
     m.resolveMentionedUserIds.mockResolvedValue([5, 8]);
     m.updateOwnPost.mockResolvedValue({ postId: 7, clubId: null, addedTaggedUserIds: [8] });
-    await caller().updatePost({ postId: 7, content: "Con @ada e @carlo", taggedUserIds: [5, 8] });
-    expect(m.resolveMentionedUserIds).toHaveBeenCalledWith(42, "Con @ada e @carlo", [5, 8]);
+    await caller().updatePost({ postId: 7, content: "Con @ada e @carlo", mediaUrls: [], taggedUserIds: [5, 8] });
+    expect(m.resolveMentionedUserIds).toHaveBeenCalledWith(42, "Con @ada e @carlo", [5, 8], { keepTagged: [] });
     expect(m.updateOwnPost).toHaveBeenCalledWith(42, 7, {
       content: "Con @ada e @carlo",
       mediaUrls: [],
@@ -143,13 +143,49 @@ describe("mentions when editing", () => {
     });
   });
 
-  it("an old build sends no ids: the post's mentions still in the text stay, nobody new is told", async () => {
-    m.getOwnPostForEdit.mockResolvedValue({ id: 7, taggedUsers: [{ userId: 5 }, { userId: 6 }] });
+  it("no ids sent: the post's mentions still in the text stay, nobody new is told", async () => {
+    m.getOwnPostForEdit.mockResolvedValue({
+      id: 7,
+      content: "Con @ada e @bea",
+      taggedUsers: [
+        { userId: 5, name: "Ada", username: "ada" },
+        { userId: 6, name: "Bea", username: "bea" },
+      ],
+    });
     m.updateOwnPost.mockResolvedValue({ postId: 7, clubId: 3, addedTaggedUserIds: [] });
     await caller().updatePost({ postId: 7, content: "Solo @ada" });
     expect(m.getOwnPostForEdit).toHaveBeenCalledWith(42, { postId: 7 });
-    expect(m.resolveMentionedUserIds).toHaveBeenCalledWith(42, "Solo @ada", [5, 6]);
+    // Bea was a mention in the text (not tagged apart): removing her from the text removes her.
+    expect(m.resolveMentionedUserIds).toHaveBeenCalledWith(42, "Solo @ada", [5, 6], { keepTagged: [] });
     expect(m.updateOwnPost).toHaveBeenCalledWith(42, 7, expect.objectContaining({ taggedUserIds: [5] }));
     expect(m.notifyMentionedUsers).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserIds: [], clubId: 3 }));
+  });
+
+  it("people tagged apart by an older post may stay without being in the text", async () => {
+    m.getOwnPostForEdit.mockResolvedValue({
+      id: 7,
+      content: "Vasca con @ada",
+      taggedUsers: [
+        { userId: 5, name: "Ada", username: "ada" },
+        { userId: 9, name: "Dario", username: null },
+      ],
+    });
+    m.resolveMentionedUserIds.mockResolvedValue([9]);
+    m.updateOwnPost.mockResolvedValue({ postId: 7, clubId: null, addedTaggedUserIds: [] });
+    await caller().updatePost({ postId: 7, content: "Vasca", mediaUrls: [], taggedUserIds: [9] });
+    expect(m.resolveMentionedUserIds).toHaveBeenCalledWith(42, "Vasca", [9], { keepTagged: [9] });
+  });
+
+  it("text and media left out stay as they are", async () => {
+    m.getOwnPostForEdit.mockResolvedValue({
+      id: 7,
+      content: "Con @ada",
+      taggedUsers: [{ userId: 5, name: "Ada", username: "ada" }],
+    });
+    m.updateOwnPost.mockResolvedValue({ postId: 7, clubId: null, addedTaggedUserIds: [] });
+    await caller().updatePost({ postId: 7 });
+    // The stored text is what the mentions are checked against.
+    expect(m.resolveMentionedUserIds).toHaveBeenCalledWith(42, "Con @ada", [5], { keepTagged: [] });
+    expect(m.updateOwnPost).toHaveBeenCalledWith(42, 7, { content: undefined, mediaUrls: undefined, taggedUserIds: [5] });
   });
 });

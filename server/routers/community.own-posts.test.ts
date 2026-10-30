@@ -77,6 +77,30 @@ describe("community.updatePost", () => {
     ).rejects.toThrow("Inserisci un testo o almeno un media.");
   });
 
+  it("a club post after leaving the club: FORBIDDEN, deleting stays possible", async () => {
+    m.updateOwnPost.mockRejectedValue(new Error("Not a club member"));
+    await expect(
+      communityRouter.createCaller(ctx()).updatePost({ postId: 7, content: "x" }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Non fai più parte del club: puoi eliminare il post, non modificarlo.",
+    });
+  });
+
+  it("a club post longer than 1000 characters: «al massimo 1000 caratteri»", async () => {
+    m.updateOwnPost.mockRejectedValue(new Error("Content too long"));
+    await expect(
+      communityRouter.createCaller(ctx()).updatePost({ postId: 7, content: "x".repeat(1001) }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "Un post del club può avere al massimo 1000 caratteri." });
+  });
+
+  it("an unexpected error does not reach the client", async () => {
+    m.updateOwnPost.mockRejectedValue(new Error('column "media_urls" does not exist'));
+    await expect(
+      communityRouter.createCaller(ctx()).updatePost({ postId: 7, content: "x" }),
+    ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "Non riesco a salvare il post. Riprova." });
+  });
+
   it("another user's post: «Puoi modificare solo i tuoi post»", async () => {
     m.updateOwnPost.mockRejectedValue(new Error("Cannot edit other users posts"));
     await expect(

@@ -1,4 +1,4 @@
-import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
+import { CLUB_POST_CONTENT_MAX_LENGTH, DB_UNAVAILABLE_ERR_MSG, POST_CONTENT_MAX_LENGTH } from "@shared/const";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { authorClubNameSql } from "./lib/author-club";
@@ -180,7 +180,12 @@ type OwnPostRow = {
   club_id: number | null;
   is_deleted: boolean;
   tagged_user_ids: number[] | null;
+  content?: string | null;
+  media_url?: string | null;
+  media_urls?: string[] | null;
   activity_is_open_water?: boolean | null;
+  /** For a club post: whether its author is still an active member of the club. */
+  author_is_club_member?: boolean | null;
 };
 
 async function loadPostForAuthor(postId: number): Promise<OwnPostRow | null> {
@@ -188,7 +193,12 @@ async function loadPostForAuthor(postId: number): Promise<OwnPostRow | null> {
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   const result = await db.execute(sql`
     SELECT p.id, p.user_id, p.activity_id, p.club_id, p.is_deleted, p.tagged_user_ids,
-      a.is_open_water AS activity_is_open_water
+      p.content, p.media_url, p.media_urls,
+      a.is_open_water AS activity_is_open_water,
+      CASE WHEN p.club_id IS NULL THEN NULL ELSE EXISTS (
+        SELECT 1 FROM community_club_members m
+        WHERE m.club_id = p.club_id AND m.user_id = p.user_id AND m.status = 'active'
+      ) END AS author_is_club_member
     FROM social_posts p
     LEFT JOIN swimming_activities a ON a.id = p.activity_id
     WHERE p.id = ${postId}
@@ -233,10 +243,19 @@ export async function deleteOwnPost(userId: number, postId: number) {
   return { deleted: true as const };
 }
 
+/** The stored media of a post: `media_urls`, else the single `media_url` of older posts. */
+function storedMediaUrls(row: OwnPostRow): string[] {
+  if (Array.isArray(row.media_urls) && row.media_urls.length) return row.media_urls;
+  return row.media_url ? [row.media_url] : [];
+}
+
 /**
  * The author edits text and media of their post (feed, club or shared swim). The post keeps
- * its place in the feed. A swim without text or media gets the default caption; any other
- * post needs text or at least one media. Returns the mentions that were not there before.
+ * its place in the feed. A field left out (undefined) stays as it is; null or an empty list
+ * clears it. A swim without text or media gets the default caption; any other post needs text
+ * or at least one media. A club post can be edited only while its author is an active member
+ * of the club (deleting it is always allowed) and keeps the club's shorter text limit.
+ * Returns the mentions that were not there before.
  */
 export async function updateOwnPost(
   userId: number,
@@ -253,11 +272,22 @@ export async function updateOwnPost(
   if (Number(row.user_id) !== userId) {
     throw new Error("Cannot edit other users posts");
   }
+  if (row.club_id != null && !row.author_is_club_member) {
+    throw new Error("Not a club member");
+  }
 
   const mediaUrls = Array.from(
-    new Set((data.mediaUrls ?? []).map((item) => item.trim()).filter((item) => item.length > 0))
+    new Set(
+      (data.mediaUrls === undefined ? storedMediaUrls(row) : (data.mediaUrls ?? []))
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    )
   ).slice(0, 6);
-  const rawContent = data.content?.trim() ?? "";
+  const rawContent = (data.content === undefined ? row.content : data.content)?.trim() ?? "";
+  const maxLength = row.club_id != null ? CLUB_POST_CONTENT_MAX_LENGTH : POST_CONTENT_MAX_LENGTH;
+  if (data.content !== undefined && rawContent.length > maxLength) {
+    throw new Error("Content too long");
+  }
   let content: string | null = rawContent.length > 0 ? rawContent : null;
   if (!content && mediaUrls.length === 0) {
     if (!row.activity_id) throw new Error("Empty post");

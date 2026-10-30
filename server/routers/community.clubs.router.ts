@@ -1,3 +1,4 @@
+import { CLUB_POST_CONTENT_MAX_LENGTH } from "@shared/const";
 import { ENV } from "../_core/env";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import {
@@ -322,7 +323,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
         createPost: protectedProcedure
             .input(z.object({
                 clubId: z.number(),
-                content: z.string().max(1000).optional().nullable(),
+                content: z.string().max(CLUB_POST_CONTENT_MAX_LENGTH).optional().nullable(),
                 mediaUrl: z.string().url().optional().nullable(),
                 mediaUrls: z.array(z.string().url()).max(6).optional(),
                 /** Users picked after «@» in the composer; kept only if still written in the text. */

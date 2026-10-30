@@ -1,4 +1,4 @@
-import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
+import { CLUB_POST_CONTENT_MAX_LENGTH, DB_UNAVAILABLE_ERR_MSG, POST_CONTENT_MAX_LENGTH } from "@shared/const";
 import {
     protectedProcedure, router, z,
     TRPCError,
@@ -15,7 +15,7 @@ import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { activityCardSql, authorClubNameSql } from "../db_social";
-import { notifyMentionedUsers, resolveMentionedUserIds } from "../lib/mentions";
+import { notifyMentionedUsers, resolveMentionedUserIds, taggedApartIds } from "../lib/mentions";
 import { createCommunityClubsRouter } from "./community.clubs.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
@@ -269,7 +269,7 @@ export const communityRouter = router({
     createPost: protectedProcedure
         .input(z.object({
             activityId: z.number(),
-            content: z.string().max(2000).optional().nullable(),
+            content: z.string().max(POST_CONTENT_MAX_LENGTH).optional().nullable(),
             mediaUrl: z.string().url().optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
             /** Users picked after «@» in the composer; kept only if still written in the text. */
@@ -399,29 +399,37 @@ export const communityRouter = router({
             return post;
         }),
 
+    /**
+     * The author edits their post. A field left out stays as it is (null or [] clears it): text,
+     * media, and the mentions (`taggedUserIds`). People tagged apart by posts from before «@»
+     * stay while the editor still sends them.
+     */
     updatePost: protectedProcedure
         .input(z.object({
             postId: z.number().int().positive(),
-            content: z.string().max(2000).optional().nullable(),
+            content: z.string().max(POST_CONTENT_MAX_LENGTH).optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
-            /** Users picked after «@»; an old build sends none: the post's own are checked again. */
             taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             try {
-                const content = input.content ?? null;
-                const pickedIds =
-                    input.taggedUserIds ??
-                    ((await getOwnPostForEdit(ctx.user.id, { postId: input.postId }))?.taggedUsers ?? []).map(
-                        (user) => user.userId,
-                    );
-                const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, pickedIds);
-                const result = await updateOwnPost(ctx.user.id, input.postId, {
+                const existing = await getOwnPostForEdit(ctx.user.id, { postId: input.postId });
+                const previousTagged = (existing?.taggedUsers ?? []).map((user) => user.userId);
+                const content = input.content === undefined ? (existing?.content ?? null) : input.content;
+                // Mentions count only while written in the text; people tagged apart (older
+                // posts) stay while the editor sends them. No ids sent: the post's own.
+                const taggedUserIds = await resolveMentionedUserIds(
+                    ctx.user.id,
                     content,
-                    mediaUrls: normalizeMediaUrls(input.mediaUrls, null),
+                    input.taggedUserIds ?? previousTagged,
+                    { keepTagged: taggedApartIds(existing?.content, existing?.taggedUsers ?? []) },
+                );
+                const result = await updateOwnPost(ctx.user.id, input.postId, {
+                    content: input.content,
+                    mediaUrls: input.mediaUrls === undefined ? undefined : normalizeMediaUrls(input.mediaUrls, null),
                     taggedUserIds,
                 });
-                // Only the mentions added by this edit are told.
+                // Only the mentions added by this edit are told (and never twice for a post).
                 await notifyMentionedUsers({
                     authorUserId: ctx.user.id,
                     mentionedUserIds: result.addedTaggedUserIds,
@@ -430,17 +438,37 @@ export const communityRouter = router({
                 });
                 return { success: true, postId: result.postId };
             } catch (error) {
-                const message = error instanceof Error ? error.message : "Impossibile modificare il post";
+                const message = error instanceof Error ? error.message : "";
                 if (message === "Post not found") {
                     throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
                 }
                 if (message === "Cannot edit other users posts") {
                     throw new TRPCError({ code: "FORBIDDEN", message: "Puoi modificare solo i tuoi post" });
                 }
+                if (message === "Not a club member") {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "Non fai più parte del club: puoi eliminare il post, non modificarlo.",
+                    });
+                }
                 if (message === "Empty post") {
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
                 }
-                throw new TRPCError({ code: "BAD_REQUEST", message });
+                if (message === "Content too long") {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: `Un post del club può avere al massimo ${CLUB_POST_CONTENT_MAX_LENGTH} caratteri.`,
+                    });
+                }
+                if (message === DB_UNAVAILABLE_ERR_MSG) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+                }
+                logger.error("[community] updatePost failed", {
+                    userId: ctx.user.id,
+                    postId: input.postId,
+                    error: message || String(error),
+                });
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Non riesco a salvare il post. Riprova." });
             }
         }),
 
@@ -467,7 +495,7 @@ export const communityRouter = router({
 
     createTextPost: protectedProcedure
         .input(z.object({
-            content: z.string().max(2000).optional().nullable(),
+            content: z.string().max(POST_CONTENT_MAX_LENGTH).optional().nullable(),
             mediaUrl: z.string().url().optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
             /** Users picked after «@» in the composer; kept only if still written in the text. */
