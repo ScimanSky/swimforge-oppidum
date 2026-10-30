@@ -1,7 +1,8 @@
 /**
  * Direct messages between swimmers, in three places:
  * - `mode="link"`: the header icon to /messages, with the unread count (and the Realtime
- *   subscription that refreshes every message query: the header is always mounted);
+ *   subscription that refreshes every message query: the header is always mounted). Realtime is
+ *   how messages arrive; every message query also asks again once a minute, in case it drops;
  * - `mode="page"`: the Messages page, conversations and the open chat side by side on desktop,
  *   one at a time on phones. The URL says what is open: `?con=<userId>` the chat, `?new=1`
  *   «Nuovo messaggio» (the person search), so back returns to the list and a link (a push
@@ -108,6 +109,8 @@ const RETENTION_DAYS = (() => {
 })();
 const RETENTION_NOTE = `I messaggi vengono eliminati automaticamente dal server dopo ${RETENTION_DAYS} giorni.`;
 const SEARCH_DEBOUNCE_MS = 250;
+/** Realtime brings new messages; this poll only covers a dropped subscription. */
+const DM_FALLBACK_POLL_MS = 60_000;
 
 function parseForwardMetadata(raw: unknown): ForwardMetadata | null {
   const source =
@@ -211,7 +214,7 @@ function useMessagesRealtime() {
 function MessagesLink() {
   useMessagesRealtime();
   const unreadQuery = trpc.community.messages.unreadCount.useQuery(undefined, {
-    refetchInterval: 30_000,
+    refetchInterval: DM_FALLBACK_POLL_MS,
   });
   const unread = toCount(unreadQuery.data?.count);
 
@@ -243,14 +246,14 @@ function usePageVisible() {
 }
 
 /**
- * One chat: the messages (polled every 5 s while shown), marked read as they arrive while the
- * page is on screen, and sending.
+ * One chat: the messages (refreshed by Realtime, polled once a minute while shown), marked read
+ * as they arrive while the page is on screen, and sending.
  */
 function useConversation(otherUserId: number, { active, limit }: { active: boolean; limit: number }) {
   const utils = trpc.useUtils();
   const query = trpc.community.messages.conversation.useQuery(
     { otherUserId, limit },
-    { enabled: active, refetchInterval: active ? 5_000 : false }
+    { enabled: active, refetchInterval: active ? DM_FALLBACK_POLL_MS : false }
   );
   const pageVisible = usePageVisible();
 
@@ -519,23 +522,16 @@ function MessagesPage() {
 
   const conversationsQuery = trpc.community.messages.recent.useQuery(
     { limit: 20 },
-    { refetchInterval: 8_000, refetchOnWindowFocus: true }
+    { refetchInterval: DM_FALLBACK_POLL_MS, refetchOnWindowFocus: true }
   );
-  const conversations = useMemo<Conversation[]>(() => {
-    // One row per person (newest message first), unread counts added up.
-    const byUserId = new Map<number, Conversation>();
-    for (const conv of conversationsQuery.data ?? []) {
-      const existing = byUserId.get(conv.otherUser.id);
-      const unreadCount = toCount(conv.unreadCount) + toCount(existing?.unreadCount);
-      const newer =
-        !existing ||
-        new Date(conv.lastMessage.createdAt).getTime() >= new Date(existing.lastMessage.createdAt).getTime();
-      byUserId.set(conv.otherUser.id, { ...(newer ? conv : existing), unreadCount });
-    }
-    return Array.from(byUserId.values()).sort(
-      (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-    );
-  }, [conversationsQuery.data]);
+  // The server sends one row per person; newest message first.
+  const conversations = useMemo<Conversation[]>(
+    () =>
+      (conversationsQuery.data ?? [])
+        .map((conv) => ({ ...conv, unreadCount: toCount(conv.unreadCount) }))
+        .sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()),
+    [conversationsQuery.data]
+  );
 
   // Who `?con=` is: the conversation list, else the person just picked, else their profile.
   const listed = conId === null ? undefined : conversations.find((conv) => conv.otherUser.id === conId);

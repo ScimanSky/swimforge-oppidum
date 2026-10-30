@@ -142,19 +142,12 @@ describe("direct messages", () => {
   it("the conversation list selects no email and falls back to the username", async () => {
     const { getRecentConversations } = await import("./db_social_enhanced");
     const now = new Date();
-    m.state.selectResults.push(
-      [
-        { id: 10, senderId: 5, receiverId: 1, content: "a", isRead: true, readAt: null, createdAt: now },
-        { id: 11, senderId: 1, receiverId: 6, content: "b", isRead: true, readAt: null, createdAt: now },
-      ],
-      [],
-      [
-        { id: 5, name: "  ", username: "squalo", profilePicture: null },
-        { id: 6, name: null, username: null, profilePicture: null },
-      ],
-    );
+    m.state.executeResults.push([
+      { id: 10, senderId: 5, receiverId: 1, content: "a", isRead: true, createdAt: now, otherUserId: 5, otherName: "  ", otherUsername: "squalo" },
+      { id: 11, senderId: 1, receiverId: 6, content: "b", isRead: true, createdAt: now, otherUserId: 6, otherName: null, otherUsername: null },
+    ]);
     const result: any[] = await getRecentConversations(1);
-    expectNoEmailInSelections();
+    expect(render(m.state.executed[0])).not.toMatch(/email/i);
     expect(JSON.stringify(result)).not.toMatch(/email/i);
     const names = result.map((row) => row.otherUser.username);
     expect(names).toEqual(["squalo", "Utente #6"]);

@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   chatError: null as unknown,
   people: [] as any[],
   enabled: {} as Record<string, Array<boolean | undefined>>,
+  intervals: {} as Record<string, unknown[]>,
   sends: [] as unknown[],
   sendError: null as unknown,
   marks: [] as unknown[],
@@ -33,8 +34,9 @@ vi.mock("@/lib/trpc", () => {
   const cache = { invalidate: state.invalidate };
   // Like TanStack Query: a disabled query has no data and stays pending.
   const query = (name: string, data: (input: any) => unknown, error: () => unknown = () => null) => ({
-    useQuery: (input: any, options?: { enabled?: boolean }) => {
+    useQuery: (input: any, options?: { enabled?: boolean; refetchInterval?: unknown }) => {
       (state.enabled[name] ??= []).push(options?.enabled);
+      (state.intervals[name] ??= []).push(options?.refetchInterval);
       const base = { refetch: state.refetch };
       if (options?.enabled === false) return { ...base, data: undefined, isPending: true, isError: false };
       const value = data(input);
@@ -213,6 +215,7 @@ describe("DirectMessages (Corsia)", () => {
     state.chatError = null;
     state.people = [];
     state.enabled = {};
+    state.intervals = {};
     state.sends = [];
     state.sendError = null;
     state.marks = [];
@@ -239,6 +242,11 @@ describe("DirectMessages (Corsia)", () => {
 
       channel.inserts.forEach((insert) => insert());
       expect(state.invalidate).toHaveBeenCalledTimes(3);
+    });
+
+    it("Realtime brings messages: the unread count only asks again once a minute", () => {
+      renderIn(<DirectMessages mode="link" />);
+      expect(new Set(state.intervals.unreadCount)).toEqual(new Set([60_000]));
     });
 
     it("goes to /messages and says how many are unread", () => {
@@ -268,6 +276,52 @@ describe("DirectMessages (Corsia)", () => {
         "Ricevuto: Ci sei domani?",
       ]);
       expect(state.marks).toEqual([{ senderId: 5 }]);
+    });
+
+    it("the list and the open chat fall back to a poll once a minute, not every few seconds", () => {
+      renderIn(<DirectMessages mode="page" />);
+      expect(new Set(state.intervals.recent)).toEqual(new Set([60_000]));
+      expect(new Set(state.intervals.conversation)).toEqual(new Set([60_000]));
+    });
+
+    it("a forwarded post is a card with the author, the preview and «Apri il post»", () => {
+      state.recent = [
+        {
+          ...conversation(5, "Ada Rossi", "Post inoltrato da Bea", 0, 1),
+          lastMessage: {
+            ...conversation(5, "Ada Rossi", "Post inoltrato da Bea", 0, 1).lastMessage,
+            messageType: "forward_post",
+          },
+        },
+      ];
+      const forward = msg(3, 5, 4, "Post inoltrato da Bea\n\nGuarda che vasca");
+      forward.message.messageType = "forward_post";
+      (forward.message as { metadata: unknown }).metadata = {
+        targetType: "post",
+        targetId: 42,
+        ownerName: "Bea",
+        previewText: "Mille metri a stile",
+        previewMediaUrl: null,
+      };
+      state.chats = { 5: [forward] };
+      renderIn(<DirectMessages mode="page" />);
+
+      // The list says what it is, not the fallback text.
+      expect(screen.getByRole("button", { name: /^Ada Rossi .*Post inoltrato$/ })).toBeInTheDocument();
+      const log = screen.getByRole("log", { name: "Messaggi con Ada Rossi" });
+      expect(within(log).getByText("Bea")).toBeInTheDocument();
+      expect(within(log).getByText("Mille metri a stile")).toBeInTheDocument();
+      expect(within(log).getByRole("link", { name: "Apri il post" })).toHaveAttribute("href", "/post/42");
+    });
+
+    it("a forward whose metadata is unreadable shows its text", () => {
+      const forward = msg(3, 5, 4, "Post inoltrato da Bea");
+      forward.message.messageType = "forward_post";
+      state.chats = { 5: [forward] };
+      renderIn(<DirectMessages mode="page" />);
+      const log = screen.getByRole("log", { name: "Messaggi con Ada Rossi" });
+      expect(within(log).getByText("Post inoltrato da Bea")).toBeInTheDocument();
+      expect(within(log).queryByRole("link", { name: "Apri il post" })).toBeNull();
     });
 
     it("marks read once per new message; a failed attempt is tried again on the next poll", () => {
