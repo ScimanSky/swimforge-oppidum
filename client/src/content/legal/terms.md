@@ -41,7 +41,7 @@ Per utilizzare SwimForge, devi:
 - Mantenere la sicurezza del tuo account e password
 - Essere responsabile di tutte le attività che si verificano tramite il tuo account
 
-Se sei minorenne (sotto i 18 anni), devi avere il consenso di un genitore o tutore per utilizzare il Servizio.
+Se hai tra 14 e 18 anni, parlane con un genitore o con chi ne fa le veci prima di registrarti. Non raccogliamo il loro consenso e non chiediamo documenti.
 
 ---
 
@@ -351,8 +351,7 @@ Le notifiche saranno inviate all'indirizzo email registrato o tramite notifica n
 Per domande, reclami o richieste riguardo a questi Termini, contattaci:
 
 **Gestore del servizio**: Fabrizio  
-**Email**: admin@swimforge.it  
-**Indirizzo**: [Da inserire se applicabile]
+**Email**: admin@swimforge.it
 
 ---
 
