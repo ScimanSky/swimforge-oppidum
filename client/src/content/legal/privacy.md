@@ -1,18 +1,19 @@
 # Privacy Policy di SwimForge
 
-**Ultimo aggiornamento:** 29 ottobre 2026
+**Ultimo aggiornamento:** 30 ottobre 2026
 
 ---
 
 ## In breve
 
 - SwimForge è un servizio per nuotatori: il sito swimforge.it e l'app Android usano lo stesso server. Il titolare del trattamento è **Fabrizio**, persona fisica. Per qualsiasi domanda scrivi a **admin@swimforge.it**.
+- Per registrarti, anche con Google, accetti i Termini di Servizio e questa informativa e dichiari di avere almeno 14 anni.
 - Raccogliamo i dati del tuo account e del profilo, le nuotate che importi da Garmin Connect e quello che pubblichi: post, commenti, messaggi e contenuti dei club.
-- Frequenza cardiaca, VO2max, recupero e dati simili sono **dati sulla salute**: li importiamo solo se dai il consenso «Trattamento dati salute». Puoi revocarlo quando vuoi.
-- Per le analisi automatiche delle nuotate e per il Coach AI inviamo dati di allenamento a **Google Gemini**.
+- Frequenza cardiaca, zone cardio, training effect, VO2max, recupero e stress sono **dati sulla salute**: li importiamo e li facciamo analizzare all'IA solo se dai il consenso «Trattamento dati salute». Con il consenso il Coach funziona per intero; se lo revochi, il Coach continua a lavorare con distanze, tempi e passo.
+- Per le analisi automatiche delle nuotate e per il Coach AI inviamo dati di allenamento a **Google Gemini**, mai nome, email, luoghi o coordinate GPS.
 - Non vendiamo i tuoi dati, non mostriamo pubblicità e non usiamo cookie o strumenti di analisi di terze parti.
 - Il database è nell'Unione europea, in Svezia, e il server in Italia. Alcuni fornitori, tra cui Google e i servizi che ospitano foto e video, possono trattare dati fuori dall'UE con le garanzie previste dal GDPR.
-- Dall'app puoi scaricare i tuoi dati, cambiare i consensi ed eliminare l'account.
+- Dalle impostazioni cambi i consensi ed elimini l'account, subito, con nuotate, contenuti e file caricati; i club con altri membri vanno prima trasferiti. Dal sito puoi anche scaricare i tuoi dati.
 
 ---
 
@@ -32,6 +33,7 @@ Non è stato nominato un Responsabile della protezione dei dati (DPO).
 
 - **Registrazione con email:** nome, cognome, email e password. La password è conservata presso Supabase solo in forma cifrata, come hash: nessuno può leggerla.
 - **Accesso con Google:** se scegli «Accedi con Google», Google ci comunica il tuo nome, la tua email e un identificativo del tuo account Google.
+- **Accettazione alla registrazione:** per creare l'account spunti due caselle, «Accetto i Termini di Servizio e la Privacy Policy» e «Dichiaro di avere almeno 14 anni». Con l'email le spunti nel modulo di registrazione: finché non confermi l'indirizzo, la tua accettazione resta salvata presso Supabase insieme alla registrazione. Con Google le spunti dopo l'accesso, prima che l'account SwimForge venga creato. Registriamo l'accettazione come descritto nella sezione 2.7 prima di aprire qualsiasi sessione: senza accettazione non ti facciamo entrare. Se con Google annulli, l'account SwimForge non viene creato, ma Supabase conserva il nome, l'email e l'identificativo Google ricevuti all'accesso: scrivici e li cancelliamo.
 - **Sessione:** quando accedi apriamo una sessione che dura fino a 30 giorni. Sul sito è il cookie `app_session_id`, nell'app Android un token salvato sul telefono.
 - **Date e presenza:** la data di creazione dell'account, quella dell'ultimo accesso e il momento in cui sei stato attivo l'ultima volta. Quest'ultimo serve a mostrare agli altri se sei online.
 
@@ -83,7 +85,7 @@ Se attivi le notifiche salviamo un identificativo del dispositivo (il token di F
 ### 2.7 Dati tecnici, sicurezza e statistiche d'uso
 
 - **Log del server:** per ogni richiesta registriamo data e ora, indirizzo della pagina o funzione richiesta, esito, durata e indirizzo IP. Per gli errori registriamo anche dettagli tecnici.
-- **Prova dei consensi:** quando dai o revochi un consenso registriamo la data, la versione del testo, l'indirizzo IP e il tipo di browser o dispositivo (user agent).
+- **Prova dei consensi:** quando accetti i Termini di Servizio e questa informativa, quando dichiari di avere almeno 14 anni e quando dai o revochi un consenso, registriamo la data, la versione del testo, l'indirizzo IP e il tipo di browser o dispositivo (user agent).
 - **Protezione dagli abusi:** usiamo l'indirizzo IP per poco tempo, per bloccare i tentativi ripetuti, per esempio di accesso.
 - **Accessi:** il servizio di autenticazione di Supabase registra per sicurezza gli eventi di accesso, come login e recupero della password.
 - **Statistiche d'uso interne:** registriamo nel nostro database alcuni eventi legati al tuo account. Per esempio: post creato o visto, nuotata sincronizzata, record personale visto o condiviso, profilo di un altro utente aperto, allenamento del club aperto o completato. Ci servono a capire quali funzioni vengono usate. Non usiamo Google Analytics né altri servizi di analisi esterni.
@@ -93,18 +95,32 @@ Se attivi le notifiche salviamo un identificativo del dispositivo (il token di F
 ## 3. Perché usiamo i dati e su quale base giuridica
 
 - **Fornirti il servizio:** account e accesso, profilo, importazione delle nuotate, statistiche, badge, sfide, classifiche, feed, messaggi, club, notifiche. La base è l'**esecuzione del contratto**, cioè i Termini di Servizio che accetti alla registrazione (art. 6.1.b GDPR).
-- **Dati sulla salute e analisi con l'IA che li usano:** il tuo **consenso esplicito** (art. 9.2.a e 6.1.a GDPR). Vedi le sezioni 4 e 5.
+- **Dati sulla salute** (frequenza cardiaca, zone cardio, training effect, VO2max, recupero, stress) **e analisi con l'IA che li usano:** il tuo **consenso esplicito** (art. 9.2.a e 6.1.a GDPR). Vedi le sezioni 4 e 5.
 - **Comunicazioni promozionali:** il tuo **consenso** (art. 6.1.a GDPR). Oggi non ne inviamo; se lo faremo, le riceverà solo chi ha dato il consenso.
 - **Sicurezza, protezione dagli abusi, log, prova dei consensi, gestione delle segnalazioni e statistiche d'uso interne:** il nostro **legittimo interesse** a proteggere il servizio e chi lo usa e a migliorarlo (art. 6.1.f GDPR). Puoi opporti (sezione 10).
+- **Contenuti che restano agli altri dopo l'eliminazione del tuo account** (sfide, eventi e inviti dei club che hai creato, gare e risultati dei club, sezione 9): il **legittimo interesse** degli altri partecipanti e del club a non perderli (art. 6.1.f GDPR). Puoi opporti (sezione 10).
 - **Obblighi di legge**, per esempio le richieste di un'autorità (art. 6.1.c GDPR).
 
 ---
 
 ## 4. Dati sulla salute e consenso
 
-In **Impostazioni > Privacy > Consensi GDPR** trovi due consensi: «Trattamento dati salute» e «Sincronizzazione Garmin». Senza entrambi SwimForge non collega il tuo account Garmin e non importa nuotate. Il consenso «Trattamento dati salute» copre anche le analisi automatiche descritte nella sezione 5, che usano questi dati.
+Sono dati sulla salute la frequenza cardiaca (media, massima, per giro e per vasca), le zone di frequenza cardiaca, la frequenza cardiaca a riposo, il tempo di recupero, il training effect, il VO2max e lo stress. Li trattiamo solo con il tuo **consenso esplicito** (art. 9.2.a GDPR).
 
-**Revoca.** Puoi revocare i consensi in qualsiasi momento dallo stesso menu. Dalla revoca SwimForge smette di importare nuove nuotate da Garmin. La revoca non cancella le nuotate già importate e non le esclude dalle analisi. Se vuoi che non vengano più usate, elimina l'account o scrivici: le cancelliamo. La revoca non rende illecito quanto fatto prima.
+In **Impostazioni > Privacy > Consensi GDPR** trovi due consensi:
+
+- **«Trattamento dati salute»:** permette di importare questi dati da Garmin e di farli analizzare a Google Gemini: l'analisi di ogni nuotata, le zone cardio negli allenamenti del Coach e le analisi delle nuotate nella chat (sezione 5).
+- **«Sincronizzazione Garmin»:** permette di collegare Garmin Connect e importare le nuotate.
+
+Senza entrambi SwimForge non collega il tuo account Garmin e non importa nuotate. Con il consenso «Trattamento dati salute» il Coach funziona per intero.
+
+**Revoca.** Puoi revocare i consensi in qualsiasi momento dallo stesso menu. Dalla revoca:
+
+- SwimForge smette di importare nuove nuotate da Garmin;
+- l'IA smette di usare i dati sulla salute, anche delle nuotate già importate: niente analisi della singola nuotata, niente zone cardio negli allenamenti, niente analisi delle nuotate nella chat, e la stima del tuo livello non usa più training effect e zone cardio;
+- Consigli, Piano e Chat del Coach continuano a funzionare con distanze, tempi e passo.
+
+La revoca non cancella le analisi già generate né le nuotate già importate: restano nel tuo account finché non elimini l'account o non ci scrivi per cancellarle. La revoca non rende illecito quanto fatto prima.
 
 **Dati sulla salute che scrivi tu.** Nelle note o nella chat con il coach potresti scrivere dati sulla tua salute, per esempio un dolore o un infortunio. Li usiamo solo per risponderti: inserisci solo quello che serve.
 
@@ -112,29 +128,31 @@ In **Impostazioni > Privacy > Consensi GDPR** trovi due consensi: «Trattamento 
 
 ## 5. Intelligenza artificiale: cosa inviamo a Google Gemini
 
+Oltre a quello che scrivi tu nella chat, non inviamo mai a Gemini il tuo nome, la tua email, la data di nascita, il nome delle nuotate, le note, luoghi o coordinate GPS. I dati sulla salute li inviamo solo se hai dato il consenso «Trattamento dati salute».
+
 ### 5.1 Analisi della singola nuotata (automatica)
 
-Dopo l'importazione SwimForge invia a Gemini i dati della nuotata: distanza, tempi, passo, stile, frequenza cardiaca media e massima, SWOLF, bracciate, training effect, VO2max e dati per giro. Invia anche una parte dei dati grezzi ricevuti da Garmin, che possono contenere il nome del tuo profilo Garmin e, per le nuotate all'aperto, le coordinate di partenza. Il risultato (titolo, sintesi e consigli) resta salvato nel tuo account.
+Funziona solo con il consenso «Trattamento dati salute». Per ogni nuotata importata SwimForge invia a Gemini: distanza, durata, passo medio, stile, vasca o acque libere, lunghezza della vasca, numero di giri, frequenza cardiaca media e massima, tempo nelle zone di frequenza cardiaca, SWOLF, bracciate per vasca, frequenza e distanza della bracciata, training effect aerobico e anaerobico, VO2max e i dati dei giri (fino a 8 giri con distanza, tempo, passo, SWOLF, frequenza cardiaca e stile, più medie e ripartizione per stile). Il risultato (titolo, sintesi e consigli) resta salvato nel tuo account.
 
 ### 5.2 Chat con il coach
 
 Quando scrivi al coach inviamo a Gemini:
 
 - gli ultimi messaggi della conversazione, con l'obiettivo e i vincoli che hai indicato;
-- livello e statistiche generali;
+- livello, stima del livello e statistiche generali;
 - le ultime nuotate (data, distanza, durata, passo, SWOLF);
-- metriche come passo soglia, zone, carico, forma e fatica;
-- le ultime analisi delle sessioni.
+- metriche come passo soglia, zone di passo, carico, forma e fatica;
+- le ultime analisi delle nuotate, solo se hai dato il consenso «Trattamento dati salute».
 
-Non inviamo nome, email o data di nascita.
+La stima del livello la calcola SwimForge, senza IA, dai tuoi tempi migliori, dallo SWOLF e dall'intensità delle nuotate; usa training effect e zone cardio solo con il consenso.
 
 ### 5.3 Allenamenti generati
 
-Inviamo statistiche riassuntive delle tue nuotate, compresa la distribuzione del tempo nelle zone di frequenza cardiaca.
+Inviamo statistiche riassuntive delle tue nuotate e la stima del livello. La distribuzione del tempo nelle zone di frequenza cardiaca la inviamo solo con il consenso «Trattamento dati salute»; senza, l'intensità si basa sulle zone di passo.
 
 ### 5.4 Consigli della pagina Coach
 
-Inviamo le tue metriche di nuoto: volumi, passo soglia, zone, carico, forma e fatica. I consigli ottenuti restano salvati nel tuo account finché non vengono sostituiti da quelli nuovi.
+Inviamo le tue metriche di nuoto: volumi, passo soglia, zone di passo, carico, forma e fatica, nessun dato sulla salute. I consigli ottenuti restano salvati nel tuo account finché non vengono sostituiti da quelli nuovi.
 
 ### 5.5 Funzioni dei club
 
@@ -204,25 +222,40 @@ In questi casi il trasferimento avviene, ove applicabile, sulla base della decis
 
 ### Eliminazione dell'account
 
-Puoi eliminare l'account da **Impostazioni > Privacy > Dati e account > Elimina account**. Cancelliamo subito:
+Puoi eliminare l'account da **Impostazioni > Privacy > Dati e account > Elimina account**. L'eliminazione è immediata e definitiva.
 
-- account, profilo e accesso;
-- nuotate, con giri e vasche;
-- post, commenti, reazioni, chi segui e chi ti segue;
-- messaggi diretti, sia inviati sia ricevuti, e notifiche;
-- iscrizioni ai club, contenuti dei club che hai pubblicato e i club che hai creato;
+**Club di cui sei proprietario.**
+
+- Se un tuo club ha altri membri attivi, prima di eliminare l'account devi trasferirne la proprietà a uno di loro con «Trasferisci a…», nella stessa sezione. Finché non lo fai, l'app non elimina l'account. Dopo il trasferimento resti amministratore del club fino all'eliminazione dell'account.
+- Un club senza altri membri attivi viene eliminato insieme all'account, con tutto il suo contenuto: post, eventi, galleria, annunci, inviti, gare, storico e allenamenti del club, compreso quello lasciato da ex membri.
+
+**Cosa cancelliamo subito:**
+
+- account, profilo e accesso, compreso l'account presso Supabase;
+- nuotate, con giri e vasche, e la tua partecipazione alle sfide;
+- post, storie, commenti, reazioni e splash, chi segui e chi ti segue, post nascosti e segnalazioni che hai inviato. Con i tuoi post spariscono anche i commenti e le reazioni degli altri;
+- messaggi diretti, inviati e ricevuti: spariscono anche per l'altra persona;
+- notifiche;
+- iscrizioni ai club, partecipazioni agli eventi, annunci e foto, video e PDF che hai pubblicato nei club;
 - badge, XP, record, statistiche e obiettivi;
 - analisi e allenamenti generati dall'IA;
-- token Garmin nel database, consensi e token per le notifiche push.
+- token Garmin nel database, consensi e token per le notifiche push;
+- gli eventi delle statistiche d'uso interne che riguardano te, il tuo profilo o i tuoi post, e il dato sulla tua presenza online.
+
+Subito dopo cancelliamo dai fornitori (ImageKit, Cloudinary e Supabase) le foto, i video e i PDF che hai caricato e chiudiamo la sessione Garmin sul server di sincronizzazione, cancellandone i token. Se un fornitore non risponde, l'errore viene registrato e completiamo la cancellazione a mano entro 30 giorni.
 
 Se il servizio email è attivo, ti mandiamo un'email di conferma.
 
-Alcune cose oggi non vengono cancellate in automatico:
+**Cosa resta.** Alcuni dati servono ad altri utenti e restano anche dopo l'eliminazione, sulla base del legittimo interesse degli altri partecipanti e del club (sezione 3):
 
-- foto, video e PDF che hai caricato restano sui server di ImageKit, Cloudinary o Supabase, anche se l'app non li mostra più. Scrivici e li cancelliamo;
-- la copia dei token Garmin sul server del servizio di sincronizzazione. Prima di eliminare l'account scollega Garmin, oppure scrivici;
-- gli eventi delle statistiche d'uso interne restano con il solo numero dell'account cancellato, senza nome né email;
+- le sfide che hai creato, con i progressi degli altri partecipanti, e gli eventi e gli inviti che hai creato nei club: restano senza alcun collegamento al tuo account;
+- nei club che continuano a esistere: le gare che hai creato come responsabile, gli allenamenti del club che hai generato o pubblicato e le impostazioni dei contenuti automatici del club. Restano anche le tue iscrizioni alle gare e i tuoi risultati, che fanno parte della storia sportiva del club: i risultati riportano il nome dell'atleta e, se il club l'ha importata, l'email. Lo stesso vale per la tua scheda nello storico del club, importata da siti pubblici di risultati. In questi dati resta il numero del tuo vecchio account, che non corrisponde più a nessun profilo;
+- il logo e la copertina che hai caricato per un club che continua a esistere: appartengono al club;
+- le notifiche ricevute da altri che riportano il tuo nome, per esempio «ha iniziato a seguirti», fino alla loro cancellazione automatica dopo 90 giorni;
+- di un club eliminato con il tuo account restano presso i fornitori il logo, la copertina e gli altri file che non hai caricato tu, senza più collegamenti nell'app: scrivici e li cancelliamo;
 - le copie di sicurezza (backup) del database gestite da Supabase, se presenti, che si sovrascrivono a rotazione.
+
+Per far cancellare anche quello che resta, per esempio i tuoi risultati nelle gare di un club, scrivici.
 
 ---
 
@@ -230,15 +263,15 @@ Alcune cose oggi non vengono cancellate in automatico:
 
 Il GDPR ti riconosce questi diritti: accesso ai dati, rettifica, cancellazione, limitazione del trattamento, portabilità, opposizione al trattamento basato sul legittimo interesse e revoca del consenso in qualsiasi momento.
 
-Nell'app puoi:
+Nelle impostazioni puoi:
 
-- **scaricare i tuoi dati:** **Impostazioni > Privacy > Dati e account > Esporta i dati**. Ottieni un file JSON con account, profilo, nuotate (compresi i dati ricevuti da Garmin), post, commenti, splash, follower, badge, XP, record, statistiche, obiettivi, notifiche, messaggi diretti, iscrizioni ai club, segnalazioni, post nascosti e consensi. Per una copia completa, per esempio con i dettagli dei giri, le analisi dell'IA e i dati dei club, scrivici;
+- **scaricare i tuoi dati:** dal sito swimforge.it, in **Impostazioni > Privacy > Dati e account > Esporta i dati**. Nell'app Android trovi un messaggio che ti rimanda al sito. Ottieni un file JSON con account, profilo, test CSS e zone di passo, nuotate (compresi i dati completi ricevuti da Garmin) con giri e vasche, record, statistiche settimanali, obiettivi, badge, XP, analisi delle nuotate, consigli e allenamenti generati dall'IA, post, storie, commenti, splash, reazioni, chi segui e chi ti segue, notifiche, messaggi diretti inviati e ricevuti, iscrizioni ai club, segnalazioni che hai inviato, post nascosti e consensi. Il file non contiene la chat con il coach, che è solo sul tuo dispositivo, né i token Garmin. Puoi scaricarlo al massimo 5 volte all'ora. Per il resto, per esempio i contenuti dei club oltre all'iscrizione o l'email Garmin collegata, scrivici;
 - **correggere i dati del profilo:** **Impostazioni > Profilo**;
 - **dare o revocare i consensi:** **Impostazioni > Privacy > Consensi GDPR**. Termini di Servizio e Privacy Policy sono necessari per usare SwimForge;
 - **scegliere chi vede cosa:** **Impostazioni > Privacy** (profilo pubblico, inoltri privati);
 - **gestire le notifiche:** **Impostazioni > Notifiche** e le impostazioni del telefono;
 - **scollegare Garmin:** **Impostazioni > Connessioni**;
-- **uscire da tutti i dispositivi** ed **eliminare l'account:** **Impostazioni > Privacy > Dati e account**.
+- **uscire da tutti i dispositivi** ed **eliminare l'account** (sezione 9): **Impostazioni > Privacy > Dati e account**.
 
 Per tutto il resto scrivi a **admin@swimforge.it**. Rispondiamo entro un mese.
 
@@ -259,7 +292,7 @@ Nessun sistema è sicuro al 100%: usa una password robusta e diversa da quella d
 
 ## 12. Minori
 
-SwimForge non è destinato a chi ha meno di **14 anni**, come previsto dai Termini di Servizio. L'app oggi non verifica l'età. Se scopri che un minore di 14 anni ci ha fornito dati, scrivici e li cancelliamo.
+SwimForge non è destinato a chi ha meno di **14 anni**, come previsto dai Termini di Servizio. Per registrarti dichiari di avere almeno 14 anni spuntando una casella; registriamo la dichiarazione con data, versione del testo, indirizzo IP e user agent (sezione 2.7) e non si può revocare dall'app. Non chiediamo documenti. Se scopri che un minore di 14 anni ci ha fornito dati, scrivici e li cancelliamo.
 
 ---
 

@@ -1,7 +1,7 @@
 # Cookie Policy di SwimForge
 
 **Data di entrata in vigore**: 17 Febbraio 2026  
-**Ultimo aggiornamento**: 29 ottobre 2026
+**Ultimo aggiornamento**: 30 ottobre 2026
 
 Questa Cookie Policy spiega come SwimForge utilizza cookie e tecnologie simili, in conformità con GDPR, Codice Privacy italiano (D.Lgs. 196/2003) e Linee Guida Cookie del Garante (Provvedimento n. 231/2021).
 

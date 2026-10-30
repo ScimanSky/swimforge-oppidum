@@ -1,7 +1,7 @@
 # Termini di Servizio di SwimForge
 
 **Data di entrata in vigore**: 26 Gennaio 2026  
-**Ultimo aggiornamento**: 29 ottobre 2026
+**Ultimo aggiornamento**: 30 ottobre 2026
 
 ---
 
@@ -10,6 +10,8 @@
 Benvenuto su **SwimForge** ("noi", "nostro", "il Servizio"). Questi Termini di Servizio ("Termini") regolano il tuo accesso e utilizzo di SwimForge, inclusi il sito web, l'applicazione mobile e tutti i servizi correlati.
 
 **Utilizzando SwimForge, accetti di essere vincolato da questi Termini.** Se non accetti questi Termini, non utilizzare il Servizio.
+
+Per registrarti accetti questi Termini e la Privacy Policy in modo esplicito, spuntando la casella «Accetto i Termini di Servizio e la Privacy Policy». Senza questa accettazione l'account non viene creato e non puoi accedere.
 
 ---
 
@@ -34,7 +36,7 @@ SwimForge è fornito "così com'è" e ci riserviamo il diritto di modificare, so
 
 Per utilizzare SwimForge, devi:
 
-- Avere almeno **14 anni** se risiedi in Italia (art. 2-quinquies Codice Privacy) o l'età minima prevista dalla legge locale
+- Avere almeno **14 anni** se risiedi in Italia (art. 2-quinquies Codice Privacy) o l'età minima prevista dalla legge locale. Alla registrazione lo dichiari spuntando la casella «Dichiaro di avere almeno 14 anni»
 - Fornire informazioni accurate e complete durante la registrazione
 - Mantenere la sicurezza del tuo account e password
 - Essere responsabile di tutte le attività che si verificano tramite il tuo account
@@ -52,7 +54,9 @@ Per utilizzare SwimForge, devi creare un account fornendo:
 - Indirizzo email valido
 - Password sicura
 
-In alternativa puoi accedere con il tuo account Google.
+In alternativa puoi accedere con il tuo account Google. Anche in questo caso, prima che l'account SwimForge venga creato, accetti questi Termini e la Privacy Policy e dichiari di avere almeno 14 anni con le stesse caselle.
+
+Puoi accedere solo con email e password o con Google.
 
 ### 4.2 Sicurezza dell'account
 
@@ -69,7 +73,7 @@ Ci riserviamo il diritto di sospendere o cancellare il tuo account se:
 - Utilizzi il Servizio per scopi illegali o non autorizzati
 - Non utilizzi il Servizio per un periodo prolungato
 
-Puoi cancellare il tuo account in qualsiasi momento dalle impostazioni. La cancellazione è permanente e comporta la perdita di tutti i dati.
+Puoi cancellare il tuo account in qualsiasi momento dalle impostazioni, alle condizioni della sezione 14.1. La cancellazione è immediata e permanente. Cosa viene cancellato e cosa resta agli altri utenti è descritto nella Privacy Policy, sezione 9.
 
 ---
 
@@ -148,6 +152,8 @@ SwimForge utilizza intelligenza artificiale (Google Gemini) per generare:
 - Analisi personalizzate delle tue nuotate
 - Risposte del Coach AI nella chat
 - Allenamenti su misura
+
+Le analisi che usano dati sulla salute (frequenza cardiaca, zone cardio, training effect, VO2max) funzionano solo se hai dato il consenso «Trattamento dati salute» in Impostazioni > Privacy. Senza questo consenso il Coach lavora con distanze, tempi e passo. I dettagli sono nella Privacy Policy, sezioni 4 e 5.
 
 ### 8.2 Limitazioni degli insights AI
 
@@ -271,10 +277,12 @@ Continuando a utilizzare SwimForge dopo le modifiche, accetti i nuovi Termini.
 
 ### 14.1 Risoluzione da parte tua
 
-Puoi cancellare il tuo account in qualsiasi momento dalle impostazioni. La cancellazione è permanente e comporta:
-- Perdita di tutti i dati (attività, XP, badge, statistiche)
-- Rimozione dalle classifiche e challenge
-- Revoca dell'accesso al Servizio
+Puoi cancellare il tuo account in qualsiasi momento da **Impostazioni > Privacy > Dati e account > Elimina account**. La cancellazione è immediata e permanente e comporta:
+- La perdita dei tuoi dati: nuotate, XP, badge, statistiche, post e messaggi
+- La rimozione dalle classifiche e dalle challenge a cui partecipi
+- La revoca dell'accesso al Servizio
+
+Se sei proprietario di un club che ha altri membri attivi, prima di cancellare l'account devi trasferirne la proprietà a uno di loro; finché non lo fai, la cancellazione non è possibile. Un club senza altri membri attivi viene cancellato insieme al tuo account. Le challenge, gli eventi e gli inviti dei club che hai creato restano agli altri utenti, senza collegamento al tuo account. L'elenco completo di cosa viene cancellato e di cosa resta è nella Privacy Policy, sezione 9.
 
 ### 14.2 Risoluzione da parte nostra
 
@@ -361,4 +369,4 @@ Ci impegniamo a fornirti un'esperienza sicura, trasparente e divertente. Buon nu
 
 ---
 
-**Ultimo aggiornamento**: 29 ottobre 2026
+**Ultimo aggiornamento**: 30 ottobre 2026
