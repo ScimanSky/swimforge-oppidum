@@ -1377,12 +1377,12 @@ export default function Settings() {
                     <RequiredConsent
                       title="Termini di Servizio"
                       status="Obbligatorio · accettato"
-                      version={(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.1"}
+                      version={(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.2"}
                     />
                     <RequiredConsent
                       title="Privacy Policy"
                       status="Obbligatorio · accettata"
-                      version={(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.1"}
+                      version={(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.2"}
                     />
                   </div>
                   <div className="rounded-xl bg-raised p-3">

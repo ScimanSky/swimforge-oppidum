@@ -18,8 +18,10 @@ export const CONSENT_TYPES = [
 export type ConsentType = (typeof CONSENT_TYPES)[number];
 
 export const CONSENT_VERSION: Record<ConsentType, string> = {
-  terms_acceptance: "v1.1",
-  privacy_policy: "v1.1",
+  // Texts of 30 October 2026. Recorded with each new acceptance only: hasRequiredLegalConsents does
+  // not look at the version, so nobody who accepted an earlier one is asked again (or locked out).
+  terms_acceptance: "v1.2",
+  privacy_policy: "v1.2",
   health_data_processing: "v1.0",
   garmin_sync: "v1.0",
   strava_sync: "v1.0",
@@ -212,7 +214,8 @@ export async function hasHealthDataConsent(userId: number): Promise<boolean> {
 }
 
 /**
- * True when the user accepted Termini and Privacy. The age confirmation is not required here:
+ * True when the user accepted Termini and Privacy, in any version (never re-asked when the texts
+ * change: that would lock the older app builds out). The age confirmation is not required here:
  * accounts created before it existed keep working without being asked again.
  */
 export async function hasRequiredLegalConsents(userId: number): Promise<boolean> {
