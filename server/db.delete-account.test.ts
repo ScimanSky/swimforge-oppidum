@@ -292,6 +292,27 @@ describe("deleteUserAccount", () => {
       expect(step("sql:UPDATE community_club_invites SET inviter_id = NULL WHERE inviter_id = $")).toBeGreaterThan(-1);
     });
 
+    it("keeps the reports the user only handled as a moderator, without the moderator", async () => {
+      const { deleteUserAccount } = await import("./db");
+      await deleteUserAccount(9);
+      const where = whereText("public.social_post_reports");
+      expect(where).toContain("reporter_user_id = $");
+      expect(where).toContain("post_id IN (SELECT id FROM social_posts WHERE user_id = $)");
+      expect(where).not.toContain("handled_by");
+      const release = step("sql:UPDATE social_post_reports SET handled_by = NULL WHERE handled_by = $");
+      expect(release).toBeGreaterThan(-1);
+      expect(release).toBeLessThan(step("sql:DELETE FROM users"));
+    });
+
+    it("disables the club AI automations that post as the user", async () => {
+      const { deleteUserAccount } = await import("./db");
+      await deleteUserAccount(9);
+      const disable = step("sql:UPDATE club_ai_automation_configs SET enabled = false, updated_at = NOW() WHERE actor_user_id = $");
+      expect(disable).toBeGreaterThan(-1);
+      expect(disable).toBeLessThan(step("sql:DELETE FROM users"));
+      expect(tables()).not.toContain("public.club_ai_automation_configs");
+    });
+
     it("does not null a creator column that is still NOT NULL (migration 0036 not run yet)", async () => {
       m.creatorColumnsNullable = false;
       const { deleteUserAccount } = await import("./db");

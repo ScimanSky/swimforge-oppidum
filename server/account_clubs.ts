@@ -222,3 +222,14 @@ export async function releaseAuthoredRows(tx: SqlExecutor, userId: number): Prom
     await tx.execute(sql`UPDATE ${sql.raw(table)} SET ${sql.raw(column)} = NULL WHERE ${sql.raw(column)} = ${userId}`);
   }
 }
+
+/**
+ * The club AI automations whose posts are signed by the user (actor_user_id, NOT NULL) are switched
+ * off: the scheduler only runs enabled ones, and the staff picks a new author to switch them back on.
+ */
+export async function disableClubAutomationsOf(tx: SqlExecutor, userId: number): Promise<void> {
+  if (!(await relationExists(tx, "public.club_ai_automation_configs"))) return;
+  await tx.execute(
+    sql`UPDATE club_ai_automation_configs SET enabled = false, updated_at = NOW() WHERE actor_user_id = ${userId}`,
+  );
+}

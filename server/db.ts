@@ -19,7 +19,7 @@ import { ENV } from './_core/env';
 import { updateUserProfileBadge } from './db_profile_badges';
 import { logger } from "./middleware/logger";
 import { classifyAsyncError } from "./lib/withErrorHandling";
-import { deleteFromIfExists } from "./lib/relation-exists";
+import { deleteFromIfExists, relationExists } from "./lib/relation-exists";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
@@ -936,8 +936,15 @@ export async function deleteUserAccount(
     throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
   const ownedClubsMode = options.ownedClubs ?? "refuse";
-  const { AccountDeletionBlockedError, clubsBlockingDeletion, deleteClubRows, listOwnedClubs, lockOwnedClubs, releaseAuthoredRows } =
-    await import("./account_clubs");
+  const {
+    AccountDeletionBlockedError,
+    clubsBlockingDeletion,
+    deleteClubRows,
+    disableClubAutomationsOf,
+    listOwnedClubs,
+    lockOwnedClubs,
+    releaseAuthoredRows,
+  } = await import("./account_clubs");
 
   const userResult = await db.execute(sql`
     SELECT id, email, name, open_id
@@ -989,8 +996,10 @@ export async function deleteUserAccount(
       tx,
       lockedClubs.map((club) => club.id),
     );
-    // Challenges, club events and invites the user created stay for the others.
+    // Challenges, club events and invites the user created stay for the others; the club AI
+    // automations that post as the user stop.
     await releaseAuthoredRows(tx, userId);
+    await disableClubAutomationsOf(tx, userId);
 
     // Legacy season engagement tables: created at runtime by the removed season
     // engine, so they may not exist.
@@ -1075,11 +1084,15 @@ export async function deleteUserAccount(
       "public.social_post_reports",
       sql`
         reporter_user_id = ${userId}
-        OR handled_by = ${userId}
         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
       `,
       ["public.social_posts"]
     );
+    // Reports the user only handled as a moderator belong to their reporters: they stay, without
+    // the moderator.
+    if (await relationExists(tx, "public.social_post_reports")) {
+      await tx.execute(sql`UPDATE social_post_reports SET handled_by = NULL WHERE handled_by = ${userId}`);
+    }
     await deleteFromIfExists(tx, "public.social_follows", sql`follower_id = ${userId} OR following_id = ${userId}`);
     await deleteFromIfExists(tx, "public.social_posts", sql`user_id = ${userId}`);
 
