@@ -88,4 +88,23 @@ describe("auth.deleteAccount with owned clubs", () => {
       blockingClubs: blocking,
     });
   });
+
+  describe("password confirmation", () => {
+    const SUPABASE_ID = "3f0c1d9e-6a4b-4c2d-9e8f-1a2b3c4d5e6f";
+
+    it("a Supabase account never needs a local password, even if the row carries one", async () => {
+      m.getUserById.mockResolvedValue({ id: 9, openId: SUPABASE_ID, passwordHash: "$2a$10$someone-else", loginMethod: "google" });
+      await expect(caller().deleteAccount({})).resolves.toMatchObject({ success: true });
+      expect(m.verifyUserPassword).not.toHaveBeenCalled();
+      await expect(caller().deleteAccountStatus()).resolves.toMatchObject({ requiresPassword: false });
+    });
+
+    it("a legacy local account (no Supabase identity) still confirms with its password", async () => {
+      m.getUserById.mockResolvedValue({ id: 9, openId: null, passwordHash: "$2a$10$own", loginMethod: "email" });
+      await expect(caller().deleteAccount({})).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(m.deleteUserAccount).not.toHaveBeenCalled();
+      await expect(caller().deleteAccountStatus()).resolves.toMatchObject({ requiresPassword: true });
+    });
+  });
 });
+

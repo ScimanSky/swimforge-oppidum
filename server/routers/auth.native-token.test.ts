@@ -44,7 +44,7 @@ describe("auth.syncSupabaseUser native token", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     m.verifySupabaseAccessToken.mockResolvedValue({ id: "sb-1", email: "a@b.it", app_metadata: { provider: "email" }, user_metadata: {} });
-    m.getUserByEmail.mockResolvedValue({ id: 5, email: "a@b.it", name: "A", sessionTokenVersion: 1 });
+    m.getUserByEmail.mockResolvedValue({ id: 5, email: "a@b.it", name: "A", openId: "sb-1", sessionTokenVersion: 1 });
     m.updateUserLastSignedIn.mockResolvedValue(undefined);
     m.createSessionToken.mockResolvedValue("jwt-token");
     m.hasRequiredLegalConsents.mockResolvedValue(true);

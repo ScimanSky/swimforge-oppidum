@@ -862,6 +862,31 @@ export async function verifyUserPassword(userId: number, password: string): Prom
   return bcrypt.compare(password, passwordHash);
 }
 
+/**
+ * Binds the account to the Supabase identity that signed in with its email: open_id becomes the
+ * Supabase user id, every session issued before for the row is revoked (session_token_version + 1)
+ * and a local password, which no path accepts anymore, is dropped. One statement, so the row never
+ * has the new identity with the old sessions still valid. Returns the new token version.
+ */
+export async function relinkUserToSupabaseIdentity(userId: number, supabaseId: string): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
+  }
+  const result = await db.execute(sql`
+    UPDATE users
+    SET open_id = ${supabaseId},
+        password_hash = NULL,
+        session_token_version = COALESCE(session_token_version, 1) + 1,
+        updated_at = NOW()
+    WHERE id = ${userId}
+    RETURNING session_token_version
+  `);
+  const row = result.rows[0] as { session_token_version?: unknown } | undefined;
+  if (!row) throw new Error("User not found");
+  return Number(row.session_token_version);
+}
+
 export async function incrementSessionTokenVersion(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;

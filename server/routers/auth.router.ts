@@ -37,6 +37,26 @@ export function toSelfUser(user: User | null) {
 const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
 
+/** The Postgres error code of a failed query, also when drizzle wraps the driver error. */
+function pgErrorCode(error: unknown): string | undefined {
+    const shaped = error as { code?: unknown; cause?: { code?: unknown } } | null;
+    const code = shaped?.code ?? shaped?.cause?.code;
+    return typeof code === "string" ? code : undefined;
+}
+
+/** A Supabase Auth user id (UUID) in users.open_id: the account signs in through Supabase. */
+function isSupabaseUserId(openId: string | null | undefined): openId is string {
+    return Boolean(openId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(openId));
+}
+
+/**
+ * The deletion asks for the local password only of a legacy local account. A Supabase account never
+ * set one: a password left on its row (the removed local registration) belongs to someone else.
+ */
+function deletionRequiresPassword(user: Pick<User, "passwordHash" | "openId">): boolean {
+    return Boolean(user.passwordHash) && !isSupabaseUserId(user.openId);
+}
+
 /** The acceptance could not be stored: no session is issued without it. */
 const ACCEPTANCE_NOT_RECORDED_MESSAGE = "Non è stato possibile registrare l'accettazione di Termini e Privacy. Riprova.";
 
@@ -158,6 +178,29 @@ export const authRouter = router({
 
                 user = result.user;
             } else {
+                // The row found by email belongs to another identity (open_id null from the removed
+                // local registration, a Manus id, a Supabase user deleted and recreated): it goes to
+                // the Supabase user who just proved the email, and every session issued before for
+                // it is revoked, before the new one exists.
+                if (user.openId !== supabaseUser.id) {
+                    try {
+                        const tokenVersion = await db.relinkUserToSupabaseIdentity(user.id, supabaseUser.id);
+                        user = { ...user, openId: supabaseUser.id, passwordHash: null, sessionTokenVersion: tokenVersion };
+                    } catch (error) {
+                        const duplicate = pgErrorCode(error) === "23505";
+                        logger.error("[Auth] Supabase identity not bound to the account", {
+                            event: "auth:supabase_relink_failed",
+                            userId: user.id,
+                            duplicate,
+                            message: error instanceof Error ? error.message : String(error),
+                        });
+                        throw new TRPCError(
+                            duplicate
+                                ? { code: "CONFLICT", message: "Questo accesso è già collegato a un altro account SwimForge. Scrivi a admin@swimforge.it." }
+                                : { code: "INTERNAL_SERVER_ERROR", message: "Accesso non riuscito, riprova." },
+                        );
+                    }
+                }
                 // Aggiorna last signed in
                 await db.updateUserLastSignedIn(user.id);
             }
@@ -213,7 +256,7 @@ export const authRouter = router({
         }
 
         return {
-            requiresPassword: Boolean(user.passwordHash),
+            requiresPassword: deletionRequiresPassword(user),
             loginMethod: user.loginMethod ?? "email",
             // Clubs with other members: transferred first, or the deletion is refused.
             blockingClubs: await db.getAccountDeletionBlockers(ctx.user.id),
@@ -383,7 +426,7 @@ export const authRouter = router({
 
             // Local accounts require password confirmation.
             // OAuth/social accounts can be deleted directly from an authenticated session.
-            if (user.passwordHash) {
+            if (deletionRequiresPassword(user)) {
                 const password = input.password?.trim() ?? "";
                 if (!password) {
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Password obbligatoria" });
@@ -413,7 +456,7 @@ export const authRouter = router({
             }
 
             // Best effort: delete Supabase Auth user when open_id is a UUID.
-            if (deletedUser.openId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deletedUser.openId)) {
+            if (isSupabaseUserId(deletedUser.openId)) {
                 try {
                     const supabaseAdmin = getSupabaseAdminClient();
                     await supabaseAdmin.auth.admin.deleteUser(deletedUser.openId);

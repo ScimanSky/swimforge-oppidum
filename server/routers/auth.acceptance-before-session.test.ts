@@ -91,7 +91,7 @@ describe("auth.syncSupabaseUser", () => {
   });
 
   it("record fails for an existing account that had not accepted → no session either", async () => {
-    m.getUserByEmail.mockResolvedValue({ id: 5, email: "a@b.it", name: "A", sessionTokenVersion: 1 });
+    m.getUserByEmail.mockResolvedValue({ id: 5, email: "a@b.it", name: "A", openId: "sb-1", sessionTokenVersion: 1 });
     m.recordLegalAcceptance.mockRejectedValue(new Error("connection reset"));
     const c = ctx();
     await expect(
