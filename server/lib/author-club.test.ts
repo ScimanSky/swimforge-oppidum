@@ -29,10 +29,14 @@ function expectVisibleOnlyToViewer(part: string, params: unknown[], viewerId: nu
 describe("authorClubNameSql", () => {
   const { sql: text, params } = render(authorClubNameSql(42));
 
-  it("reads the author's preferences.primaryClubId, only from an object", () => {
+  it("reads the author's preferences.primaryClubId, only from an object, only a whole number as an id", () => {
     expect(text).toMatch(/LEFT JOIN swimmer_profiles psp ON psp\.user_id = p\.user_id/);
     expect(text).toMatch(/jsonb_typeof\(psp\.preferences::jsonb\) = 'object'/);
     expect(text).toMatch(/-> 'primaryClubId'/);
+    // The cast sits inside a CASE after the checks: a malformed value can never break the feed.
+    expect(text).toMatch(
+      /CASE\s+WHEN jsonb_typeof\(stored\.value\) = 'number' AND \(stored\.value #>> '\{\}'\) ~ '\^\[0-9\]\{1,9\}\$'\s+THEN \(stored\.value #>> '\{\}'\)::integer/,
+    );
   });
 
   it("«Nessuno» (an explicit null) shows no club", () => {
@@ -40,11 +44,11 @@ describe("authorClubNameSql", () => {
   });
 
   it("the chosen club only while the author is an active member, and only if the viewer may see it", () => {
-    const primary = between(text, "WHEN jsonb_typeof(pref.primary_club) = 'number'", "ELSE (");
+    const primary = between(text, "WHEN pref.primary_club_id IS NOT NULL", "ELSE (");
     expect(primary).toMatch(/pm\.user_id = p\.user_id/);
     expect(primary).toMatch(/pm\.status = 'active'/);
-    expect(primary).toMatch(/pm\.club_id::numeric = \(pref\.primary_club #>> '\{\}'\)::numeric/);
-    expect(primary).toMatch(/c\.id::numeric = \(pref\.primary_club #>> '\{\}'\)::numeric/);
+    expect(primary).toMatch(/pm\.club_id = pref\.primary_club_id/);
+    expect(primary).toMatch(/c\.id = pref\.primary_club_id/);
     // A private chosen club is not shown to non-members (and no other club in its place).
     expectVisibleOnlyToViewer(primary, params, 42);
   });

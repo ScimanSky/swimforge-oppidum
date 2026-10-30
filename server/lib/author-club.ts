@@ -27,16 +27,16 @@ export function authorClubNameSql(viewerId: number, authorId: SQL = sql`p.user_i
   return sql`(
     SELECT CASE
       WHEN jsonb_typeof(pref.primary_club) = 'null' THEN NULL
-      WHEN jsonb_typeof(pref.primary_club) = 'number' AND EXISTS (
+      WHEN pref.primary_club_id IS NOT NULL AND EXISTS (
         SELECT 1
         FROM community_club_members pm
         WHERE pm.user_id = ${authorId}
           AND pm.status = 'active'
-          AND pm.club_id::numeric = (pref.primary_club #>> '{}')::numeric
+          AND pm.club_id = pref.primary_club_id
       ) THEN (
         SELECT c.name
         FROM community_clubs c
-        WHERE c.id::numeric = (pref.primary_club #>> '{}')::numeric
+        WHERE c.id = pref.primary_club_id
           AND ${clubVisibleToViewerSql(viewerId)}
         LIMIT 1
       )
@@ -52,11 +52,20 @@ export function authorClubNameSql(viewerId: number, authorId: SQL = sql`p.user_i
       )
     END
     FROM (
-      SELECT CASE
-        WHEN jsonb_typeof(psp.preferences::jsonb) = 'object' THEN psp.preferences::jsonb -> 'primaryClubId'
-      END AS primary_club
+      SELECT
+        stored.value AS primary_club,
+        -- Only a whole number is a club id (CASE: never casts anything else).
+        CASE
+          WHEN jsonb_typeof(stored.value) = 'number' AND (stored.value #>> '{}') ~ '^[0-9]{1,9}$'
+            THEN (stored.value #>> '{}')::integer
+        END AS primary_club_id
       FROM (SELECT 1) AS one
       LEFT JOIN swimmer_profiles psp ON psp.user_id = ${authorId}
+      LEFT JOIN LATERAL (
+        SELECT CASE
+          WHEN jsonb_typeof(psp.preferences::jsonb) = 'object' THEN psp.preferences::jsonb -> 'primaryClubId'
+        END AS value
+      ) AS stored ON true
       LIMIT 1
     ) AS pref
   )`;
