@@ -16,7 +16,7 @@ const h = vi.hoisted(() => {
 vi.mock("../db", () => ({ getDb: async () => h.db }));
 vi.mock("../db_social_enhanced", () => ({ createNotification: h.createNotification }));
 
-import { notifyMentionedUsers, resolveMentionedUserIds } from "./mentions";
+import { notifyMentionedUsers, resolveMentionedUserIds, taggedApartIds } from "./mentions";
 
 const render = (query: unknown) => new PgDialect().sqlToQuery(query as SQL);
 
@@ -53,6 +53,33 @@ describe("resolveMentionedUserIds", () => {
   });
 });
 
+describe("people tagged apart (posts from before «@»)", () => {
+  it("an edit keeps a tag apart the editor still sends, without it in the text", async () => {
+    h.state.results.push([
+      { id: 5, name: "Ada Rossi", username: "ada" },
+      { id: 9, name: "Dario", username: null },
+    ]);
+    // Ada is written in the text; Dario was tagged apart by the old post and kept.
+    await expect(resolveMentionedUserIds(42, "Con @ada", [5, 9], { keepTagged: [9] })).resolves.toEqual([5, 9]);
+  });
+
+  it("without «@» in the text only the kept tags are looked up; a deleted user is dropped", async () => {
+    h.state.results.push([]); // user 9 no longer exists
+    await expect(resolveMentionedUserIds(42, "Vasca", [5, 9], { keepTagged: [9] })).resolves.toEqual([]);
+    expect(render(h.state.executed[0]).params).toEqual([9]);
+  });
+
+  it("taggedApartIds: the tagged users whose token is not in the text", () => {
+    expect(
+      taggedApartIds("Vasca con @ada", [
+        { userId: 5, name: "Ada", username: "ada" },
+        { userId: 9, name: "Dario", username: null },
+      ]),
+    ).toEqual([9]);
+    expect(taggedApartIds(null, [{ userId: 9, name: "Dario" }])).toEqual([9]);
+  });
+});
+
 describe("notifyMentionedUsers", () => {
   it("notifies only the mentioned users who can read the post, as a mention", async () => {
     h.state.results.push([{ id: 5 }], [{ name: "Ada" }]);
@@ -73,6 +100,18 @@ describe("notifyMentionedUsers", () => {
       referenceId: 7,
       actorId: 42,
     });
+  });
+
+  it("never twice for the same post: whoever already has a mention for it is left out", async () => {
+    h.state.results.push([]);
+    await notifyMentionedUsers({ authorUserId: 42, mentionedUserIds: [5], postId: 7, clubId: null });
+
+    const readers = render(h.state.executed[0]);
+    expect(readers.sql).toMatch(
+      /NOT EXISTS \(\s*SELECT 1 FROM user_notifications n\s+WHERE n\.user_id = u\.id\s+AND n\.type = 'mention'\s+AND n\.reference_id = \$\d+/,
+    );
+    expect(readers.params.filter((param) => param === 7)).toHaveLength(2);
+    expect(h.createNotification).not.toHaveBeenCalled();
   });
 
   it("a club post links to the club; nobody to notify asks nothing", async () => {
