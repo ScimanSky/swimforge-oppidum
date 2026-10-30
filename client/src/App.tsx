@@ -28,7 +28,6 @@ const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const StravaConnect = lazy(() => import("./pages/StravaConnect"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
@@ -43,7 +42,6 @@ const PUBLIC_PAGES: Record<PublicPath, ComponentType> = {
   "/auth": AuthRedirect,
   "/auth/callback": AuthCallback,
   "/auth/consenso": LegalAcceptance,
-  "/strava/callback": StravaConnect,
   "/login": Login,
   "/register": Register,
   "/signup": Register,

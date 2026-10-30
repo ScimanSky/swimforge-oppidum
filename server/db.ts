@@ -699,20 +699,6 @@ export async function getAllLevelThresholds() {
   return await db.select().from(levelThresholds).orderBy(levelThresholds.level);
 }
 
-export async function getLevelForXp(xp: number) {
-  const db = await getDb();
-  if (!db) return { level: 1, title: 'Novizio', color: '#9ca3af' };
-  
-  const result = await db
-    .select()
-    .from(levelThresholds)
-    .where(sql`${levelThresholds.xpRequired} <= ${xp}`)
-    .orderBy(desc(levelThresholds.level))
-    .limit(1);
-  
-  return result.length > 0 ? result[0] : { level: 1, title: 'Novizio', color: '#9ca3af' };
-}
-
 export async function getLevelThreshold(level: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -728,16 +714,6 @@ export async function getLevelThreshold(level: number) {
 
 export async function getNextLevelThreshold(currentLevel: number) {
   return getLevelThreshold(currentLevel + 1);
-}
-
-export async function createLevelThreshold(level: number, xpRequired: number, title: string, color: string) {
-  const db = await getDb();
-  if (!db) return;
-  // PostgreSQL upsert
-  await db.insert(levelThresholds).values({ level, xpRequired, title, color }).onConflictDoUpdate({
-    target: levelThresholds.level,
-    set: { xpRequired, title, color }
-  });
 }
 
 // ============================================
@@ -1102,6 +1078,7 @@ export async function deleteUserAccount(
     await deleteFromIfExists(tx, "public.event_attendees", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.club_announcements", sql`author_id = ${userId}`);
     await deleteFromIfExists(tx, "public.community_club_members", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.club_workout_completions", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.club_media", sql`uploader_id = ${userId}`);
 
     // Progression and stats
@@ -1110,6 +1087,9 @@ export async function deleteUserAccount(
     await deleteFromIfExists(tx, "public.personal_records", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.weekly_stats", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.xp_transactions", sql`user_id = ${userId}`);
+    // The social XP removed on 30/10/2026 (scripts/sql/2026-10-30-remove-social-xp.sql): the
+    // archive exists only once that script has run, hence the to_regclass check of the helper.
+    await deleteFromIfExists(tx, "public.xp_transactions_social_removed", sql`user_id = ${userId}`);
 
     // AI artifacts
     await deleteFromIfExists(tx, "public.ai_insights_cache", sql`user_id = ${userId}`);

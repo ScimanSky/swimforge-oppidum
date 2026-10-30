@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sql, type SQL } from "drizzle-orm";
+import { type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { TrpcContext } from "./_core/context";
 
-// The feed and the post detail show the name of the author's club next to the author.
-// A club that is not public must not leak who belongs to it: its name shows only to
-// its active members.
+// The feed and the post detail show the name of the author's club next to the author: their
+// «Club principale», else their latest club. A club that is not public must not leak who
+// belongs to it: its name shows only to its active members.
 
 const VIEWER_ID = 42;
 const dialect = new PgDialect();
@@ -27,10 +27,6 @@ vi.mock("./db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./db")>()),
   getDb: async () => m.db,
 }));
-vi.mock("./user_presence", () => ({
-  ensureUserPresenceSchema: async () => {},
-  getOnlineIntervalSql: () => sql`now()`,
-}));
 vi.mock("./product_analytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./product_analytics")>()),
   trackProductEvent: vi.fn(async () => {}),
@@ -49,21 +45,20 @@ function expectClubNameVisibleOnlyWhenAllowed(query: unknown, viewerId: number) 
   const { sql: text, params } = render(query);
   const end = text.indexOf("AS user_club_name");
   expect(end, "the query selects user_club_name").toBeGreaterThan(0);
-  const start = text.lastIndexOf("SELECT c.name", end);
-  expect(start, "user_club_name is a club name subquery").toBeGreaterThan(0);
+  const start = text.lastIndexOf("SELECT CASE", text.lastIndexOf("pref.primary_club) = 'null'", end));
+  expect(start, "user_club_name is the author club subquery").toBeGreaterThan(0);
   const subquery = text.slice(start, end);
 
-  // Only the author's active memberships.
+  // «Club principale» first, else the author's latest club: only active memberships.
+  expect(subquery).toMatch(/'primaryClubId'/);
+  expect(subquery).toMatch(/pm\.user_id = p\.user_id/);
   expect(subquery).toMatch(/m\.user_id = p\.user_id/);
   expect(subquery).toMatch(/m\.status = 'active'/);
-  // A public club shows to everyone...
-  expect(subquery).toMatch(/c\.visibility = 'public' AND c\.is_private IS NOT TRUE/);
-  // ...any other club only to the viewer's own active memberships of it.
-  expect(subquery).toMatch(/vm\.club_id = c\.id/);
-  expect(subquery).toMatch(/vm\.status = 'active'/);
-  const viewerParam = /vm\.user_id = \$(\d+)/.exec(subquery);
-  expect(viewerParam, "the membership check is bound to the viewer").not.toBeNull();
-  expect(params[Number(viewerParam![1]) - 1]).toBe(viewerId);
+  // Both ways a public club shows to everyone, any other club only to its active members.
+  expect(subquery.match(/c\.visibility = 'public' AND c\.is_private IS NOT TRUE/g)).toHaveLength(2);
+  const viewerParams = Array.from(subquery.matchAll(/vm\.user_id = \$(\d+)/g));
+  expect(viewerParams, "both membership checks are bound to the viewer").toHaveLength(2);
+  for (const match of viewerParams) expect(params[Number(match[1]) - 1]).toBe(viewerId);
 }
 
 describe("getSocialFeed user_club_name", () => {
@@ -107,5 +102,20 @@ describe("community.postById user_club_name", () => {
     const postQuery = m.executed.find((q) => /AS user_club_name/.test(render(q).sql));
     expect(postQuery, "postById selects user_club_name").toBeDefined();
     expectClubNameVisibleOnlyWhenAllowed(postQuery, VIEWER_ID);
+  });
+});
+
+describe("feed swim card", () => {
+  it("selects Garmin's average pace and the training records set in that swim", async () => {
+    await getSocialFeed(VIEWER_ID, { scope: "global" });
+    const { sql: text } = render(m.executed[0]);
+    expect(text).toMatch(/a\.avg_pace_per_100m AS activity_avg_pace_per_100m/);
+    expect(text).toMatch(/FROM personal_records pr/);
+    expect(text).toMatch(/pr\.activity_id = p\.activity_id/);
+    expect(text).toMatch(/pr\.user_id = p\.user_id/);
+    // A regex: in the sql template a LIKE escape (pb\_%\_t) loses its backslashes.
+    expect(text).toContain("pr.record_type ~ '^pb_[0-9]+_[0-9]+_t$'");
+    expect(text).toMatch(/'previous_value', pr\.previous_value/);
+    expect(text).toMatch(/AS activity_records/);
   });
 });

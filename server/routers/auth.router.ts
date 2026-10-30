@@ -10,7 +10,6 @@ import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { hasRequiredLegalConsents, recordLegalAcceptance } from "../consent";
-import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
 import { AccountDeletionBlockedError, accountDeletionBlockedMessage } from "../account_clubs";
 import { reportAccountCleanupFailure } from "../account_cleanup";
@@ -84,28 +83,15 @@ const LEGAL_ACCEPTANCE_SCHEMA = z.object({
 export const authRouter = router({
     me: publicProcedure.query(opts => toSelfUser(opts.ctx.user)),
 
+    // compat: remove after 2027-01-31, old Android builds call it (online presence is gone;
+    // they send it every minute and must not see an error).
+    heartbeat: protectedProcedure.mutation(() => ({ ok: true }) as const),
+
     logout: publicProcedure.mutation(async ({ ctx }) => {
-        if (ctx.user?.id) {
-            try {
-                await markUserOffline(ctx.user.id);
-            } catch {
-                // Non-blocking: logout should still succeed even if presence update fails.
-            }
-        }
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
         ctx.res.clearCookie(CSRF_COOKIE_NAME, { ...cookieOptions, httpOnly: false });
         return { success: true } as const;
-    }),
-
-    heartbeat: protectedProcedure.mutation(async ({ ctx }) => {
-        try {
-            await touchUserPresence(ctx.user.id);
-            return { ok: true } as const;
-        } catch {
-            // Presence is best-effort in production; never fail the client request.
-            return { ok: false } as const;
-        }
     }),
 
     // Sync Supabase OAuth user

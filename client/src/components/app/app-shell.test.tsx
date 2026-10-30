@@ -11,7 +11,11 @@ const state = vi.hoisted(() => ({
   garminSync: vi.fn(),
   garminPending: false,
   native: false,
+  latestSwim: null as null | { id: number; shared: boolean },
+  toastInfo: vi.fn(),
 }));
+
+vi.mock("sonner", () => ({ toast: { info: state.toastInfo, error: vi.fn(), success: vi.fn() } }));
 
 vi.mock("@/lib/platform", () => ({ isNativePlatform: () => state.native }));
 
@@ -26,10 +30,25 @@ vi.mock("@/lib/trpc", () => ({
           },
         }),
       },
-      heartbeat: { useMutation: () => ({ mutate: vi.fn() }) },
     },
     profile: { get: { useQuery: () => ({ data: { avatarUrl: null } }) } },
+    community: {
+      latestSwim: {
+        useQuery: () => ({ data: state.latestSwim, isSuccess: true, isError: false }),
+      },
+    },
+    useUtils: () => ({ activities: { list: { invalidate: vi.fn() } } }),
   },
+}));
+
+vi.mock("@/components/social/ShareActivityPicker", () => ({
+  ShareActivityPicker: ({ initialActivityId }: any) => (
+    <div data-testid="share-picker">{`condividi nuotata ${initialActivityId}`}</div>
+  ),
+}));
+
+vi.mock("@/components/social/EditPostSheet", () => ({
+  EditPostSheet: ({ postRef }: any) => <div data-testid="edit-post">{JSON.stringify(postRef)}</div>,
 }));
 
 vi.mock("@/lib/supabase", () => ({
@@ -104,6 +123,8 @@ describe("AppShell Corsia", () => {
     state.garminPending = false;
     state.native = false;
     state.garminSync.mockReset();
+    state.latestSwim = null;
+    state.toastInfo.mockReset();
   });
   afterEach(cleanup);
 
@@ -189,22 +210,18 @@ describe("AppShell Corsia", () => {
     const sheet = within(screen.getByRole("dialog", { name: "Crea" }));
     expect(sheet.getByRole("button", { name: "Nuovo post" })).toBeInTheDocument();
     expect(sheet.getByRole("link", { name: "Messaggio" })).toHaveAttribute("href", "/messages?new=1");
-    expect(sheet.getByRole("button", { name: "Bozza IA del post" })).toBeInTheDocument();
+    expect(sheet.getByRole("button", { name: "Condividi l'ultima nuotata" })).toBeInTheDocument();
+    expect(sheet.queryByRole("button", { name: /Bozza IA/ })).not.toBeInTheDocument();
     expect(sheet.getByRole("button", { name: "Sincronizza Garmin" })).toBeInTheDocument();
   });
 
-  it("Nuovo post e Bozza IA aprono il CreatePostSheet, Sincronizza Garmin avvia la sincronizzazione", async () => {
+  it("Nuovo post apre il CreatePostSheet, Sincronizza Garmin avvia la sincronizzazione", async () => {
     renderShell("/today");
     const openSheet = () => userEvent.click(within(bottomBar()).getByRole("button", { name: "Crea" }));
 
     await openSheet();
     await userEvent.click(screen.getByRole("button", { name: "Nuovo post" }));
     expect(screen.getByTestId("create-post-sheet")).toHaveTextContent("vuoto");
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Crea" })).not.toBeInTheDocument());
-
-    await openSheet();
-    await userEvent.click(screen.getByRole("button", { name: "Bozza IA del post" }));
-    expect(screen.getByTestId("create-post-sheet")).toHaveTextContent("Bozza IA:");
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Crea" })).not.toBeInTheDocument());
     await openSheet();
@@ -212,12 +229,42 @@ describe("AppShell Corsia", () => {
     expect(state.garminSync).toHaveBeenCalledTimes(1);
   });
 
+  it("Condividi l'ultima nuotata apre la condivisione di quella nuotata", async () => {
+    state.latestSwim = { id: 99, shared: false };
+    renderShell("/today");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: "Crea" }));
+    await userEvent.click(screen.getByRole("button", { name: "Condividi l'ultima nuotata" }));
+    expect(await screen.findByTestId("share-picker")).toHaveTextContent("condividi nuotata 99");
+    expect(screen.queryByTestId("create-post-sheet")).not.toBeInTheDocument();
+  });
+
+  it("Condividi l'ultima nuotata: se è già nel feed si modifica il suo post", async () => {
+    state.latestSwim = { id: 99, shared: true };
+    renderShell("/today");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: "Crea" }));
+    await userEvent.click(screen.getByRole("button", { name: "Condividi l'ultima nuotata" }));
+    expect(await screen.findByTestId("edit-post")).toHaveTextContent('{"activityId":99}');
+  });
+
+  it("Condividi l'ultima nuotata senza nuotate spiega cosa fare", async () => {
+    state.latestSwim = null;
+    renderShell("/today");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: "Crea" }));
+    await userEvent.click(screen.getByRole("button", { name: "Condividi l'ultima nuotata" }));
+    await waitFor(() =>
+      expect(state.toastInfo).toHaveBeenCalledWith("Non hai ancora nuotate da condividere.", {
+        description: "Sincronizza Garmin per importare le tue nuotate.",
+      }),
+    );
+    expect(screen.queryByTestId("share-picker")).not.toBeInTheDocument();
+  });
+
   it("il Crea della barra laterale apre lo stesso menu", async () => {
     renderShell("/home");
     const aside = within(screen.getByRole("complementary"));
     await userEvent.click(aside.getByRole("button", { name: "Crea" }));
     expect(aside.getByRole("button", { name: "Crea" })).toHaveAttribute("aria-expanded", "true");
-    for (const label of ["Nuovo post", "Bozza IA del post", "Sincronizza Garmin"]) {
+    for (const label of ["Nuovo post", "Condividi l'ultima nuotata", "Sincronizza Garmin"]) {
       expect(aside.getByRole("button", { name: label })).toBeInTheDocument();
     }
     expect(aside.getByRole("link", { name: "Messaggio" })).toBeInTheDocument();

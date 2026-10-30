@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sql, type SQL } from "drizzle-orm";
+import { type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { TrpcContext } from "../_core/context";
 
@@ -24,10 +24,6 @@ const m = vi.hoisted(() => {
 vi.mock("../db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../db")>()),
   getDb: async () => m.db,
-}));
-vi.mock("../user_presence", () => ({
-  ensureUserPresenceSchema: async () => {},
-  getOnlineIntervalSql: () => sql`now()`,
 }));
 vi.mock("../product_analytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../product_analytics")>()),
@@ -62,5 +58,6 @@ describe("community.postById", () => {
     const text = new PgDialect().sqlToQuery(m.executed[1] as SQL).sql;
     expect(text).not.toMatch(/email/i);
     expect(text).toMatch(/AS user_username/);
+    expect(text).not.toMatch(/user_presence|user_is_online/);
   });
 });

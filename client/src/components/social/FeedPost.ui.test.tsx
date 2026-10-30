@@ -11,19 +11,37 @@ import type { FeedPostRecord } from "./feed-types"
 const state = vi.hoisted(() => ({
   reactions: [] as Array<{ reactionType: string; count: number }>,
   userReaction: null as { reactionType: string } | null,
+  invalidated: [] as Array<[string, unknown]>,
+  deleteOptions: null as null | { onSuccess?: () => void },
 }))
 
 const { mutation } = vi.hoisted(() => ({
   mutation: () => ({ mutate: () => {}, isPending: false }),
 }))
 
-vi.mock("@/lib/trpc", () => ({
+vi.mock("@/lib/trpc", () => {
+  const cache = (name: string) => ({ invalidate: (input?: unknown) => state.invalidated.push([name, input]) })
+  return {
   trpc: {
-    useUtils: () => ({}),
+    useUtils: () => ({
+      community: {
+        feed: cache("feed"),
+        clubs: { feed: cache("clubs.feed") },
+        postById: cache("postById"),
+        unsharedActivities: cache("unsharedActivities"),
+        latestSwim: cache("latestSwim"),
+      },
+      activities: { list: cache("activities.list"), get: cache("activities.get") },
+    }),
     community: {
       users: { toggleFollow: { useMutation: mutation } },
       hidePost: { useMutation: mutation },
-      deletePost: { useMutation: mutation },
+      deletePost: {
+        useMutation: (options: { onSuccess?: () => void }) => {
+          state.deleteOptions = options
+          return { mutate: () => options.onSuccess?.(), isPending: false }
+        },
+      },
       reactions: {
         list: { useQuery: () => ({ data: state.reactions }) },
         userReaction: { useQuery: () => ({ data: state.userReaction }) },
@@ -33,6 +51,11 @@ vi.mock("@/lib/trpc", () => ({
       addComment: { useMutation: mutation },
     },
   },
+  }
+})
+
+vi.mock("./EditPostSheet", () => ({
+  EditPostSheet: ({ postRef }: any) => <div data-testid="edit-post">{JSON.stringify(postRef)}</div>,
 }))
 
 const NOW = new Date("2026-10-28T18:00:00.000Z")
@@ -46,6 +69,7 @@ const activityPost: FeedPostRecord = {
   activity_date: "2026-10-28T16:00:00.000Z",
   activity_distance_meters: 3400,
   activity_duration_seconds: 3700,
+  activity_avg_pace_per_100m: 109,
   activity_calories: 650,
   activity_heart_rate: null,
   activity_swolf: null,
@@ -56,12 +80,14 @@ const activityPost: FeedPostRecord = {
   user_club_name: "Nuoto Oppidum",
 }
 
-function renderPost(post: FeedPostRecord) {
-  return render(
-    <Router hook={memoryLocation({ path: "/home" }).hook}>
-      <FeedPost post={post} currentUserId={1} autoplayVideos={false} />
+function renderPost(post: FeedPostRecord, currentUserId = 1, path = "/home") {
+  const location = memoryLocation({ path, record: true })
+  const result = render(
+    <Router hook={location.hook}>
+      <FeedPost post={post} currentUserId={currentUserId} autoplayVideos={false} />
     </Router>
   )
+  return { ...result, location }
 }
 
 describe("FeedPost Corsia", () => {
@@ -84,6 +110,54 @@ describe("FeedPost Corsia", () => {
     expect(screen.getByText("Nuoto Oppidum · 2h fa")).toBeInTheDocument()
   })
 
+  it("il proprio post si può modificare ed eliminare, quando si vuole", async () => {
+    vi.useRealTimers()
+    renderPost(activityPost, 2)
+    await userEvent.click(screen.getByRole("button", { name: "Menu post" }))
+    expect(await screen.findByRole("menuitem", { name: "Elimina" })).toBeInTheDocument()
+    expect(screen.queryByRole("menuitem", { name: "Segnala" })).toBeNull()
+    await userEvent.click(screen.getByRole("menuitem", { name: "Modifica" }))
+    expect(await screen.findByTestId("edit-post")).toHaveTextContent('{"postId":9}')
+  })
+
+  it("eliminare un post aggiorna feed, pagina del post e nuotata; sulla pagina del post si torna al feed", async () => {
+    vi.useRealTimers()
+    state.invalidated = []
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true)
+    const { location } = renderPost(activityPost, 2, "/post/9")
+    await userEvent.click(screen.getByRole("button", { name: "Menu post" }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Elimina" }))
+    expect(state.invalidated).toEqual(
+      expect.arrayContaining([
+        ["feed", undefined],
+        ["postById", { postId: 9 }],
+        ["unsharedActivities", undefined],
+        ["latestSwim", undefined],
+        ["activities.get", { id: 41 }],
+      ]),
+    )
+    // Replaced, not pushed: «Indietro» does not open the deleted post again.
+    expect(location.history).toEqual(["/home"])
+    confirm.mockRestore()
+  })
+
+  it("eliminare dal feed resta sul feed", async () => {
+    vi.useRealTimers()
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true)
+    const { location } = renderPost(activityPost, 2, "/home")
+    await userEvent.click(screen.getByRole("button", { name: "Menu post" }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Elimina" }))
+    expect(location.history).toEqual(["/home"])
+    confirm.mockRestore()
+  })
+
+  it("nessun pallino «online» sull'avatar: la presenza non c'è più", () => {
+    // An old server could still send the flag: it is ignored.
+    renderPost({ ...activityPost, user_is_online: true } as FeedPostRecord)
+    const avatarLink = screen.getByRole("link", { name: "Profilo di Giulia Bianchi" })
+    expect(avatarLink.querySelector(".bg-success")).toBeNull()
+  })
+
   it("senza club: la fonte della nuotata", () => {
     renderPost({ ...activityPost, user_club_name: null })
     expect(screen.getByText("Garmin · 2h fa")).toBeInTheDocument()
@@ -100,6 +174,27 @@ describe("FeedPost Corsia", () => {
     expect(within(card).queryByText("FC media")).toBeNull()
   })
 
+  it("card attività: il passo è quello di Garmin, mai dal tempo totale con le pause", () => {
+    renderPost({ ...activityPost, activity_avg_pace_per_100m: 98 })
+    const card = screen.getByRole("group", { name: "Nuotata in vasca" })
+    expect(within(card).getByText("1:38")).toHaveClass("text-action-text")
+    cleanup()
+
+    renderPost({ ...activityPost, activity_avg_pace_per_100m: null })
+    const noPace = screen.getByRole("group", { name: "Nuotata in vasca" })
+    expect(within(noPace).queryByText("Passo /100")).toBeNull()
+    expect(within(noPace).queryByText("1:49")).toBeNull()
+  })
+
+  it("card attività: il bollino dei record fatti in quella nuotata", () => {
+    renderPost({
+      ...activityPost,
+      activity_records: [{ record_type: "pb_200_25_t", stroke_type: "freestyle", value: 19240, previous_value: 19640 }],
+    })
+    const records = screen.getByRole("list", { name: "Record di questa nuotata" })
+    expect(within(records).getByText("Record 200 SL 3:12 (−4 s)")).toBeInTheDocument()
+  })
+
   it("card attività: FC e SWOLF solo se presenti, al massimo quattro metriche", () => {
     renderPost({ ...activityPost, activity_heart_rate: 141.6, activity_swolf: "38" as unknown as number })
     const card = screen.getByRole("group", { name: "Nuotata in vasca" })
@@ -108,7 +203,7 @@ describe("FeedPost Corsia", () => {
     expect(within(card).queryByText("SWOLF")).toBeNull()
   })
 
-  it("post di solo testo: nessuna card attività, hashtag in colore azione", () => {
+  it("post di solo testo: nessuna card attività; gli hashtag sono testo normale", () => {
     const { container } = renderPost({
       ...activityPost,
       content: "Finalmente sotto l'1:50 sui 200. #soglia",
@@ -122,7 +217,22 @@ describe("FeedPost Corsia", () => {
     expect(container.querySelector("article p.whitespace-pre-wrap")).toHaveTextContent(
       "Finalmente sotto l'1:50 sui 200. #soglia"
     )
-    expect(screen.getByText("#soglia")).toHaveClass("text-action-text")
+    expect(screen.getByText("#soglia")).not.toHaveClass("text-action-text")
+  })
+
+  it("menzioni: collegate al profilo nel testo; chi era taggato a parte resta come chip", () => {
+    renderPost({
+      ...activityPost,
+      content: "Vasca con @ada",
+      tagged_users: [
+        { user_id: 5, name: "Ada Rossi", username: "ada" },
+        { user_id: 6, name: "Carlo", username: "carlo" },
+      ],
+    })
+    const text = document.querySelector("article p.whitespace-pre-wrap") as HTMLElement
+    expect(within(text).getByRole("link", { name: "@ada" })).toHaveAttribute("href", "/u/5")
+    expect(screen.getAllByRole("link", { name: "@ada" })).toHaveLength(1)
+    expect(screen.getByRole("link", { name: "@carlo" })).toHaveAttribute("href", "/u/6")
   })
 
   it("azioni: cuore con il totale, commenti, condividi; cuore pieno blu azione (non arancio XP) se hai reagito", () => {

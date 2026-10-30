@@ -36,6 +36,8 @@ import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { publicSiteUrl } from "@/lib/public-url";
+import { CLUB_ROLE_LABEL, CLUB_STAFF_ROLES, COACH_AREA_ROLES } from "@/lib/club-roles";
+import { ClubInviteCreator } from "@/components/club/ClubInviteCreator";
 import { Bot, Clock3, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
@@ -86,17 +88,7 @@ const WORKOUT_EQUIPMENT_OPTIONS: Array<{ value: WorkoutEquipment; label: string 
   { value: "snorkel", label: "Snorkel" },
 ];
 
-/** Who may open the coach area (server: meets, workouts and history accept coaches too). */
-const COACH_AREA_ROLES = ["coach", "owner", "admin", "moderator"];
-/** Club staff (server: invites and the AI coach refuse coaches). */
-const CLUB_STAFF_ROLES = ["owner", "admin", "moderator"];
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Proprietario",
-  admin: "Admin",
-  moderator: "Moderatore",
-  coach: "Coach",
-};
+const ROLE_LABELS = CLUB_ROLE_LABEL;
 
 type AiJobType = "scan_meets_weekly" | "generate_workouts_weekly" | "publish_workout_daily" | "post_motivation_mwf";
 
@@ -1352,13 +1344,11 @@ export default function ClubCoachModeration() {
 
         {isClubStaff ? (
           <CoachSection icon={<Users className="size-4 text-action-text" aria-hidden />} title="Inviti al club">
-            <Button
-              className="w-full sm:w-auto"
-              disabled={createInviteMutation.isPending}
-              onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
-            >
-              {createInviteMutation.isPending ? "Generazione…" : "Genera nuovo invito"}
-            </Button>
+            <ClubInviteCreator
+              actorRole={role}
+              isPending={createInviteMutation.isPending}
+              onCreate={(invite) => createInviteMutation.mutate({ clubId, ...invite })}
+            />
             {invitesQuery.isPending ? (
               <LoadingSkeleton label="Caricamento degli inviti…" count={2} itemClassName="h-11 w-full rounded-xl" />
             ) : !invites && invitesQuery.isError ? (

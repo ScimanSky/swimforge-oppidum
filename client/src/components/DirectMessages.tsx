@@ -1,12 +1,17 @@
 /**
  * Direct messages between swimmers, in three places:
- * - `mode="link"`: the header icon to /messages, with the unread count (and the Realtime
- *   subscription that refreshes every message query: the header is always mounted);
+ * - `mode="link"`: the header icon to /messages, with the unread count (asked again once a
+ *   minute and when the app comes back to the front);
  * - `mode="page"`: the Messages page, conversations and the open chat side by side on desktop,
  *   one at a time on phones. The URL says what is open: `?con=<userId>` the chat, `?new=1`
  *   «Nuovo messaggio» (the person search), so back returns to the list and a link (a push
  *   notification, «Crea» → «Messaggio») opens the right view;
  * - a dialog with one swimmer (`recipientId`), opened from their public profile.
+ *
+ * Messages arrive by polling: the open chat every few seconds while the page is on screen, the
+ * conversation list and the unread count once a minute and on focus. `direct_messages` is not in
+ * the Supabase Realtime publication (and has RLS with no policies), so a Realtime subscription
+ * would never deliver anything.
  */
 
 import {
@@ -40,8 +45,6 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { dmRetentionNote } from "@/lib/dm-retention";
 import { formatDayMonth, formatSessionDate, getInitials } from "@/lib/format";
 import { previousInAppPath } from "@/lib/in-app-history";
-import { uniqueRealtimeTopic } from "@/lib/realtime-topic";
-import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
 import { cn } from "@/lib/utils";
@@ -105,6 +108,10 @@ function messagesHref({ conId, composing }: MessagesView) {
 
 const RETENTION_NOTE = dmRetentionNote();
 const SEARCH_DEBOUNCE_MS = 250;
+/** The open chat, while the page is on screen: how quickly a reply shows up. */
+const DM_CHAT_POLL_MS = 5_000;
+/** The conversation list and the unread count (also refreshed on focus). */
+const DM_LIST_POLL_MS = 60_000;
 
 function parseForwardMetadata(raw: unknown): ForwardMetadata | null {
   const source =
@@ -172,43 +179,10 @@ export default function DirectMessages(props: DirectMessagesProps) {
   return <MessageDialog recipientId={props.recipientId} recipientName={props.recipientName} />;
 }
 
-/** Supabase Realtime: a new message for me refreshes the unread count, the list and the chats. */
-function useMessagesRealtime() {
-  const utils = trpc.useUtils();
-  const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
-  const currentUserId = profileQuery.data?.userId;
-
-  useEffect(() => {
-    if (!currentUserId) return;
-
-    const channel = supabase
-      .channel(uniqueRealtimeTopic(`dm:${currentUserId}`))
-      .on(
-        "postgres_changes" as any,
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "direct_messages",
-          filter: `receiver_id=eq.${currentUserId}`,
-        },
-        () => {
-          utils.community.messages.unreadCount.invalidate();
-          utils.community.messages.recent.invalidate();
-          utils.community.messages.conversation.invalidate();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentUserId, utils]);
-}
-
 function MessagesLink() {
-  useMessagesRealtime();
   const unreadQuery = trpc.community.messages.unreadCount.useQuery(undefined, {
-    refetchInterval: 30_000,
+    refetchInterval: DM_LIST_POLL_MS,
+    refetchOnWindowFocus: true,
   });
   const unread = toCount(unreadQuery.data?.count);
 
@@ -240,16 +214,16 @@ function usePageVisible() {
 }
 
 /**
- * One chat: the messages (polled every 5 s while shown), marked read as they arrive while the
- * page is on screen, and sending.
+ * One chat: the messages (polled every 5 s while shown and the page is on screen, not at all in
+ * the background), marked read as they arrive while the page is on screen, and sending.
  */
 function useConversation(otherUserId: number, { active, limit }: { active: boolean; limit: number }) {
   const utils = trpc.useUtils();
+  const pageVisible = usePageVisible();
   const query = trpc.community.messages.conversation.useQuery(
     { otherUserId, limit },
-    { enabled: active, refetchInterval: active ? 5_000 : false }
+    { enabled: active, refetchInterval: active && pageVisible ? DM_CHAT_POLL_MS : false }
   );
-  const pageVisible = usePageVisible();
 
   const markRead = trpc.community.messages.markRead.useMutation({
     onSuccess: () => {
@@ -516,23 +490,16 @@ function MessagesPage() {
 
   const conversationsQuery = trpc.community.messages.recent.useQuery(
     { limit: 20 },
-    { refetchInterval: 8_000, refetchOnWindowFocus: true }
+    { refetchInterval: DM_LIST_POLL_MS, refetchOnWindowFocus: true }
   );
-  const conversations = useMemo<Conversation[]>(() => {
-    // One row per person (newest message first), unread counts added up.
-    const byUserId = new Map<number, Conversation>();
-    for (const conv of conversationsQuery.data ?? []) {
-      const existing = byUserId.get(conv.otherUser.id);
-      const unreadCount = toCount(conv.unreadCount) + toCount(existing?.unreadCount);
-      const newer =
-        !existing ||
-        new Date(conv.lastMessage.createdAt).getTime() >= new Date(existing.lastMessage.createdAt).getTime();
-      byUserId.set(conv.otherUser.id, { ...(newer ? conv : existing), unreadCount });
-    }
-    return Array.from(byUserId.values()).sort(
-      (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-    );
-  }, [conversationsQuery.data]);
+  // The server sends one row per person; newest message first.
+  const conversations = useMemo<Conversation[]>(
+    () =>
+      (conversationsQuery.data ?? [])
+        .map((conv) => ({ ...conv, unreadCount: toCount(conv.unreadCount) }))
+        .sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()),
+    [conversationsQuery.data]
+  );
 
   // Who `?con=` is: the conversation list, else the person just picked, else their profile.
   const listed = conId === null ? undefined : conversations.find((conv) => conv.otherUser.id === conId);

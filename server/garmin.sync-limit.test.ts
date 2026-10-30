@@ -77,7 +77,10 @@ describe("syncGarminActivities request to the Garmin service", () => {
 });
 
 /** A db whose every select resolves to one connected row and that records updates. */
+const executed: unknown[] = [];
+
 function mockDbRecordingUpdates() {
+  executed.length = 0;
   const updates: Array<{ table: unknown; values: Record<string, unknown> }> = [];
   const rows = [{ userId: 7, oauth1Token: "stored", garminConnected: true, totalXp: 0, level: 1 }];
   const chain: any = {
@@ -90,6 +93,10 @@ function mockDbRecordingUpdates() {
   };
   const db = {
     select: () => chain,
+    execute: async (query: unknown) => {
+      executed.push(query);
+      return { rows: [] };
+    },
     update: (table: unknown) => ({
       set: (values: Record<string, unknown>) => {
         updates.push({ table, values });
@@ -139,6 +146,16 @@ describe("syncGarminActivities auto-sync timestamp", () => {
     expect(updates.some((u) => u.table === swimmerProfiles && "lastGarminSyncAt" in u.values)).toBe(false);
     // The "last sync" shown in Settings still reflects the manual sync.
     expect(updates.some((u) => u.table === garminTokens && "lastSyncAt" in u.values)).toBe(true);
+  });
+
+  it("every sync, even one with no new swims, brings the stored level in line with the total XP", async () => {
+    mockDbRecordingUpdates();
+    await syncGarminActivities(7, 30);
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const texts = executed.map((query) => new PgDialect().sqlToQuery(query as never).sql);
+    const heal = texts.find((text) => /UPDATE swimmer_profiles sp/.test(text));
+    expect(heal, "the level self-heal runs").toBeDefined();
+    expect(heal).toMatch(/FROM level_thresholds lt/);
   });
 
   it("a sync that changed nothing leaves the swim metrics and insights cached", async () => {

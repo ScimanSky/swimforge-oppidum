@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   chatError: null as unknown,
   people: [] as any[],
   enabled: {} as Record<string, Array<boolean | undefined>>,
+  intervals: {} as Record<string, unknown[]>,
+  focusRefetch: {} as Record<string, unknown[]>,
   sends: [] as unknown[],
   sendError: null as unknown,
   marks: [] as unknown[],
@@ -33,8 +35,10 @@ vi.mock("@/lib/trpc", () => {
   const cache = { invalidate: state.invalidate };
   // Like TanStack Query: a disabled query has no data and stays pending.
   const query = (name: string, data: (input: any) => unknown, error: () => unknown = () => null) => ({
-    useQuery: (input: any, options?: { enabled?: boolean }) => {
+    useQuery: (input: any, options?: { enabled?: boolean; refetchInterval?: unknown; refetchOnWindowFocus?: unknown }) => {
       (state.enabled[name] ??= []).push(options?.enabled);
+      (state.intervals[name] ??= []).push(options?.refetchInterval);
+      (state.focusRefetch[name] ??= []).push(options?.refetchOnWindowFocus);
       const base = { refetch: state.refetch };
       if (options?.enabled === false) return { ...base, data: undefined, isPending: true, isError: false };
       const value = data(input);
@@ -95,38 +99,10 @@ vi.mock("@/lib/trpc", () => {
   };
 });
 
-// Like realtime-js: channel(topic) hands back the channel with that topic while it is still in
-// the client's list, removeChannel only starts leaving (asynchronous), and adding a callback to
-// a channel already subscribed throws.
-const realtime = vi.hoisted(() => {
-  type FakeChannel = { topic: string; subscribed: boolean; inserts: Array<() => void>; on: any; subscribe: any };
-  const channels = new Map<string, FakeChannel>();
-  const channel = (topic: string) => {
-    const existing = channels.get(topic);
-    if (existing) return existing;
-    const created: FakeChannel = {
-      topic,
-      subscribed: false,
-      inserts: [],
-      on(_type: string, _filter: unknown, callback: () => void) {
-        if (created.subscribed) {
-          throw new Error(`cannot add \`postgres_changes\` callbacks for realtime:${topic} after \`subscribe()\`.`);
-        }
-        created.inserts.push(callback);
-        return created;
-      },
-      subscribe() {
-        created.subscribed = true;
-        return created;
-      },
-    };
-    channels.set(topic, created);
-    return created;
-  };
-  return { channels, channel, removeChannel: async () => "ok", latest: () => Array.from(channels.values()).at(-1) };
-});
+// direct_messages is not in the Realtime publication: the component must not subscribe.
+const realtime = vi.hoisted(() => ({ channel: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({
-  supabase: { channel: realtime.channel, removeChannel: realtime.removeChannel },
+  supabase: { channel: realtime.channel, removeChannel: vi.fn() },
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/in-app-history", () => ({ previousInAppPath: () => state.previous }));
@@ -213,6 +189,8 @@ describe("DirectMessages (Corsia)", () => {
     state.chatError = null;
     state.people = [];
     state.enabled = {};
+    state.intervals = {};
+    state.focusRefetch = {};
     state.sends = [];
     state.sendError = null;
     state.marks = [];
@@ -224,21 +202,16 @@ describe("DirectMessages (Corsia)", () => {
     state.previous = null;
     state.refetch.mockClear();
     state.invalidate.mockClear();
-    realtime.channels.clear();
+    realtime.channel.mockClear();
     vi.mocked(toast.error).mockClear();
   });
 
   describe("header link", () => {
-    it("a quick remount subscribes anew (never to a channel still leaving): new messages refresh the count", () => {
+    it("no Realtime subscription (direct_messages is not published): the unread count asks again once a minute", () => {
       renderIn(<DirectMessages mode="link" />);
-      cleanup();
-      renderIn(<DirectMessages mode="link" />);
-      expect(realtime.channels.size).toBe(2);
-      const channel = realtime.latest()!;
-      expect(channel.topic).toMatch(/^dm:4:/);
-
-      channel.inserts.forEach((insert) => insert());
-      expect(state.invalidate).toHaveBeenCalledTimes(3);
+      expect(realtime.channel).not.toHaveBeenCalled();
+      expect(new Set(state.intervals.unreadCount)).toEqual(new Set([60_000]));
+      expect(new Set(state.focusRefetch.unreadCount)).toEqual(new Set([true]));
     });
 
     it("goes to /messages and says how many are unread", () => {
@@ -268,6 +241,62 @@ describe("DirectMessages (Corsia)", () => {
         "Ricevuto: Ci sei domani?",
       ]);
       expect(state.marks).toEqual([{ senderId: 5 }]);
+    });
+
+    it("the open chat polls every 5 s while the page is on screen, the list once a minute", () => {
+      renderIn(<DirectMessages mode="page" />);
+      expect(realtime.channel).not.toHaveBeenCalled();
+      expect(new Set(state.intervals.recent)).toEqual(new Set([60_000]));
+      expect(new Set(state.focusRefetch.recent)).toEqual(new Set([true]));
+      expect(state.intervals.conversation.at(-1)).toBe(5_000);
+    });
+
+    it("the open chat stops polling while the page is hidden and starts again when it is back", () => {
+      renderIn(<DirectMessages mode="page" />);
+      setVisibility("hidden");
+      expect(state.intervals.conversation.at(-1)).toBe(false);
+      setVisibility("visible");
+      expect(state.intervals.conversation.at(-1)).toBe(5_000);
+    });
+
+    it("a forwarded post is a card with the author, the preview and «Apri il post»", () => {
+      state.recent = [
+        {
+          ...conversation(5, "Ada Rossi", "Post inoltrato da Bea", 0, 1),
+          lastMessage: {
+            ...conversation(5, "Ada Rossi", "Post inoltrato da Bea", 0, 1).lastMessage,
+            messageType: "forward_post",
+          },
+        },
+      ];
+      const forward = msg(3, 5, 4, "Post inoltrato da Bea\n\nGuarda che vasca");
+      forward.message.messageType = "forward_post";
+      (forward.message as { metadata: unknown }).metadata = {
+        targetType: "post",
+        targetId: 42,
+        ownerName: "Bea",
+        previewText: "Mille metri a stile",
+        previewMediaUrl: null,
+      };
+      state.chats = { 5: [forward] };
+      renderIn(<DirectMessages mode="page" />);
+
+      // The list says what it is, not the fallback text.
+      expect(screen.getByRole("button", { name: /^Ada Rossi .*Post inoltrato$/ })).toBeInTheDocument();
+      const log = screen.getByRole("log", { name: "Messaggi con Ada Rossi" });
+      expect(within(log).getByText("Bea")).toBeInTheDocument();
+      expect(within(log).getByText("Mille metri a stile")).toBeInTheDocument();
+      expect(within(log).getByRole("link", { name: "Apri il post" })).toHaveAttribute("href", "/post/42");
+    });
+
+    it("a forward whose metadata is unreadable shows its text", () => {
+      const forward = msg(3, 5, 4, "Post inoltrato da Bea");
+      forward.message.messageType = "forward_post";
+      state.chats = { 5: [forward] };
+      renderIn(<DirectMessages mode="page" />);
+      const log = screen.getByRole("log", { name: "Messaggi con Ada Rossi" });
+      expect(within(log).getByText("Post inoltrato da Bea")).toBeInTheDocument();
+      expect(within(log).queryByRole("link", { name: "Apri il post" })).toBeNull();
     });
 
     it("marks read once per new message; a failed attempt is tried again on the next poll", () => {

@@ -112,6 +112,17 @@ describe("ClubHero", () => {
     expect(screen.queryByRole("button", { name: "Impostazioni del club" })).not.toBeInTheDocument();
   });
 
+  it("a coach gets «Area coach» and the «Coach» chip, not the club settings", () => {
+    renderClubHero(
+      { is_member: true, member_role: "coach" },
+      { coachPageHref: "/community/club/1/coach" }
+    );
+    expect(screen.getByRole("link", { name: /area coach/i })).toHaveAttribute("href", "/community/club/1/coach");
+    expect(screen.getByText("Coach")).toBeInTheDocument();
+    expect(screen.queryByText("coach")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Impostazioni del club" })).not.toBeInTheDocument();
+  });
+
   it("does not render duplicate eventi link when events and meets route is the same", () => {
     renderClubHero(
       {},

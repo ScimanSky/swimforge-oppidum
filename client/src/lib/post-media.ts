@@ -8,7 +8,6 @@ export const MAX_POST_IMAGE_BYTES = 20 * 1024 * 1024
 export const MAX_POST_VIDEO_BYTES = 100 * 1024 * 1024
 export const MAX_POST_MEDIA_ITEMS = 4
 
-const HASHTAG_REGEX = /(^|\s)#([A-Za-z0-9_]{2,40})(?![A-Za-z0-9_])/g
 const VIDEO_URL_REGEX = /\.(mp4|mov|webm|m4v)(\?.*)?$/i
 
 export function detectMediaKindFromFile(file: File): PostMediaKind | null {
@@ -41,13 +40,6 @@ export function validatePostMediaFile(file: File): { ok: true; kind: PostMediaKi
   }
 
   return { ok: true, kind }
-}
-
-export function extractHashtags(content: string) {
-  const tags = Array.from(content.matchAll(HASHTAG_REGEX))
-    .map((entry) => (entry?.[2] ?? "").trim().toLowerCase())
-    .filter((tag) => tag.length >= 2 && tag.length <= 40)
-  return Array.from(new Set(tags))
 }
 
 export function isVideoUrl(url: string) {

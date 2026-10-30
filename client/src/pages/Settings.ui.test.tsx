@@ -31,6 +31,10 @@ vi.mock("@/components/GarminSection", () => ({
   ),
 }));
 vi.mock("@/lib/supabase", () => ({ supabase: { auth: { signOut: vi.fn() } } }));
+// Tested on its own (PrimaryClubField.ui.test): here only what Settings hands it.
+vi.mock("@/components/club/PrimaryClubField", () => ({
+  PrimaryClubField: ({ value }: { value: unknown }) => <p>Club principale scelto: {JSON.stringify(value) ?? "nessuna scelta"}</p>,
+}));
 vi.mock("@/lib/push", () => ({ registerPushToken: vi.fn(), unregisterPushToken: vi.fn(async () => {}) }));
 // The Radix switch and select measure themselves; jsdom has no ResizeObserver.
 vi.stubGlobal(
@@ -112,7 +116,6 @@ function seed() {
       ],
     },
     "garmin.status": { data: { connected: true, lastSync: null } },
-    "strava.status": { data: { connected: false } },
     "consent.list": { data: { byType: { garmin_sync: { granted: true } }, versions: {} } },
   };
   state.refetch = {};
@@ -132,7 +135,8 @@ describe("Settings (Corsia)", () => {
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     const summary = screen.getByRole("region", { name: "Riepilogo" });
     expect(summary).toHaveTextContent("12.480 XP totale");
-    expect(summary).toHaveTextContent("1 di 2 Integrazioni attive");
+    expect(summary).toHaveTextContent("Sì Garmin collegato");
+    expect(summary).not.toHaveTextContent(/Strava|Integrazioni attive/);
     expect(summary).toHaveTextContent("3 Attività importate");
     expect(summary).toHaveTextContent("Stile libero Stile più nuotato");
     const tabs = screen.getByRole("tablist", { name: "Sezioni delle impostazioni" });
@@ -156,6 +160,22 @@ describe("Settings (Corsia)", () => {
     expect(screen.getByLabelText("Data di nascita")).toHaveAttribute("autocomplete", "bday");
     expect(screen.getByLabelText("Bio")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cambia foto profilo" })).toBeInTheDocument();
+  });
+
+  it("profilo: la sezione «Club» con il club principale salvato nelle preferenze", () => {
+    render(<Settings />);
+    const section = screen.getByRole("region", { name: "Club" });
+    expect(section).toHaveTextContent("Club principale scelto: nessuna scelta");
+    cleanup();
+
+    state.queries["profile.get"] = { data: { ...profile, preferences: { ...profile.preferences, primaryClubId: 3 } } };
+    render(<Settings />);
+    expect(screen.getByRole("region", { name: "Club" })).toHaveTextContent("Club principale scelto: 3");
+    cleanup();
+
+    state.queries["profile.get"] = { data: { ...profile, preferences: { ...profile.preferences, primaryClubId: null } } };
+    render(<Settings />);
+    expect(screen.getByRole("region", { name: "Club" })).toHaveTextContent("Club principale scelto: null");
   });
 
   it("profilo in caricamento: scheletro, nessun modulo vuoto", () => {
@@ -201,17 +221,20 @@ describe("Settings (Corsia)", () => {
     expect(screen.getByRole("switch", { name: "Profilo pubblico" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Attività pubbliche" })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: "Sincronizzazione Garmin" })).toBeChecked();
+    // Strava is gone: no switch for its consent.
+    expect(screen.queryByRole("switch", { name: /Strava/ })).toBeNull();
+    expect(screen.queryByText(/Strava/)).toBeNull();
     expect(screen.getByRole("link", { name: "Apri la Privacy Policy" })).toHaveAttribute("href", "/privacy");
   });
 
-  it("connessioni: Garmin si gestisce nella sua scheda, Strava mostra solo lo stato", () => {
+  it("connessioni: Garmin si gestisce nella sua scheda, niente Strava", () => {
     state.search = "tab=connections";
     render(<Settings />);
     const accounts = screen.getByRole("region", { name: "Account collegati" });
     expect(within(accounts).getByText("Collegato")).toBeInTheDocument();
     expect(within(accounts).getByRole("button", { name: "Gestisci Garmin Connect" })).toBeInTheDocument();
     expect(within(accounts).getAllByRole("button")).toHaveLength(1);
-    expect(within(accounts).getByText("Non collegato")).toBeInTheDocument();
+    expect(within(accounts).queryByText("Strava")).not.toBeInTheDocument();
     expect(within(accounts).getByText("Disponibile prossimamente")).toBeInTheDocument();
   });
 

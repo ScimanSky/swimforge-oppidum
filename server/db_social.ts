@@ -1,7 +1,7 @@
-import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
+import { CLUB_POST_CONTENT_MAX_LENGTH, DB_UNAVAILABLE_ERR_MSG, POST_CONTENT_MAX_LENGTH } from "@shared/const";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { ensureUserPresenceSchema, getOnlineIntervalSql } from "./user_presence";
+import { authorClubNameSql } from "./lib/author-club";
 import {
   socialPosts,
   socialSplashes,
@@ -15,39 +15,42 @@ import {
 export type FeedScope = "global" | "self" | "following";
 export type PostReportReason = "spam" | "offensive" | "harassment" | "misinformation" | "other";
 export type PostReportStatus = "open" | "in_review" | "resolved" | "rejected";
-const POST_DELETE_WINDOW_HOURS = Math.max(1, Number.parseInt(process.env.POST_DELETE_WINDOW_HOURS ?? "24", 10) || 24);
+
+/** The author's club next to their name: see lib/author-club.ts («Club principale»). */
+export { authorClubNameSql };
 
 /**
- * The name of the post author's most recent club (`p` is the social_posts alias), shown
- * next to the author. A club that is not public shows only to the viewer's own clubs:
- * otherwise the feed would tell everyone who belongs to a private or invite-only club.
+ * Swim fields of a feed post (`p` post, `a` its activity): Garmin's average pace (from moving
+ * time, not total time with rests) and the training records set in that swim, with the time
+ * they beat.
  */
-export function authorClubNameSql(viewerId: number) {
-  return sql`(
-    SELECT c.name
-    FROM community_club_members m
-    JOIN community_clubs c ON c.id = m.club_id
-    WHERE m.user_id = p.user_id
-      AND m.status = 'active'
-      AND (
-        (c.visibility = 'public' AND c.is_private IS NOT TRUE)
-        OR EXISTS (
-          SELECT 1
-          FROM community_club_members vm
-          WHERE vm.club_id = c.id
-            AND vm.user_id = ${viewerId}
-            AND vm.status = 'active'
-        )
-      )
-    ORDER BY m.joined_at DESC NULLS LAST, m.id DESC
-    LIMIT 1
-  )`;
+export function activityCardSql() {
+  return sql`
+      a.avg_pace_per_100m AS activity_avg_pace_per_100m,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'record_type', pr.record_type,
+              'stroke_type', pr.stroke_type,
+              'value', pr.value,
+              'previous_value', pr.previous_value
+            )
+            ORDER BY pr.record_type, pr.stroke_type, pr.value
+          )
+          FROM personal_records pr
+          WHERE p.activity_id IS NOT NULL
+            AND pr.activity_id = p.activity_id
+            AND pr.user_id = p.user_id
+            AND pr.record_type ~ '^pb_[0-9]+_[0-9]+_t$'
+        ),
+        '[]'::json
+      ) AS activity_records`;
 }
 
 export async function getSocialFeed(userId: number, options: { limit?: number; scope?: FeedScope; before?: Date } = {}) {
   const db = await getDb();
   if (!db) return [];
-  await ensureUserPresenceSchema();
 
   const limit = options.limit ?? 20;
   const scope = options.scope ?? "global";
@@ -77,7 +80,6 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       p.media_url,
       p.media_urls,
       p.tagged_user_ids,
-      p.hashtags,
       p.visibility,
       p.created_at,
       p.updated_at,
@@ -85,11 +87,6 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       sp.username AS user_username,
       sp.avatar_url AS user_avatar,
       ${authorClubNameSql(userId)} AS user_club_name,
-      EXISTS(
-        SELECT 1 FROM user_presence up
-        WHERE up.user_id = p.user_id
-          AND up.last_seen_at >= ${getOnlineIntervalSql()}
-      ) AS user_is_online,
       a.distance_meters AS activity_distance_meters,
       a.duration_seconds AS activity_duration_seconds,
       a.activity_date AS activity_date,
@@ -99,6 +96,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       a.calories AS activity_calories,
       a.avg_heart_rate AS activity_heart_rate,
       a.swolf_score AS activity_swolf,
+      ${activityCardSql()},
       COALESCE((SELECT COUNT(*) FROM social_splashes s WHERE s.post_id = p.id), 0) AS splash_count,
       COALESCE((SELECT COUNT(*) FROM social_comments c WHERE c.post_id = p.id), 0) AS comment_count,
       EXISTS(
@@ -175,52 +173,206 @@ export async function unhidePostForUser(userId: number, postId: number) {
   return { hidden: false };
 }
 
+type OwnPostRow = {
+  id: number;
+  user_id: number;
+  activity_id: number | null;
+  club_id: number | null;
+  is_deleted: boolean;
+  tagged_user_ids: number[] | null;
+  content?: string | null;
+  media_url?: string | null;
+  media_urls?: string[] | null;
+  activity_is_open_water?: boolean | null;
+  /** For a club post: whether its author is still an active member of the club. */
+  author_is_club_member?: boolean | null;
+};
+
+async function loadPostForAuthor(postId: number): Promise<OwnPostRow | null> {
+  const db = await getDb();
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
+  const result = await db.execute(sql`
+    SELECT p.id, p.user_id, p.activity_id, p.club_id, p.is_deleted, p.tagged_user_ids,
+      p.content, p.media_url, p.media_urls,
+      a.is_open_water AS activity_is_open_water,
+      CASE WHEN p.club_id IS NULL THEN NULL ELSE EXISTS (
+        SELECT 1 FROM community_club_members m
+        WHERE m.club_id = p.club_id AND m.user_id = p.user_id AND m.status = 'active'
+      ) END AS author_is_club_member
+    FROM social_posts p
+    LEFT JOIN swimming_activities a ON a.id = p.activity_id
+    WHERE p.id = ${postId}
+    LIMIT 1
+  `);
+  return (result.rows[0] as OwnPostRow | undefined) ?? null;
+}
+
+/** Default caption of a swim shared without text or photos. */
+export function defaultActivityCaption(isOpenWater: boolean | null | undefined) {
+  return isOpenWater ? "Allenamento in acque libere" : "Allenamento in piscina";
+}
+
+/**
+ * The author deletes their post, at any time. Soft delete: every read filters is_deleted,
+ * so the post disappears for everyone. A shared swim goes back to «not shared».
+ */
 export async function deleteOwnPost(userId: number, postId: number) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
-  const post = await db
-    .select({
-      id: socialPosts.id,
-      userId: socialPosts.userId,
-      activityId: socialPosts.activityId,
-      isDeleted: socialPosts.isDeleted,
-      createdAt: socialPosts.createdAt,
-    })
-    .from(socialPosts)
-    .where(eq(socialPosts.id, postId))
-    .limit(1);
-
-  const row = post[0];
-  if (!row || row.isDeleted) {
+  const row = await loadPostForAuthor(postId);
+  if (!row || row.is_deleted) {
     throw new Error("Post not found");
   }
-  if (row.userId !== userId) {
+  if (Number(row.user_id) !== userId) {
     throw new Error("Cannot delete other users posts");
   }
 
-  const ageMs = Date.now() - row.createdAt.getTime();
-  const maxAgeMs = POST_DELETE_WINDOW_HOURS * 60 * 60 * 1000;
-  if (ageMs > maxAgeMs) {
-    throw new Error(`Delete window expired (${POST_DELETE_WINDOW_HOURS}h)`);
+  await db.execute(sql`
+    UPDATE social_posts SET is_deleted = true, updated_at = NOW()
+    WHERE id = ${postId}
+  `);
+
+  if (row.activity_id) {
+    await db.execute(sql`
+      UPDATE swimming_activities SET share_to_feed = false
+      WHERE id = ${row.activity_id} AND user_id = ${userId}
+    `);
   }
 
-  await db
-    .update(socialPosts)
-    .set({
-      isDeleted: true,
-      updatedAt: new Date(),
-    })
-    .where(eq(socialPosts.id, postId));
+  return { deleted: true as const };
+}
 
-  if (row.activityId) {
-    await db
-      .update(swimmingActivities)
-      .set({ shareToFeed: false })
-      .where(and(eq(swimmingActivities.id, row.activityId), eq(swimmingActivities.userId, userId)));
+/** The stored media of a post: `media_urls`, else the single `media_url` of older posts. */
+function storedMediaUrls(row: OwnPostRow): string[] {
+  if (Array.isArray(row.media_urls) && row.media_urls.length) return row.media_urls;
+  return row.media_url ? [row.media_url] : [];
+}
+
+/**
+ * The author edits text and media of their post (feed, club or shared swim). The post keeps
+ * its place in the feed. A field left out (undefined) stays as it is; null or an empty list
+ * clears it. A swim without text or media gets the default caption; any other post needs text
+ * or at least one media. A club post can be edited only while its author is an active member
+ * of the club (deleting it is always allowed) and keeps the club's shorter text limit.
+ * Returns the mentions that were not there before.
+ */
+export async function updateOwnPost(
+  userId: number,
+  postId: number,
+  data: { content?: string | null; mediaUrls?: string[] | null; taggedUserIds?: number[] | null }
+) {
+  const db = await getDb();
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
+
+  const row = await loadPostForAuthor(postId);
+  if (!row || row.is_deleted) {
+    throw new Error("Post not found");
+  }
+  if (Number(row.user_id) !== userId) {
+    throw new Error("Cannot edit other users posts");
+  }
+  if (row.club_id != null && !row.author_is_club_member) {
+    throw new Error("Not a club member");
   }
 
-  return { deleted: true, windowHours: POST_DELETE_WINDOW_HOURS };
+  const mediaUrls = Array.from(
+    new Set(
+      (data.mediaUrls === undefined ? storedMediaUrls(row) : (data.mediaUrls ?? []))
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    )
+  ).slice(0, 6);
+  const rawContent = (data.content === undefined ? row.content : data.content)?.trim() ?? "";
+  const maxLength = row.club_id != null ? CLUB_POST_CONTENT_MAX_LENGTH : POST_CONTENT_MAX_LENGTH;
+  if (data.content !== undefined && rawContent.length > maxLength) {
+    throw new Error("Content too long");
+  }
+  let content: string | null = rawContent.length > 0 ? rawContent : null;
+  if (!content && mediaUrls.length === 0) {
+    if (!row.activity_id) throw new Error("Empty post");
+    content = defaultActivityCaption(row.activity_is_open_water);
+  }
+
+  const previousTagged = new Set((row.tagged_user_ids ?? []).map(Number));
+  const taggedUserIds = data.taggedUserIds ?? Array.from(previousTagged);
+  const mediaArray = mediaUrls.length
+    ? sql`ARRAY[${sql.join(mediaUrls.map((url) => sql`${url}`), sql`, `)}]::text[]`
+    : sql`'{}'::text[]`;
+  const taggedArray = taggedUserIds.length
+    ? sql`ARRAY[${sql.join(taggedUserIds.map((id) => sql`${id}`), sql`, `)}]::integer[]`
+    : sql`'{}'::integer[]`;
+
+  await db.execute(sql`
+    UPDATE social_posts
+    SET content = ${content},
+      media_url = ${mediaUrls[0] ?? null},
+      media_urls = ${mediaArray},
+      tagged_user_ids = ${taggedArray},
+      updated_at = NOW()
+    WHERE id = ${postId}
+  `);
+
+  return {
+    postId,
+    clubId: row.club_id,
+    addedTaggedUserIds: taggedUserIds.filter((id) => !previousTagged.has(id)),
+  };
+}
+
+/** The author's own post, by id or by the shared swim, with what the editor needs. */
+export async function getOwnPostForEdit(userId: number, ref: { postId?: number; activityId?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
+  const where = ref.postId ? sql`p.id = ${ref.postId}` : sql`p.activity_id = ${ref.activityId ?? 0}`;
+  const result = await db.execute(sql`
+    SELECT
+      p.id, p.activity_id, p.club_id, p.content, p.media_url, p.media_urls,
+      COALESCE(
+        (
+          SELECT json_agg(json_build_object('user_id', tu.id, 'name', tu.name, 'username', tsp.username))
+          FROM users tu
+          LEFT JOIN swimmer_profiles tsp ON tsp.user_id = tu.id
+          WHERE tu.id = ANY(COALESCE(p.tagged_user_ids, '{}'::integer[]))
+        ),
+        '[]'::json
+      ) AS tagged_users
+    FROM social_posts p
+    WHERE ${where}
+      AND p.user_id = ${userId}
+      AND p.is_deleted = false
+    ORDER BY p.id DESC
+    LIMIT 1
+  `);
+  const row = result.rows[0] as
+    | {
+        id: number;
+        activity_id: number | null;
+        club_id: number | null;
+        content: string | null;
+        media_url: string | null;
+        media_urls: string[] | null;
+        tagged_users: Array<{ user_id: number; name: string | null; username: string | null }> | null;
+      }
+    | undefined;
+  if (!row) return null;
+  const mediaUrls = Array.isArray(row.media_urls) && row.media_urls.length
+    ? row.media_urls
+    : row.media_url
+      ? [row.media_url]
+      : [];
+  return {
+    id: Number(row.id),
+    activityId: row.activity_id == null ? null : Number(row.activity_id),
+    clubId: row.club_id == null ? null : Number(row.club_id),
+    content: row.content ?? "",
+    mediaUrls,
+    taggedUsers: (row.tagged_users ?? []).map((user) => ({
+      userId: Number(user.user_id),
+      name: user.name ?? null,
+      username: user.username ?? null,
+    })),
+  };
 }
 
 export async function reportPost(userId: number, input: { postId: number; reason: PostReportReason; details?: string | null }) {
@@ -402,7 +554,6 @@ export async function upsertActivityPost(
     mediaUrl?: string | null;
     mediaUrls?: string[] | null;
     taggedUserIds?: number[] | null;
-    hashtags?: string[] | null;
     visibility?: string | null;
   }
 ) {
@@ -426,7 +577,7 @@ export async function upsertActivityPost(
   const normalizedMediaUrls = (data.mediaUrls ?? []).map((item) => item.trim()).filter((item) => item.length > 0);
   const hasMedia = normalizedMediaUrls.length > 0 || Boolean(data.mediaUrl?.trim());
   const rawContent = data.content?.trim() ?? "";
-  const fallbackContent = activityRow.isOpenWater ? "Allenamento in acque libere" : "Allenamento in piscina";
+  const fallbackContent = defaultActivityCaption(activityRow.isOpenWater);
   const resolvedContent = rawContent.length > 0 ? rawContent : !hasMedia ? fallbackContent : null;
 
   await db
@@ -435,31 +586,43 @@ export async function upsertActivityPost(
     .where(eq(swimmingActivities.id, activityId));
 
   const existing = await db
-    .select({ id: socialPosts.id })
+    .select({ id: socialPosts.id, isDeleted: socialPosts.isDeleted })
     .from(socialPosts)
     .where(eq(socialPosts.activityId, activityId))
     .limit(1);
+
+  // A swim with a training record tells the followers so.
+  const recordCount = await db.execute(sql`
+    SELECT COUNT(*)::int AS n FROM personal_records
+    WHERE activity_id = ${activityId} AND user_id = ${userId} AND record_type ~ '^pb_[0-9]+_[0-9]+_t$'
+  `);
+  const hasRecord = Number((recordCount.rows[0] as { n?: number } | undefined)?.n ?? 0) > 0;
+  const notificationTitle = hasRecord ? "Nuovo record nel feed" : "Nuova attività nel feed";
+  const notificationText = hasRecord
+    ? " ha condiviso una nuotata con un nuovo record."
+    : " ha condiviso un nuovo allenamento.";
 
   const basePayload = {
     content: resolvedContent,
     mediaUrl: data.mediaUrl ?? null,
     mediaUrls: normalizedMediaUrls,
     taggedUserIds: data.taggedUserIds ?? [],
-    hashtags: data.hashtags ?? [],
     visibility: data.visibility ?? "public",
     isDeleted: false,
     updatedAt: new Date(),
   };
 
   if (existing.length) {
-    await db.update(socialPosts).set(basePayload).where(eq(socialPosts.id, existing[0].id));
+    // A swim shared again after «Rimuovi dal feed» goes back to the top of the feed.
+    const payload = existing[0].isDeleted ? { ...basePayload, createdAt: new Date() } : basePayload;
+    await db.update(socialPosts).set(payload).where(eq(socialPosts.id, existing[0].id));
     await db.execute(sql`
       INSERT INTO user_notifications (user_id, type, title, message, link, reference_id, created_at)
       SELECT
         f.follower_id,
         'activity_shared',
-        'Nuova attività nel feed',
-        COALESCE(u.name, 'Un nuotatore') || ' ha condiviso un nuovo allenamento.',
+        ${notificationTitle},
+        COALESCE(u.name, 'Un nuotatore') || ${notificationText},
         ${`/post/${existing[0].id}`},
         ${existing[0].id},
         NOW()
@@ -497,8 +660,8 @@ export async function upsertActivityPost(
       SELECT
         f.follower_id,
         'activity_shared',
-        'Nuova attività nel feed',
-        COALESCE(u.name, 'Un nuotatore') || ' ha condiviso un nuovo allenamento.',
+        ${notificationTitle},
+        COALESCE(u.name, 'Un nuotatore') || ${notificationText},
         ${`/post/${postId}`},
         ${postId},
         NOW()
@@ -517,30 +680,48 @@ export async function setActivityShare(userId: number, activityId: number, share
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
-  const activity = await db
-    .select({ id: swimmingActivities.id })
-    .from(swimmingActivities)
-    .where(and(eq(swimmingActivities.id, activityId), eq(swimmingActivities.userId, userId)))
-    .limit(1);
-
-  if (!activity.length) {
+  const activity = await db.execute(sql`
+    SELECT id FROM swimming_activities
+    WHERE id = ${activityId} AND user_id = ${userId}
+    LIMIT 1
+  `);
+  if (!activity.rows.length) {
     throw new Error("Activity not found");
   }
 
-  await db.update(swimmingActivities).set({ shareToFeed: share }).where(eq(swimmingActivities.id, activityId));
-
-  if (share) {
-    await upsertActivityPost(userId, activityId, {
-      content: null,
-      mediaUrl: null,
-      mediaUrls: [],
-      taggedUserIds: [],
-      hashtags: [],
-      visibility: "public",
-    });
-  } else {
-    await db.update(socialPosts).set({ isDeleted: true, updatedAt: new Date() }).where(eq(socialPosts.activityId, activityId));
+  if (!share) {
+    await db.execute(sql`UPDATE swimming_activities SET share_to_feed = false WHERE id = ${activityId}`);
+    await db.execute(sql`
+      UPDATE social_posts SET is_deleted = true, updated_at = NOW()
+      WHERE activity_id = ${activityId} AND user_id = ${userId}
+    `);
+    return;
   }
+
+  // Sharing again a post that was removed brings it back with its text and photos.
+  const existing = await db.execute(sql`
+    SELECT id, is_deleted FROM social_posts
+    WHERE activity_id = ${activityId} AND user_id = ${userId}
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+  const post = existing.rows[0] as { id: number; is_deleted: boolean } | undefined;
+  if (post) {
+    await db.execute(sql`UPDATE swimming_activities SET share_to_feed = true WHERE id = ${activityId}`);
+    await db.execute(sql`
+      UPDATE social_posts SET is_deleted = false, updated_at = NOW()
+      WHERE id = ${post.id}
+    `);
+    return;
+  }
+
+  await upsertActivityPost(userId, activityId, {
+    content: null,
+    mediaUrl: null,
+    mediaUrls: [],
+    taggedUserIds: [],
+    visibility: "public",
+  });
 }
 
 export async function toggleSplash(userId: number, postId: number) {

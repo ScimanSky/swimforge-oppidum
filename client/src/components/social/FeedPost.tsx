@@ -7,6 +7,7 @@ import FeedPostComments from "./FeedPostComments"
 import { isVideoUrl } from "@/lib/post-media"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { extractFirstUrl, LinkPreviewCard, renderSocialText } from "@/lib/social-content"
+import { taggedUsersNotInText } from "@/lib/mentions"
 import type { FeedPostRecord } from "./feed-types"
 
 interface FeedPostProps {
@@ -70,7 +71,8 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
   const mediaPosition = (idx: number, separator = "") =>
     allMedia.length > 1 ? `${separator} ${idx + 1} di ${allMedia.length}` : ""
   const taggedUsers = parseTaggedUsers(post.tagged_users)
-  const hashtags = normalizeArrayField(post.hashtags)
+  // Mentions are links in the text; people tagged apart (older posts) stay as chips.
+  const taggedApart = taggedUsersNotInText(post.content, taggedUsers)
   const firstLink = post.content ? extractFirstUrl(post.content) : null
 
   return (
@@ -80,7 +82,7 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
       <div className="space-y-3 pt-2">
         {post.content ? (
           <p className="whitespace-pre-wrap text-[15px] text-foreground">
-            {renderSocialText(post.content)}
+            {renderSocialText(post.content, { mentions: taggedUsers })}
           </p>
         ) : null}
         {firstLink ? <LinkPreviewCard url={firstLink} /> : null}
@@ -90,14 +92,16 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
             title={activityTitle(post.activity_is_open_water)}
             distanceMeters={post.activity_distance_meters}
             durationSeconds={post.activity_duration_seconds}
+            avgPacePer100m={post.activity_avg_pace_per_100m}
+            records={post.activity_records}
             heartRate={post.activity_heart_rate}
             swolf={post.activity_swolf}
           />
         ) : null}
 
-        {taggedUsers.length > 0 ? (
+        {taggedApart.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {taggedUsers.map((user) => (
+            {taggedApart.map((user) => (
               <Link
                 key={user.user_id}
                 href={`/u/${user.user_id}`}
@@ -144,15 +148,6 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
           </div>
         ) : null}
 
-        {!post.content && hashtags.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {hashtags.map((tag) => (
-              <span key={tag} className="text-sm font-medium text-action-text">
-                #{tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
       </div>
 
       <FeedPostActions

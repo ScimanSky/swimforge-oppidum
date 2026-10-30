@@ -32,6 +32,7 @@ import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
 import { pointsToRouteGeojson, routeDistanceMeters, type RoutePoint } from "@/lib/club-event-map";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
+import { ClubInviteCreator } from "@/components/club/ClubInviteCreator";
 
 async function geocodeLocation(query: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const q = query.trim();
@@ -793,13 +794,12 @@ export default function ClubDetailEnhanced() {
               <DialogDescription>Genera un link di invito per il club</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <Button
-                className="w-full"
-                disabled={createInviteMutation.isPending}
-                onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
-              >
-                {createInviteMutation.isPending ? "Generazione…" : "Genera nuovo invito"}
-              </Button>
+              <ClubInviteCreator
+                actorRole={memberRole}
+                isPending={createInviteMutation.isPending}
+                onCreate={(invite) => createInviteMutation.mutate({ clubId, ...invite })}
+                className="flex flex-col gap-2"
+              />
               {(invitesQuery.data as any[])?.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Inviti attivi</p>

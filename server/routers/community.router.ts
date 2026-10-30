@@ -1,12 +1,12 @@
-import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
+import { CLUB_POST_CONTENT_MAX_LENGTH, DB_UNAVAILABLE_ERR_MSG, POST_CONTENT_MAX_LENGTH } from "@shared/const";
 import {
     protectedProcedure, router, z,
     TRPCError,
-    invalidateUserCache, invalidateLeaderboardCache,
+    invalidateUserCache,
     getSocialFeed, upsertActivityPost, setActivityShare,
     toggleSplash, addComment, getComments, deleteOwnPost,
+    updateOwnPost, getOwnPostForEdit,
     hidePostForUser, unhidePostForUser, reportPost,
-    awardActionXp,
     detectImageType, logger,
 } from "./_shared";
 import { createHash } from "crypto";
@@ -14,8 +14,8 @@ import { ENV } from "../_core/env";
 import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
-import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
-import { authorClubNameSql } from "../db_social";
+import { activityCardSql, authorClubNameSql } from "../db_social";
+import { notifyMentionedUsers, resolveMentionedUserIds, taggedApartIds } from "../lib/mentions";
 import { createCommunityClubsRouter } from "./community.clubs.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
@@ -24,36 +24,12 @@ import { communityUsersRouter } from "./community.users.router";
 import { PRODUCT_ANALYTICS_EVENT_NAMES, trackProductEvent } from "../product_analytics";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
-const HASHTAG_REGEX = /(^|\s)#([A-Za-z0-9_]{2,40})/g;
 function normalizeMediaUrls(mediaUrls?: string[] | null, mediaUrl?: string | null) {
     const values = [...(mediaUrls ?? []), mediaUrl ?? ""]
         .map((item) => item.trim())
         .filter((item) => item.length > 0)
         .slice(0, 6);
     return Array.from(new Set(values));
-}
-
-function normalizeTaggedUserIds(authorUserId: number, taggedUserIds?: number[] | null) {
-    if (!taggedUserIds?.length) return [];
-    const unique = Array.from(new Set(taggedUserIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
-    return unique.filter((id) => id !== authorUserId).slice(0, 10);
-}
-
-function extractHashtagsFromContent(content?: string | null) {
-    if (!content) return [] as string[];
-    const matches = content.matchAll(HASHTAG_REGEX);
-    const tags = Array.from(matches)
-        .map((entry) => (entry?.[2] ?? "").trim().toLowerCase())
-        .filter((tag) => tag.length >= 2 && tag.length <= 40);
-    return Array.from(new Set(tags));
-}
-
-function normalizeHashtags(content?: string | null, hashtags?: string[] | null) {
-    const explicit = (hashtags ?? [])
-        .map((raw) => raw.replace(/^#+/, "").trim().toLowerCase())
-        .filter((tag) => tag.length >= 2 && tag.length <= 40);
-    const all = [...extractHashtagsFromContent(content), ...explicit];
-    return Array.from(new Set(all)).slice(0, 20);
 }
 
 function normalizeExternalWebsiteUrl(raw?: string | null) {
@@ -107,43 +83,6 @@ function routeDistanceMeters(routeGeoJson?: { coordinates: Array<[number, number
         total += haversineMeters(prevLat, prevLng, currLat, currLng);
     }
     return Math.round(total);
-}
-
-async function notifyTaggedUsers(input: {
-    authorUserId: number;
-    taggedUserIds: number[];
-    postId: number;
-    clubId?: number | null;
-}) {
-    if (!input.taggedUserIds.length) return;
-
-    try {
-        const { getDb } = await import("../db");
-        const { sql } = await import("drizzle-orm");
-        const { createNotification } = await import("../db_social_enhanced");
-        const db = await getDb();
-        if (!db) return;
-
-        const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${input.authorUserId} LIMIT 1`);
-        const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
-        const link = input.clubId ? `/community/club/${input.clubId}` : `/post/${input.postId}`;
-
-        await Promise.all(
-            input.taggedUserIds.map((taggedUserId) =>
-                createNotification({
-                    userId: taggedUserId,
-                    type: "mention",
-                    title: "Sei stato taggato",
-                    message: `${actorName} ti ha taggato in un post.`,
-                    link,
-                    referenceId: input.postId,
-                    actorId: input.authorUserId,
-                })
-            )
-        );
-    } catch {
-        // Best-effort: tagging notification should not block post creation
-    }
 }
 
 async function requireClubMemberRole(userId: number, clubId: number) {
@@ -223,7 +162,6 @@ export const communityRouter = router({
         .input(z.object({ postId: z.number() }))
         .query(async ({ ctx, input }) => {
             await requirePostReadable(ctx.user.id, input.postId);
-            await ensureUserPresenceSchema();
 
             const { getDb } = await import("../db");
             const { sql } = await import("drizzle-orm");
@@ -240,7 +178,6 @@ export const communityRouter = router({
                   p.media_url,
                   p.media_urls,
                   p.tagged_user_ids,
-                  p.hashtags,
                   p.visibility,
                   p.created_at,
                   p.updated_at,
@@ -248,11 +185,6 @@ export const communityRouter = router({
                   sp.username AS user_username,
                   sp.avatar_url AS user_avatar,
                   ${authorClubNameSql(ctx.user.id)} AS user_club_name,
-                  EXISTS(
-                    SELECT 1 FROM user_presence up
-                    WHERE up.user_id = p.user_id
-                      AND up.last_seen_at >= ${getOnlineIntervalSql()}
-                  ) AS user_is_online,
                   a.distance_meters AS activity_distance_meters,
                   a.duration_seconds AS activity_duration_seconds,
                   a.activity_date AS activity_date,
@@ -262,6 +194,7 @@ export const communityRouter = router({
                   a.calories AS activity_calories,
                   a.avg_heart_rate AS activity_heart_rate,
                   a.swolf_score AS activity_swolf,
+                  ${activityCardSql()},
                   COALESCE((SELECT COUNT(*) FROM social_splashes s WHERE s.post_id = p.id), 0) AS splash_count,
                   COALESCE((SELECT COUNT(*) FROM social_comments c WHERE c.post_id = p.id), 0) AS comment_count,
                   EXISTS(
@@ -336,30 +269,28 @@ export const communityRouter = router({
     createPost: protectedProcedure
         .input(z.object({
             activityId: z.number(),
-            content: z.string().max(2000).optional().nullable(),
+            content: z.string().max(POST_CONTENT_MAX_LENGTH).optional().nullable(),
             mediaUrl: z.string().url().optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
-            taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
-            hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
+            /** Users picked after «@» in the composer; kept only if still written in the text. */
+            taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
             visibility: z.enum(["public", "private"]).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             const content = input.content?.trim() ?? null;
             const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
-            const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
-            const hashtags = normalizeHashtags(content, input.hashtags);
+            const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, input.taggedUserIds);
             const postId = await upsertActivityPost(ctx.user.id, input.activityId, {
                 content,
                 mediaUrl: mediaUrls[0] ?? null,
                 mediaUrls,
                 taggedUserIds,
-                hashtags,
                 visibility: input.visibility ?? "public",
             });
             if (postId) {
-                await notifyTaggedUsers({
+                await notifyMentionedUsers({
                     authorUserId: ctx.user.id,
-                    taggedUserIds,
+                    mentionedUserIds: taggedUserIds,
                     postId,
                     clubId: null,
                 });
@@ -396,20 +327,8 @@ export const communityRouter = router({
         }))
         .mutation(async ({ ctx, input }) => {
             await requirePostReadable(ctx.user.id, input.postId);
-            const splashResult = await toggleSplash(ctx.user.id, input.postId);
-            let actionXp = null;
-            if (splashResult?.splashed) {
-                actionXp = await awardActionXp({
-                    userId: ctx.user.id,
-                    actionType: "splash",
-                    entityId: input.postId,
-                });
-                if (actionXp.awardedXp > 0) {
-                    await invalidateUserCache(String(ctx.user.id));
-                    await invalidateLeaderboardCache();
-                }
-            }
-            return { ...splashResult, actionXp };
+            // XP comes only from swimming: a splash gives none.
+            return toggleSplash(ctx.user.id, input.postId);
         }),
 
     addComment: protectedProcedure
@@ -419,17 +338,9 @@ export const communityRouter = router({
         }))
         .mutation(async ({ ctx, input }) => {
             await requirePostReadable(ctx.user.id, input.postId);
+            // XP comes only from swimming: a comment gives none.
             const commentId = await addComment(ctx.user.id, input.postId, input.content);
-            const actionXp = await awardActionXp({
-                userId: ctx.user.id,
-                actionType: "comment",
-                entityId: input.postId,
-            });
-            if (actionXp.awardedXp > 0) {
-                await invalidateUserCache(String(ctx.user.id));
-                await invalidateLeaderboardCache();
-            }
-            return { success: true, commentId, actionXp };
+            return { success: true, commentId };
         }),
 
     comments: protectedProcedure
@@ -472,13 +383,92 @@ export const communityRouter = router({
                 if (message === "Cannot delete other users posts") {
                     throw new TRPCError({ code: "FORBIDDEN", message: "Puoi eliminare solo i tuoi post" });
                 }
-                if (message.startsWith("Delete window expired")) {
+                throw new TRPCError({ code: "BAD_REQUEST", message });
+            }
+        }),
+
+    /** The author's post as the editor needs it: by post id or by the shared swim. */
+    ownPost: protectedProcedure
+        .input(z.union([
+            z.object({ postId: z.number().int().positive() }),
+            z.object({ activityId: z.number().int().positive() }),
+        ]))
+        .query(async ({ ctx, input }) => {
+            const post = await getOwnPostForEdit(ctx.user.id, input);
+            if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
+            return post;
+        }),
+
+    /**
+     * The author edits their post. A field left out stays as it is (null or [] clears it): text,
+     * media, and the mentions (`taggedUserIds`). People tagged apart by posts from before «@»
+     * stay while the editor still sends them.
+     */
+    updatePost: protectedProcedure
+        .input(z.object({
+            postId: z.number().int().positive(),
+            content: z.string().max(POST_CONTENT_MAX_LENGTH).optional().nullable(),
+            mediaUrls: z.array(z.string().url()).max(6).optional(),
+            taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            try {
+                const existing = await getOwnPostForEdit(ctx.user.id, { postId: input.postId });
+                const previousTagged = (existing?.taggedUsers ?? []).map((user) => user.userId);
+                const content = input.content === undefined ? (existing?.content ?? null) : input.content;
+                // Mentions count only while written in the text; people tagged apart (older
+                // posts) stay while the editor sends them. No ids sent: the post's own.
+                const taggedUserIds = await resolveMentionedUserIds(
+                    ctx.user.id,
+                    content,
+                    input.taggedUserIds ?? previousTagged,
+                    { keepTagged: taggedApartIds(existing?.content, existing?.taggedUsers ?? []) },
+                );
+                const result = await updateOwnPost(ctx.user.id, input.postId, {
+                    content: input.content,
+                    mediaUrls: input.mediaUrls === undefined ? undefined : normalizeMediaUrls(input.mediaUrls, null),
+                    taggedUserIds,
+                });
+                // Only the mentions added by this edit are told (and never twice for a post).
+                await notifyMentionedUsers({
+                    authorUserId: ctx.user.id,
+                    mentionedUserIds: result.addedTaggedUserIds,
+                    postId: result.postId,
+                    clubId: result.clubId,
+                });
+                return { success: true, postId: result.postId };
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "";
+                if (message === "Post not found") {
+                    throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
+                }
+                if (message === "Cannot edit other users posts") {
+                    throw new TRPCError({ code: "FORBIDDEN", message: "Puoi modificare solo i tuoi post" });
+                }
+                if (message === "Not a club member") {
                     throw new TRPCError({
                         code: "FORBIDDEN",
-                        message: "Tempo massimo per eliminare il post superato",
+                        message: "Non fai più parte del club: puoi eliminare il post, non modificarlo.",
                     });
                 }
-                throw new TRPCError({ code: "BAD_REQUEST", message });
+                if (message === "Empty post") {
+                    throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
+                }
+                if (message === "Content too long") {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: `Un post del club può avere al massimo ${CLUB_POST_CONTENT_MAX_LENGTH} caratteri.`,
+                    });
+                }
+                if (message === DB_UNAVAILABLE_ERR_MSG) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+                }
+                logger.error("[community] updatePost failed", {
+                    userId: ctx.user.id,
+                    postId: input.postId,
+                    error: message || String(error),
+                });
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Non riesco a salvare il post. Riprova." });
             }
         }),
 
@@ -505,11 +495,11 @@ export const communityRouter = router({
 
     createTextPost: protectedProcedure
         .input(z.object({
-            content: z.string().max(2000).optional().nullable(),
+            content: z.string().max(POST_CONTENT_MAX_LENGTH).optional().nullable(),
             mediaUrl: z.string().url().optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
-            taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
-            hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
+            /** Users picked after «@» in the composer; kept only if still written in the text. */
+            taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             const { getDb } = await import("../db");
@@ -518,11 +508,10 @@ export const communityRouter = router({
 
             const content = input.content?.trim() ?? null;
             const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
-            const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
-            const hashtags = normalizeHashtags(content, input.hashtags);
             if (!content && mediaUrls.length === 0) {
                 throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
             }
+            const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, input.taggedUserIds);
 
             const inserted = await db
                 .insert(socialPosts)
@@ -534,7 +523,6 @@ export const communityRouter = router({
                     mediaUrl: mediaUrls[0] ?? null,
                     mediaUrls,
                     taggedUserIds,
-                    hashtags,
                     visibility: "public",
                     isDeleted: false,
                     createdAt: new Date(),
@@ -543,9 +531,9 @@ export const communityRouter = router({
                 .returning({ id: socialPosts.id });
             const postId = inserted[0]?.id ?? null;
             if (postId) {
-                await notifyTaggedUsers({
+                await notifyMentionedUsers({
                     authorUserId: ctx.user.id,
-                    taggedUserIds,
+                    mentionedUserIds: taggedUserIds,
                     postId,
                     clubId: null,
                 });
@@ -747,23 +735,87 @@ export const communityRouter = router({
             };
         }),
 
+    /**
+     * Swims of the last 30 days not yet in the feed, plus `includeActivityId` (a swim opened
+     * from its detail page, of any date) when it is the user's and not shared.
+     */
     unsharedActivities: protectedProcedure
-        .query(async ({ ctx }) => {
+        .input(z.object({ includeActivityId: z.number().int().positive().optional() }).optional())
+        .query(async ({ ctx, input }) => {
             const { getDb } = await import("../db");
             const { sql } = await import("drizzle-orm");
             const db = await getDb();
             if (!db) return [];
 
+            const includeId = input?.includeActivityId ?? null;
+            const recentOrIncluded = includeId
+                ? sql`(activity_date > NOW() - INTERVAL '30 days' OR id = ${includeId})`
+                : sql`activity_date > NOW() - INTERVAL '30 days'`;
             const result = await db.execute(sql`
                 SELECT id, activity_name, distance_meters, duration_seconds, activity_date, activity_source
                 FROM swimming_activities
                 WHERE user_id = ${ctx.user.id}
                   AND share_to_feed = false
-                  AND activity_date > NOW() - INTERVAL '30 days'
+                  AND ${recentOrIncluded}
                 ORDER BY activity_date DESC
                 LIMIT 20
             `);
-            return result.rows;
+            const rows = result.rows as Array<{ id: number }>;
+            if (includeId && !rows.some((row) => Number(row.id) === includeId)) {
+                // The swim asked for (latestSwim): also when it is marked shared but its post is
+                // gone, so sharing it again is possible (see latestSwim).
+                const included = await db.execute(sql`
+                    SELECT a.id, a.activity_name, a.distance_meters, a.duration_seconds, a.activity_date, a.activity_source
+                    FROM swimming_activities a
+                    WHERE a.user_id = ${ctx.user.id}
+                      AND a.id = ${includeId}
+                      AND (
+                        a.share_to_feed = false
+                        OR NOT EXISTS (
+                          SELECT 1 FROM social_posts p
+                          WHERE p.activity_id = a.id AND p.user_id = a.user_id AND p.is_deleted = false
+                        )
+                      )
+                    LIMIT 1
+                `);
+                return [...included.rows, ...rows];
+            }
+            return rows;
+        }),
+
+    /**
+     * The user's most recent swim, for «Condividi l'ultima nuotata»; null when none. `shared`
+     * only when its post is really in the feed: a swim marked shared whose post is gone (an
+     * older inconsistency) opens the share sheet, not an editor with nothing to edit.
+     */
+    latestSwim: protectedProcedure
+        .query(async ({ ctx }) => {
+            const { getDb } = await import("../db");
+            const { sql } = await import("drizzle-orm");
+            const db = await getDb();
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
+
+            const result = await db.execute(sql`
+                SELECT a.id, a.activity_name, a.activity_date,
+                    (a.share_to_feed AND EXISTS (
+                        SELECT 1 FROM social_posts p
+                        WHERE p.activity_id = a.id AND p.user_id = a.user_id AND p.is_deleted = false
+                    )) AS share_to_feed
+                FROM swimming_activities a
+                WHERE a.user_id = ${ctx.user.id}
+                ORDER BY a.activity_date DESC, a.id DESC
+                LIMIT 1
+            `);
+            const row = result.rows[0] as
+                | { id: number; activity_name: string | null; activity_date: Date | string | null; share_to_feed: boolean | null }
+                | undefined;
+            if (!row) return null;
+            return {
+                id: Number(row.id),
+                activityName: row.activity_name,
+                activityDate: row.activity_date,
+                shared: Boolean(row.share_to_feed),
+            };
         }),
 
     users: communityUsersRouter,
@@ -801,9 +853,6 @@ export const communityRouter = router({
         requireClubReadable,
         normalizeExternalWebsiteUrl,
         normalizeMediaUrls,
-        normalizeTaggedUserIds,
-        normalizeHashtags,
-        notifyTaggedUsers,
         routeDistanceMeters,
         isClubStaffRole: (role) => CLUB_STAFF_ROLES.has(role),
     }),

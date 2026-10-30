@@ -143,12 +143,13 @@ describe("Profilo (Corsia)", () => {
 
   const badgesRegion = () => screen.getByRole("region", { name: "Badge" });
 
-  it("no h1 (the title is in the shell header): the name is an h2, with profile badge and social counters", () => {
+  it("no h1 (the title is in the shell header): the name is an h2, with social counters and no second title", () => {
     renderProfile();
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Marta Rossi" })).toBeInTheDocument();
     expect(screen.getByText("@marta_swims")).toBeInTheDocument();
-    expect(screen.getByText("Squalo")).toBeInTheDocument();
+    // One title only, the level's: the old XP tier («profile badge») is not shown.
+    expect(screen.queryByText("Squalo")).toBeNull();
     expect(screen.getByText("31").parentElement).toHaveTextContent("31 Follower");
     expect(screen.getByText("9").parentElement).toHaveTextContent("9 Seguiti");
     expect(screen.getByRole("link", { name: /Modifica profilo/ })).toHaveAttribute("href", "/settings");
@@ -181,10 +182,13 @@ describe("Profilo (Corsia)", () => {
     expect(within(badgesRegion()).getByRole("status")).toHaveTextContent("Caricamento dei badge…");
   });
 
-  it("LevelCard shows the level from profile.get and the progress within the level", () => {
+  it("LevelCard shows the level from profile.get, its title and the progress within the level", () => {
+    state.profile.levelTitle = "Campione";
     renderProfile();
     const card = screen.getByRole("region", { name: "Livello" });
     expect(within(card).getByText("12")).toBeInTheDocument();
+    expect(within(card).getByText("Campione")).toBeInTheDocument();
+    expect(within(card).getByText("I livelli contano solo il nuoto.")).toBeInTheDocument();
     expect(within(card).getByText("580 XP")).toBeInTheDocument();
     expect(within(card).getByText("al livello 13")).toBeInTheDocument();
     expect(within(card).getByText("4.420 XP totali")).toBeInTheDocument();

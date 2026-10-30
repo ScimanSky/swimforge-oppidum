@@ -22,7 +22,6 @@ const m = vi.hoisted(() => {
     getComments: vi.fn(async () => [{ id: 1, content: "Bel lavoro" }]),
     toggleSplash: vi.fn(async () => ({ splashed: true })),
     getClubById: vi.fn(async (_userId: number, clubId: number) => ({ id: clubId, is_member: state.isMember })),
-    awardActionXp: vi.fn(async () => ({ awardedXp: 0 })),
     togglePostReaction: vi.fn(async () => ({ reactionType: "fire" })),
     getPostReactions: vi.fn(async () => []),
     getUserPostReaction: vi.fn(async () => null),
@@ -42,7 +41,6 @@ vi.mock("./_shared", async () => {
     addComment: m.addComment,
     getComments: m.getComments,
     toggleSplash: m.toggleSplash,
-    awardActionXp: m.awardActionXp,
     invalidateUserCache: vi.fn(async () => undefined),
     invalidateLeaderboardCache: vi.fn(async () => undefined),
   };
@@ -104,12 +102,11 @@ describe("club post interactions by a non-member", () => {
     expect(m.getComments).not.toHaveBeenCalled();
   });
 
-  it("addComment: forbidden, nothing is written and no XP is awarded", async () => {
+  it("addComment: forbidden, nothing is written", async () => {
     await expect(
       communityRouter.createCaller(ctx()).addComment({ postId: 7, content: "Ciao" }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(m.addComment).not.toHaveBeenCalled();
-    expect(m.awardActionXp).not.toHaveBeenCalled();
   });
 
   it("toggleSplash: forbidden, no splash is stored", async () => {
@@ -117,7 +114,6 @@ describe("club post interactions by a non-member", () => {
       code: "FORBIDDEN",
     });
     expect(m.toggleSplash).not.toHaveBeenCalled();
-    expect(m.awardActionXp).not.toHaveBeenCalled();
   });
 
   it("reactions.list, userReaction and toggle: forbidden", async () => {
@@ -180,5 +176,18 @@ describe("other readability rules", () => {
     await expect(caller.addComment({ postId: 9, content: "Ciao" })).resolves.toMatchObject({ success: true });
     await expect(caller.toggleSplash({ postId: 9 })).resolves.toMatchObject({ splashed: true });
     expect(m.getClubById).not.toHaveBeenCalled();
+  });
+});
+
+describe("XP only from swimming", () => {
+  it("comments, splashes and reactions give no XP: no XP in the answer, no XP helper left", async () => {
+    m.state.post = publicPost;
+    const caller = communityRouter.createCaller(ctx());
+    const comment = await caller.addComment({ postId: 9, content: "Ciao" });
+    const splash = await caller.toggleSplash({ postId: 9 });
+    const reaction = await caller.reactions.toggle({ postId: 9, reactionType: "fire" });
+    for (const answer of [comment, splash, reaction]) expect(answer).not.toHaveProperty("actionXp");
+    const shared = await vi.importActual<Record<string, unknown>>("./_shared");
+    expect(shared).not.toHaveProperty("awardActionXp");
   });
 });

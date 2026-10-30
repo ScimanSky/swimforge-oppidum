@@ -1,5 +1,5 @@
 import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { clubPoolWorkoutRuns, clubPoolWorkouts, communityClubMembers } from "../drizzle/schema";
 import { getDb } from "./db";
 import type { ClubPoolWorkoutDirective, ClubPoolWorkoutPlan, ClubPoolWorkoutStatus } from "@shared/types";
@@ -314,4 +314,122 @@ export async function getPublishedClubWorkoutById(params: {
   }
 
   return row;
+}
+
+async function requirePublishedWorkout(clubId: number, workoutId: number) {
+  const db = await requireDb();
+  const result = await db.execute(sql`
+    SELECT id FROM club_pool_workouts
+    WHERE id = ${workoutId} AND club_id = ${clubId} AND status = 'published'
+    LIMIT 1
+  `);
+  if (!result.rows.length) throw new Error("Workout not found");
+}
+
+/**
+ * «Segna completato» (completed = true) or its undo, for the athlete themselves, on a
+ * published workout of a club they belong to. Marking twice keeps the first time.
+ */
+export async function setClubWorkoutCompletion(params: {
+  userId: number;
+  clubId: number;
+  workoutId: number;
+  completed: boolean;
+}) {
+  const membership = await assertReadableRole(params.userId, params.clubId);
+  await requirePublishedWorkout(params.clubId, params.workoutId);
+  const db = await requireDb();
+
+  if (params.completed) {
+    await db.execute(sql`
+      INSERT INTO club_workout_completions (workout_id, club_id, user_id, completed_at)
+      VALUES (${params.workoutId}, ${params.clubId}, ${params.userId}, NOW())
+      ON CONFLICT (user_id, workout_id) DO NOTHING
+    `);
+  } else {
+    await db.execute(sql`
+      DELETE FROM club_workout_completions
+      WHERE user_id = ${params.userId} AND workout_id = ${params.workoutId}
+    `);
+  }
+  return readClubWorkoutCompletion(membership, params);
+}
+
+type CompletionRow = {
+  user_id: number;
+  completed_at: Date | string;
+  name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+};
+
+/**
+ * The athlete's own completion of a workout; coaches and staff also get «fatto da N su M»
+ * (M = active members, the club AI bot left out) and who did it, most recent first.
+ */
+export async function getClubWorkoutCompletion(params: { userId: number; clubId: number; workoutId: number }) {
+  const membership = await assertReadableRole(params.userId, params.clubId);
+  // The role is checked in clubId: the workout must belong to that club too, or a coach of
+  // another club could read who did a private club's workout.
+  await requirePublishedWorkout(params.clubId, params.workoutId);
+  return readClubWorkoutCompletion(membership, params);
+}
+
+/** Callers have checked the membership and that the workout is a published one of clubId. */
+async function readClubWorkoutCompletion(
+  membership: { role: string | null },
+  params: { userId: number; clubId: number; workoutId: number },
+) {
+  const db = await requireDb();
+
+  const own = await db.execute(sql`
+    SELECT completed_at FROM club_workout_completions
+    WHERE user_id = ${params.userId} AND workout_id = ${params.workoutId} AND club_id = ${params.clubId}
+    LIMIT 1
+  `);
+  const ownRow = own.rows[0] as { completed_at: Date | string } | undefined;
+  const result = {
+    completed: Boolean(ownRow),
+    completedAt: ownRow ? new Date(ownRow.completed_at).toISOString() : null,
+    coach: null as null | {
+      completedCount: number;
+      memberCount: number;
+      members: Array<{ userId: number; name: string | null; username: string | null; avatarUrl: string | null; completedAt: string }>;
+    },
+  };
+  if (!COACH_ROLES.has(String(membership.role ?? ""))) return result;
+
+  const [done, total] = await Promise.all([
+    db.execute(sql`
+      SELECT c.user_id, c.completed_at, u.name, sp.username, sp.avatar_url
+      FROM club_workout_completions c
+      JOIN community_club_members m
+        ON m.user_id = c.user_id AND m.club_id = ${params.clubId} AND m.status = 'active'
+      JOIN users u ON u.id = c.user_id
+      LEFT JOIN swimmer_profiles sp ON sp.user_id = c.user_id
+      WHERE c.workout_id = ${params.workoutId} AND c.club_id = ${params.clubId}
+      ORDER BY c.completed_at DESC
+    `),
+    db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM community_club_members m
+      JOIN users u ON u.id = m.user_id
+      WHERE m.club_id = ${params.clubId}
+        AND m.status = 'active'
+        AND COALESCE(u.login_method, '') <> 'bot'
+    `),
+  ]);
+  const members = (done.rows as CompletionRow[]).map((row) => ({
+    userId: Number(row.user_id),
+    name: row.name,
+    username: row.username,
+    avatarUrl: row.avatar_url,
+    completedAt: new Date(row.completed_at).toISOString(),
+  }));
+  result.coach = {
+    completedCount: members.length,
+    memberCount: Number((total.rows[0] as { total?: number } | undefined)?.total ?? 0),
+    members,
+  };
+  return result;
 }

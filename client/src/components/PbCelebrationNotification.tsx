@@ -7,6 +7,7 @@ import { Metric } from "@/components/corsia/Metric";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatSwimCentiseconds } from "@/lib/swimTime";
+import { buildPbSharePrefill } from "@/lib/pb-share";
 import { cn } from "@/lib/utils";
 import { CELEBRATION_LAYER, useCelebrationsAllowed } from "@/hooks/useCelebrationGate";
 
@@ -31,16 +32,6 @@ const strokeLabels: Record<PbCelebrationEvent["strokeType"], string> = {
   butterfly: "Farfalla",
   mixed: "Misti",
 };
-
-function buildPbSharePrefill(event: PbCelebrationEvent) {
-  const eventLabel = `${strokeLabels[event.strokeType]} ${event.distanceMeters}m`;
-  const improvementLine =
-    event.improvementCs && event.improvementCs > 0
-      ? `Nuovo PB nei ${eventLabel}: ${formatSwimCentiseconds(event.newTimeCs)} (migliorato di ${formatSwimCentiseconds(event.improvementCs)})`
-      : `Nuovo PB nei ${eventLabel}: ${formatSwimCentiseconds(event.newTimeCs)}`;
-  const sourceLine = event.source === "official" ? "Gara ufficiale" : "Allenamento";
-  return `${improvementLine}\nVasca ${event.poolLengthMeters}m · ${sourceLine}\n\n#PB #swimforge #nuoto`;
-}
 
 function getLastSeenId() {
   if (typeof window === "undefined") return 0;

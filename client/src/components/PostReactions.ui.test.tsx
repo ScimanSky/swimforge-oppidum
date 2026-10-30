@@ -75,15 +75,18 @@ describe("PostReactions (emoji)", () => {
     expect(screen.getByRole("button", { name: "Fuoco" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("picking a reaction sends it and shows the XP earned", async () => {
+  it("picking a reaction sends it; no «+N XP»: XP comes only from swimming", async () => {
     renderWithServer(<PostReactions postId={7} />);
     await userEvent.click(screen.getByRole("button", { name: "Reagisci" }));
     await userEvent.click(screen.getByRole("button", { name: "Onda" }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("+5 XP"));
-    expect(server.calls).toContainEqual({
-      path: "community.reactions.toggle",
-      input: { postId: 7, reactionType: "wave" },
-    });
+    await waitFor(() =>
+      expect(server.calls).toContainEqual({
+        path: "community.reactions.toggle",
+        input: { postId: 7, reactionType: "wave" },
+      })
+    );
+    // Even an old server's answer with XP shows no toast.
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("a failed reaction is an Italian toast, never the bare code", async () => {

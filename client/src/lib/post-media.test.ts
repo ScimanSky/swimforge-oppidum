@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   detectMediaKindFromFile,
-  extractHashtags,
   isVideoUrl,
   MAX_POST_IMAGE_BYTES,
   MAX_POST_VIDEO_BYTES,
@@ -60,17 +59,6 @@ describe("post-media helpers", () => {
   it("accepts supported video media", () => {
     const file = new File(["ok"], "turn.mp4", { type: "video/mp4" });
     expect(validatePostMediaFile(file)).toEqual({ ok: true, kind: "video" });
-  });
-
-  it("extracts normalized unique hashtags", () => {
-    const text = "Oggi #Sprint e ancora #sprint poi #Tecnica_50";
-    expect(extractHashtags(text)).toEqual(["sprint", "tecnica_50"]);
-  });
-
-  it("ignores too short or too long hashtags", () => {
-    const tooLong = "x".repeat(41);
-    const text = `#a #ok #${tooLong}`;
-    expect(extractHashtags(text)).toEqual(["ok"]);
   });
 
   it("detects video urls even with fragments", () => {

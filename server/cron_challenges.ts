@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { levelForXpSql } from "./lib/levels";
 import { challengeRankingOrderBy } from "./db_challenges";
 import { logger } from "./middleware/logger";
 
@@ -163,14 +164,7 @@ export async function completeChallenges(): Promise<{
               UPDATE swimmer_profiles sp
               SET
                 total_xp = sp.total_xp + ${CHALLENGE_WINNER_XP},
-                level = COALESCE(
-                  (
-                    SELECT max(level)
-                    FROM level_thresholds
-                    WHERE xp_required <= sp.total_xp + ${CHALLENGE_WINNER_XP}
-                  ),
-                  sp.level
-                ),
+                level = ${levelForXpSql(sql`sp.total_xp + ${CHALLENGE_WINNER_XP}`)},
                 updated_at = NOW()
               WHERE sp.user_id = ${winner.user_id}
             `);

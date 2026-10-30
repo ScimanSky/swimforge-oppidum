@@ -5,6 +5,7 @@ import {
     logger, getUserPublicProfile,
 } from "./_shared";
 import { mergeSwimmerPreferences, preferencesPatch } from "../lib/preferences";
+import { healLevel, levelForXp } from "../lib/levels";
 import type { SwimmingActivityInsert } from "./_shared";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 
@@ -15,11 +16,28 @@ export const profileRouter = router({
             throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
         }
 
+        // The level always follows the total XP (level_thresholds); a stored level left over from
+        // an old table or a missed update is fixed here (self-heal). The answer shows what is
+        // stored: the healed level, or the stored one when nothing was healed (no thresholds) or
+        // the heal failed (logged, never an error for the profile).
+        let level = profile.level;
+        try {
+            const expected = await levelForXp(profile.totalXp);
+            if (expected !== profile.level) {
+                const healed = await healLevel(ctx.user.id);
+                if (healed !== null) level = healed;
+            }
+        } catch (error) {
+            logger.warn("[profile] level self-heal failed", {
+                event: "profile:level_heal_failed",
+                userId: ctx.user.id,
+                message: error instanceof Error ? error.message : String(error),
+            });
+        }
         const [nextLevel, currentLevel] = await Promise.all([
-            db.getNextLevelThreshold(profile.level),
-            db.getLevelThreshold(profile.level),
+            db.getNextLevelThreshold(level),
+            db.getLevelThreshold(level),
         ]);
-        const currentLevelInfo = await db.getLevelForXp(profile.totalXp);
 
         // Get profile badge
         const { getUserProfileBadge, updateUserProfileBadge, updateUserProfileBadgeByLevel } = await import("../db_profile_badges");
@@ -45,12 +63,13 @@ export const profileRouter = router({
 
         return {
             ...ownProfile,
+            level,
             notificationSettings: normalizeBooleanRecord(profile.notificationSettings),
-            levelTitle: currentLevelInfo.title,
-            levelColor: currentLevelInfo.color,
-            xpLevelTitle: currentLevelInfo.title,
-            xpLevelColor: currentLevelInfo.color,
-            xpLevel: profile.level,
+            levelTitle: currentLevel?.title ?? null,
+            levelColor: currentLevel?.color ?? null,
+            xpLevelTitle: currentLevel?.title ?? null,
+            xpLevelColor: currentLevel?.color ?? null,
+            xpLevel: level,
             currentLevelXp: currentLevel?.xpRequired ?? 0,
             nextLevelXp: nextLevel?.xpRequired || null,
             xpToNextLevel: nextLevel ? nextLevel.xpRequired - profile.totalXp : 0,
@@ -144,6 +163,30 @@ export const profileRouter = router({
             });
             return { success: true };
         }),
+    /**
+     * «Club principale»: the club shown next to the user's name (feed, post, public profile).
+     * One of their active clubs, or null for «Nessuno» (no club at all). Saved in
+     * preferences.primaryClubId with the atomic merge; leaving that club later writes nothing,
+     * the club name query ignores a club they are no longer an active member of.
+     */
+    setPrimaryClub: protectedProcedure
+        .input(z.object({ clubId: z.number().int().positive().nullable() }))
+        .mutation(async ({ ctx, input }) => {
+            if (input.clubId !== null) {
+                const { getClubMemberRole } = await import("../db_clubs");
+                const membership = await getClubMemberRole(ctx.user.id, input.clubId);
+                if (membership?.status !== "active") {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: "Puoi scegliere solo un club di cui fai parte.",
+                    });
+                }
+            }
+            const saved = await mergeSwimmerPreferences(ctx.user.id, { primaryClubId: input.clubId });
+            if (!saved) throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            return { primaryClubId: input.clubId };
+        }),
+
     uploadMedia: protectedProcedure
         .input(
             z.object({

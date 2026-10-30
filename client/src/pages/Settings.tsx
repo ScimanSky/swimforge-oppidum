@@ -56,6 +56,7 @@ import GarminSection from "@/components/GarminSection"
 import GarminSyncCountPicker from "@/components/GarminSyncCountPicker"
 import { garminSyncButtonLabel, useGarminSyncCount } from "@/lib/garmin-sync-count"
 import { Link as RouterLink, useLocation } from "wouter"
+import { PrimaryClubField } from "@/components/club/PrimaryClubField"
 
 const notificationSettings = [
   {
@@ -153,6 +154,8 @@ const consentItems = [
     description:
       "Permette di collegare Garmin Connect e importare le tue nuotate: data, distanza, tempi, passo, giri e vasche, bracciate, SWOLF e stile. Serve anche il consenso «Trattamento dati salute».",
   },
+  // No «Sincronizzazione Strava»: Strava is gone. The server still accepts the strava_sync
+  // consent from old app builds.
   {
     type: "marketing_communications",
     title: "Comunicazioni marketing",
@@ -236,8 +239,6 @@ export default function Settings() {
   const activities = activitiesQuery.data
   const garminStatusQuery = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
   const garminStatus = garminStatusQuery.data
-  const stravaStatusQuery = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
-  const stravaStatus = stravaStatusQuery.data
   const consentsQuery = trpc.consent.list.useQuery(undefined, { staleTime: 30_000 })
 
   type GarminSyncResult = { synced?: number; error?: string; detectedPbs?: unknown[] }
@@ -314,9 +315,8 @@ export default function Settings() {
     if (profile) {
       metrics.push({ value: formatInteger(Number(profile.totalXp ?? 0)), label: "XP totale", tone: "xp" })
     }
-    if (garminStatus && stravaStatus) {
-      const connected = Number(Boolean(garminStatus.connected)) + Number(Boolean(stravaStatus.connected))
-      metrics.push({ value: String(connected), unit: "di 2", label: "Integrazioni attive" })
+    if (garminStatus) {
+      metrics.push({ value: garminStatus.connected ? "Sì" : "No", label: "Garmin collegato" })
     }
     if (activities) {
       const totalActivities = activitiesBySource.garmin + activitiesBySource.strava + activitiesBySource.manual
@@ -324,12 +324,11 @@ export default function Settings() {
     }
     if (favoriteStroke) metrics.push({ value: favoriteStroke, label: "Stile più nuotato" })
     return metrics
-  }, [activities, activitiesBySource, favoriteStroke, garminStatus, profile, stravaStatus])
+  }, [activities, activitiesBySource, favoriteStroke, garminStatus, profile])
   const summaryLoading =
     awaitingData(profileQuery) ||
     awaitingData(activitiesQuery) ||
-    awaitingData(garminStatusQuery) ||
-    awaitingData(stravaStatusQuery)
+    awaitingData(garminStatusQuery)
 
   const preferredPool = useMemo(() => {
     const length = activities?.[0]?.poolLengthMeters
@@ -849,8 +848,8 @@ export default function Settings() {
       <LoadError onRetry={retryProfile} />
     ) : null
 
-  const statusesLoading = awaitingData(garminStatusQuery) || awaitingData(stravaStatusQuery)
-  const statusesFailed = (garminStatusQuery.isError && !garminStatus) || (stravaStatusQuery.isError && !stravaStatus)
+  const statusesLoading = awaitingData(garminStatusQuery)
+  const statusesFailed = garminStatusQuery.isError && !garminStatus
   const accounts = [
     {
       name: "Garmin Connect",
@@ -859,12 +858,6 @@ export default function Settings() {
       activities: activitiesBySource.garmin,
       // Connect, sync and disconnect are in the Garmin card below.
       manage: true,
-    },
-    {
-      name: "Strava",
-      connected: stravaStatus?.connected ?? false,
-      lastSync: stravaStatus?.lastSync ?? null,
-      activities: activitiesBySource.strava,
     },
     {
       name: "Apple Health",
@@ -1061,6 +1054,14 @@ export default function Settings() {
                   </div>
                 </Section>
 
+                <Section title="Club">
+                  <div className="mt-4">
+                    <PrimaryClubField
+                      value={isRecord(profile?.preferences) ? profile.preferences.primaryClubId : undefined}
+                    />
+                  </div>
+                </Section>
+
                 {/* Swimming Profile */}
                 <Section title="Profilo nuotatore" description="Informazioni specifiche per il nuoto.">
                   <div className="mt-4 space-y-4">
@@ -1121,7 +1122,6 @@ export default function Settings() {
                   className="mt-4"
                   onRetry={() => {
                     if (garminStatusQuery.isError) void garminStatusQuery.refetch()
-                    if (stravaStatusQuery.isError) void stravaStatusQuery.refetch()
                   }}
                 />
               ) : (

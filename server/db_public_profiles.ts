@@ -2,6 +2,7 @@ import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { users, swimmerProfiles, socialFollows } from "../drizzle/schema";
+import { authorClubNameSql } from "./lib/author-club";
 
 type PublicProfile = {
   userId: number;
@@ -13,6 +14,8 @@ type PublicProfile = {
   location: string | null;
   level: number | null;
   totalXp: number | null;
+  /** Their «Club principale» (else latest club) when the viewer may see it. */
+  clubName: string | null;
   followerCount: number;
   followingCount: number;
   isFollowing: boolean;
@@ -50,6 +53,7 @@ export async function getUserPublicProfile(params: {
       location: swimmerProfiles.location,
       level: swimmerProfiles.level,
       totalXp: swimmerProfiles.totalXp,
+      clubName: sql<string | null>`${authorClubNameSql(params.viewerUserId, sql`${users.id}`)}`,
       privacySettings: swimmerProfiles.privacySettings,
     })
     .from(users)
@@ -99,6 +103,7 @@ export async function getUserPublicProfile(params: {
 
   return {
     ...publicRow,
+    clubName: publicRow.clubName ?? null,
     followerCount: Number(followerCountResult[0]?.count ?? 0),
     followingCount: Number(followingCountResult[0]?.count ?? 0),
     isFollowing: isFollowingResult.length > 0,
@@ -236,8 +241,11 @@ export async function searchUsers(viewerUserId: number, query: string, limit = 1
   const normalizedQuery = query.trim();
   if (!normalizedQuery) return [];
 
-  const pattern = `%${normalizedQuery}%`;
-  const prefixPattern = `${normalizedQuery}%`;
+  // «%» and «_» typed by the user are letters, not LIKE wildcards (backslash is the default
+  // LIKE escape, so it is escaped too).
+  const likeText = normalizedQuery.replace(/[\\%_]/g, (char) => `\\${char}`);
+  const pattern = `%${likeText}%`;
+  const prefixPattern = `${likeText}%`;
   const normalizedLower = normalizedQuery.toLowerCase();
   const rows = await db
     .select({

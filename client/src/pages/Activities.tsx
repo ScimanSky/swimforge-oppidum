@@ -29,7 +29,7 @@ import { ActivityCard } from "@/components/corsia/ActivityCard"
 import { Chip } from "@/components/corsia/Chip"
 import { Metric } from "@/components/corsia/Metric"
 import { WeekCard } from "@/components/corsia/WeekCard"
-import { ShareToggle } from "@/components/corsia/ShareToggle"
+import { ActivityShareActions } from "@/components/corsia/ActivityShareActions"
 import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { useCurrentDay } from "@/hooks/useCurrentDay"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
@@ -291,18 +291,12 @@ export default function Activities() {
                 </div>
               ) : null}
 
-              <ShareToggle
-                activityId={panelActivity.id}
-                shared={Boolean(panelActivity.shareToFeed)}
-                className="border-t border-border pt-5"
-              />
-
-              <div className="flex flex-wrap gap-2">
-                {!panelActivity.shareToFeed ? (
-                  <Button type="button" onClick={() => openShareForActivity(panelActivity.id)}>
-                    Condividi con foto o commento
-                  </Button>
-                ) : null}
+              <div className="flex flex-wrap gap-2 border-t border-border pt-5">
+                <ActivityShareActions
+                  activityId={panelActivity.id}
+                  shared={Boolean(panelActivity.shareToFeed)}
+                  onShare={() => openShareForActivity(panelActivity.id)}
+                />
                 <Button variant="outline" asChild>
                   <Link href={`/track/${panelActivity.id}`}>Dettaglio vasche</Link>
                 </Button>

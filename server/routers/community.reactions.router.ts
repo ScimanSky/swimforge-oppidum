@@ -1,7 +1,4 @@
 import {
-  awardActionXp,
-  invalidateLeaderboardCache,
-  invalidateUserCache,
   protectedProcedure,
   router,
   z,
@@ -33,18 +30,8 @@ export function createCommunityReactionsRouter(input: { requirePostReadable: Req
           userId: ctx.user.id,
           reactionType: input.reactionType,
         });
-        let actionXp = null;
+        // XP comes only from swimming: a reaction gives none.
         if (reaction) {
-          actionXp = await awardActionXp({
-            userId: ctx.user.id,
-            actionType: "reaction",
-            entityId: input.postId,
-          });
-          if (actionXp.awardedXp > 0) {
-            await invalidateUserCache(String(ctx.user.id));
-            await invalidateLeaderboardCache();
-          }
-
           // Notify post owner about the reaction.
           try {
             if (postMeta.ownerId !== ctx.user.id) {
@@ -72,7 +59,7 @@ export function createCommunityReactionsRouter(input: { requirePostReadable: Req
           }
         }
 
-        return { success: true, reaction, actionXp };
+        return { success: true, reaction };
       }),
 
     list: protectedProcedure

@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShareActivityPicker } from "@/components/social/ShareActivityPicker"
+import { ActivityShareActions } from "@/components/corsia/ActivityShareActions"
 import { Chip } from "@/components/corsia/Chip"
 import { Metric, type MetricProps } from "@/components/corsia/Metric"
 import { PaceBars, paceBars } from "@/components/corsia/PaceBars"
-import { ShareToggle } from "@/components/corsia/ShareToggle"
 import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
 import { activityMetrics, activityZoneSeconds } from "@/lib/activity-metrics"
@@ -933,33 +933,22 @@ export default function ActivityDetail() {
           </div>
         ) : null}
 
-        <div className="space-y-3">
-          <ShareToggle
+        {/* Phones: stacked full-width buttons; from sm up they sit side by side. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <ActivityShareActions
             activityId={activity.id}
             shared={Boolean(activity.shareToFeed)}
-            className="surface-panel px-4 py-3"
+            onShare={() => setSharePickerOpen(true)}
+            size="lg"
+            buttonClassName="w-full sm:w-auto"
           />
-          {/* Phones: stacked full-width buttons (the long label never fits beside «Coach AI»
-              on one row); from sm up they sit side by side. Labels may wrap instead of clipping. */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            {!activity.shareToFeed ? (
-              <Button
-                type="button"
-                size="lg"
-                className="h-auto min-h-12 w-full whitespace-normal py-2 text-center sm:w-auto sm:flex-1"
-                onClick={() => setSharePickerOpen(true)}
-              >
-                Condividi con foto o commento
-              </Button>
-            ) : null}
-            {/* The coach's Session IQ reads only the last synced session: no per-activity link (Phase 3). */}
-            <Button variant="outline" size="lg" className="w-full sm:w-auto" asChild>
-              <Link href="/coach">
-                <Sparkles className="size-5" aria-hidden />
-                Coach AI
-              </Link>
-            </Button>
-          </div>
+          {/* The coach's Session IQ reads only the last synced session: no per-activity link (Phase 3). */}
+          <Button variant="outline" size="lg" className="w-full sm:w-auto" asChild>
+            <Link href="/coach">
+              <Sparkles className="size-5" aria-hidden />
+              Coach AI
+            </Link>
+          </Button>
         </div>
 
         <section aria-labelledby={detailTitleId} className="space-y-4">

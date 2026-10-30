@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Column, is, sql, SQL } from "drizzle-orm";
+import { Column, is, SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
 // Endpoints that show other users (feed, comments, club members, DMs, public
@@ -43,10 +43,6 @@ const m = vi.hoisted(() => {
 });
 
 vi.mock("./db", () => ({ getDb: async () => m.db }));
-vi.mock("./user_presence", () => ({
-  ensureUserPresenceSchema: async () => {},
-  getOnlineIntervalSql: () => sql`now()`,
-}));
 
 function render(query: unknown): string {
   return dialect.sqlToQuery(query as SQL).sql;
@@ -103,6 +99,8 @@ describe("feed and comments", () => {
       const text = render(query);
       expect(text).not.toMatch(/email/i);
       expect(text).toMatch(/AS user_username/);
+      // No online presence: no green dot, no subquery per post.
+      expect(text).not.toMatch(/user_presence|user_is_online/);
     }
   });
 });
@@ -119,6 +117,8 @@ describe("clubs", () => {
       const text = render(query);
       expect(text).not.toMatch(/email/i);
       expect(text).toMatch(/AS user_username/);
+      // No online presence: no green dot, no subquery per post.
+      expect(text).not.toMatch(/user_presence|user_is_online/);
     }
   });
 });
@@ -142,19 +142,12 @@ describe("direct messages", () => {
   it("the conversation list selects no email and falls back to the username", async () => {
     const { getRecentConversations } = await import("./db_social_enhanced");
     const now = new Date();
-    m.state.selectResults.push(
-      [
-        { id: 10, senderId: 5, receiverId: 1, content: "a", isRead: true, readAt: null, createdAt: now },
-        { id: 11, senderId: 1, receiverId: 6, content: "b", isRead: true, readAt: null, createdAt: now },
-      ],
-      [],
-      [
-        { id: 5, name: "  ", username: "squalo", profilePicture: null },
-        { id: 6, name: null, username: null, profilePicture: null },
-      ],
-    );
+    m.state.executeResults.push([
+      { id: 10, senderId: 5, receiverId: 1, content: "a", isRead: true, createdAt: now, otherUserId: 5, otherName: "  ", otherUsername: "squalo" },
+      { id: 11, senderId: 1, receiverId: 6, content: "b", isRead: true, createdAt: now, otherUserId: 6, otherName: null, otherUsername: null },
+    ]);
     const result: any[] = await getRecentConversations(1);
-    expectNoEmailInSelections();
+    expect(render(m.state.executed[0])).not.toMatch(/email/i);
     expect(JSON.stringify(result)).not.toMatch(/email/i);
     const names = result.map((row) => row.otherUser.username);
     expect(names).toEqual(["squalo", "Utente #6"]);
@@ -175,6 +168,18 @@ describe("public profiles and search", () => {
     expectNoEmailInSelections();
     expect(profile).not.toBeNull();
     expect(Object.keys(profile!)).not.toContain("email");
+  });
+
+  it("getUserPublicProfile shows the swimmer's club the way the feed does («Club principale», visibility)", async () => {
+    const { getUserPublicProfile } = await import("./db_public_profiles");
+    m.state.selectResults.push([{ userId: 5, name: "Ada", username: "ada", clubName: "Oppidum Cagliari", privacySettings: null }]);
+    const profile = await getUserPublicProfile({ viewerUserId: 1, targetUserId: 5 });
+    expect(profile?.clubName).toBe("Oppidum Cagliari");
+    const { sql: text, params } = dialect.sqlToQuery((m.state.selections[0] as any).clubName as SQL);
+    expect(text).toMatch(/'primaryClubId'/);
+    expect(text).toMatch(/psp\.user_id = "users"\."id"/);
+    const viewerParam = /vm\.user_id = \$(\d+)/.exec(text);
+    expect(params[Number(viewerParam![1]) - 1]).toBe(1);
   });
 
   it("getUserPublicProfile does not hand out the target's raw privacy settings", async () => {

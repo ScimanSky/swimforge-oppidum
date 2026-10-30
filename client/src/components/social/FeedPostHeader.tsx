@@ -14,11 +14,14 @@ import {
   UserPlus,
   Flag,
   EyeOff,
+  PencilLine,
   Trash2,
 } from "lucide-react"
 import { formatTimeAgo, getInitials } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
+import { errorToastMessage } from "@/lib/trpc-errors"
 import { toast } from "sonner"
+import { EditPostSheet } from "./EditPostSheet"
 
 const SOURCE_LABELS: Record<string, string> = { garmin: "Garmin", strava: "Strava" }
 
@@ -36,7 +39,6 @@ interface FeedPostHeaderProps {
     activity_date?: string | null
     created_at: string
     user_level?: number | null
-    user_is_online?: boolean | null
   }
   isOwner: boolean
   isFollowing?: boolean
@@ -52,6 +54,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const initials = getInitials(baseName)
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing ?? false)
   const [location, setLocation] = useLocation()
+  const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => {
     setIsFollowing(initialIsFollowing ?? false)
@@ -80,10 +83,21 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const deletePost = trpc.community.deletePost.useMutation({
     onSuccess: () => {
       toast.success("Post eliminato")
+      // On the post's own page there is nothing left to show: back to the feed (replacing the
+      // entry, so «Indietro» does not open the deleted post again).
+      if (location === `/post/${post.id}`) setLocation("/home", { replace: true })
       utils.community.feed.invalidate()
       utils.community.clubs.feed.invalidate()
+      utils.community.postById.invalidate({ postId: post.id })
+      // A shared swim goes back to «Condividi».
+      if (post.activity_id) {
+        utils.activities.list.invalidate()
+        utils.activities.get.invalidate({ id: post.activity_id })
+        utils.community.unsharedActivities.invalidate()
+        utils.community.latestSwim.invalidate()
+      }
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error(errorToastMessage(err, "Non riesco a eliminare il post.")),
   })
 
   // «{club or source} · {time ago}» (Corsia feed): the club first, otherwise the sync source.
@@ -95,17 +109,11 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
 
   return (
     <div className="flex items-center gap-3 pb-1 pt-4">
-      <Link href={`/u/${post.user_id}`} aria-label={`Profilo di ${baseName}`} className="relative shrink-0">
+      <Link href={`/u/${post.user_id}`} aria-label={`Profilo di ${baseName}`} className="shrink-0">
         <Avatar className="size-11">
           <AvatarImage src={post.user_avatar || ""} alt="" />
           <AvatarFallback className="text-sm font-semibold">{initials}</AvatarFallback>
         </Avatar>
-        {post.user_is_online ? (
-          <span
-            className="absolute -left-0.5 -top-0.5 size-3 rounded-full border-2 border-background bg-success"
-            aria-hidden
-          />
-        ) : null}
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
@@ -158,18 +166,24 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             {isOwner ? (
-              <DropdownMenuItem
-                className="gap-2 text-xs text-destructive focus:text-destructive"
-                disabled={deletePost.isPending}
-                onSelect={() => {
-                  const confirmed = window.confirm("Eliminare questo post?")
-                  if (!confirmed) return
-                  deletePost.mutate({ postId: post.id })
-                }}
-              >
-                <Trash2 className="size-3.5" aria-hidden />
-                {deletePost.isPending ? "Elimino..." : "Elimina"}
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem className="gap-2 text-sm" onSelect={() => setEditOpen(true)}>
+                  <PencilLine className="size-4" aria-hidden />
+                  Modifica
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2 text-sm text-destructive focus:text-destructive"
+                  disabled={deletePost.isPending}
+                  onSelect={() => {
+                    const confirmed = window.confirm("Eliminare questo post? Sparisce per tutti.")
+                    if (!confirmed) return
+                    deletePost.mutate({ postId: post.id })
+                  }}
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                  {deletePost.isPending ? "Elimino…" : "Elimina"}
+                </DropdownMenuItem>
+              </>
             ) : (
               <>
                 <DropdownMenuItem
@@ -197,6 +211,10 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {/* Mounted only while open: the post is loaded when the author asks to edit it. */}
+      {isOwner && editOpen ? (
+        <EditPostSheet open onOpenChange={setEditOpen} postRef={{ postId: post.id }} />
+      ) : null}
     </div>
   )
 }

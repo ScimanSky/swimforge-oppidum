@@ -11,6 +11,8 @@ export type LevelCardProps = {
   /** XP required for the next level; null at the maximum level. */
   nextLevelXp: number | null;
   xpToNextLevel: number;
+  /** The level's title from level_thresholds (the only title), when known. */
+  title?: string | null;
 };
 
 /** Progress within the current level, 0-100; full when there is no next level. */
@@ -58,7 +60,7 @@ function Bar({
 
 /** Profile level card (Corsia «Season» board without season and missions). */
 export function LevelCard(props: LevelCardProps) {
-  const { level, totalXp, nextLevelXp, xpToNextLevel } = props;
+  const { level, totalXp, nextLevelXp, xpToNextLevel, title } = props;
   const titleId = useId();
   return (
     <section className="surface-panel p-5" aria-labelledby={titleId}>
@@ -70,6 +72,7 @@ export function LevelCard(props: LevelCardProps) {
           <p className="font-display text-[64px] font-bold leading-none tabular-nums">
             {level}
           </p>
+          {title ? <p className="mt-1 text-sm font-semibold">{title}</p> : null}
         </div>
         {nextLevelXp ? (
           <div className="text-right">
@@ -86,6 +89,7 @@ export function LevelCard(props: LevelCardProps) {
       <p className="mt-3 text-sm text-muted-foreground">
         {formatInteger(totalXp)} XP totali
       </p>
+      <p className="mt-1 text-xs text-muted-foreground">I livelli contano solo il nuoto.</p>
     </section>
   );
 }

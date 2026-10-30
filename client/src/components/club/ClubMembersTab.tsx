@@ -7,19 +7,24 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/corsia/Chip";
 import { LoadingSkeleton } from "@/components/corsia/LoadState";
-import { Crown, Shield, User } from "lucide-react";
+import { ClipboardList, Crown, Shield, User } from "lucide-react";
 import { formatInteger } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
 import { Link } from "wouter";
 import { toast } from "sonner";
+import { CLUB_ROLE_LABEL } from "@/lib/club-roles";
 
-const ROLES: Record<string, { label: string; icon: typeof User }> = {
-  owner: { label: "Proprietario", icon: Crown },
-  admin: { label: "Admin", icon: Shield },
-  moderator: { label: "Moderatore", icon: Shield },
-  member: { label: "Membro", icon: User },
+const ROLE_ICON: Record<string, typeof User> = {
+  owner: Crown,
+  admin: Shield,
+  moderator: Shield,
+  coach: ClipboardList,
+  member: User,
 };
+const ROLES: Record<string, { label: string; icon: typeof User }> = Object.fromEntries(
+  Object.entries(ROLE_ICON).map(([role, icon]) => [role, { label: CLUB_ROLE_LABEL[role], icon }])
+);
 
 interface ClubMembersTabProps {
   clubId: number;
@@ -163,13 +168,14 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                             updateRoleMutation.mutate({
                               clubId,
                               userId: member.user_id,
-                              role: e.target.value as "member" | "moderator" | "admin",
+                              role: e.target.value as "member" | "coach" | "moderator" | "admin",
                             })
                           }
                           className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
                           disabled={updateRoleMutation.isPending}
                         >
                           <option value="member">Membro</option>
+                          <option value="coach">Coach</option>
                           <option value="moderator">Moderatore</option>
                           <option value="admin">Admin</option>
                         </select>

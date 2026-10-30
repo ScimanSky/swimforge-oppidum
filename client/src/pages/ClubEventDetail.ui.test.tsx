@@ -47,7 +47,8 @@ const helpers = vi.hoisted(() => {
       mutate: (vars: any) => {
         (state.calls[name] ??= []).push(vars);
         if (state.failures[name]) options?.onError?.(state.failures[name]);
-        else options?.onSuccess?.({});
+        // An old server still answered an RSVP with its XP: no toast for it any more.
+        else options?.onSuccess?.(name === "rsvp" ? { actionXp: { awardedXp: 12 } } : {});
       },
       isPending: false,
     }),
@@ -136,6 +137,7 @@ describe("ClubEventDetail (Corsia)", () => {
     state.enabled = {};
     history.previous = null;
     vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
     for (const refetch of Object.values(state.refetch)) refetch.mockClear();
   });
 
@@ -161,6 +163,8 @@ describe("ClubEventDetail (Corsia)", () => {
     expect(within(group).getByRole("button", { name: "Forse" }).getAttribute("aria-pressed")).toBe("false");
     await userEvent.setup({ delay: null }).click(within(group).getByRole("button", { name: "Forse" }));
     expect(state.calls.rsvp).toEqual([{ eventId: 3, status: "maybe" }]);
+    // XP comes only from swimming: no «+12 XP».
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("partecipanti per risposta, il @nome solo sotto un nome vero", () => {

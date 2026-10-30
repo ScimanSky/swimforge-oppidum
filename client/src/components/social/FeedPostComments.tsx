@@ -21,10 +21,7 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
   )
 
   const addComment = trpc.community.addComment.useMutation({
-    onSuccess: (data) => {
-      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP Action`)
-      }
+    onSuccess: () => {
       setCommentText("")
       commentsQuery.refetch()
     },

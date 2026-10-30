@@ -13,7 +13,6 @@ export interface FeedPostRecord {
   media_url?: string | null
   media_urls?: string[] | string | null
   tagged_users?: FeedTaggedUser[] | string | null
-  hashtags?: string[] | string | null
   is_following?: boolean
   created_at: string
   activity_date?: string | null
@@ -22,6 +21,8 @@ export interface FeedPostRecord {
   activity_calories?: number | null
   activity_heart_rate?: number | null
   activity_swolf?: number | null
+  activity_avg_pace_per_100m?: number | string | null
+  activity_records?: unknown
   activity_is_open_water?: boolean | null
   comment_count?: number | string
   user_name?: string | null
@@ -29,7 +30,6 @@ export interface FeedPostRecord {
   user_avatar?: string | null
   user_club_name?: string | null
   user_level?: number | null
-  user_is_online?: boolean | null
   activity_source?: string | null
 }
 

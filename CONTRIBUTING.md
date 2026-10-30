@@ -39,14 +39,14 @@ pnpm test
 pnpm check
 ```
 
-## Providers (Strava / Garmin)
-- **Strava** is currently in dev mode (single maintainer). Multi‑user approval is pending.
+## Providers (Garmin)
+- Strava was removed in October 2026; activities imported from it earlier stay readable.
 - **Garmin** is accessed via a third‑party provider due to strict API policy.
 
 ### Adding a provider connector (high level)
 1) Add client for provider in `server/` (or new service)
 2) Normalize activity data into `swimming_activities`
-3) Wire tokens/refresh + mapping in `server/strava.ts` or new file
+3) Wire tokens/refresh + mapping in `server/garmin.ts` or a new file
 4) Add minimal tests
 
 ### Proposing a new metric

@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   invalidateList: vi.fn(),
   invalidateFeed: vi.fn(),
   invalidateUnshared: vi.fn(),
+  invalidatePostById: vi.fn(),
+  invalidateLatestSwim: vi.fn(),
   toggleShareCalls: [] as Array<{ activityId: number; share: boolean }>,
   toggleShareOptions: null as any,
 }));
@@ -57,6 +59,8 @@ vi.mock("@/lib/trpc", () => ({
       community: {
         feed: { invalidate: state.invalidateFeed },
         unsharedActivities: { invalidate: state.invalidateUnshared },
+        postById: { invalidate: state.invalidatePostById },
+        latestSwim: { invalidate: state.invalidateLatestSwim },
       },
     }),
   },
@@ -73,6 +77,10 @@ vi.mock("wouter", () => ({
 
 vi.mock("@/components/AppLayout", () => ({
   default: ({ children }: any) => <div data-testid="app-layout">{children}</div>,
+}));
+
+vi.mock("@/components/social/EditPostSheet", () => ({
+  EditPostSheet: ({ postRef }: any) => <div data-testid="edit-post">{JSON.stringify(postRef)}</div>,
 }));
 
 vi.mock("@/components/social/ShareActivityPicker", () => ({
@@ -157,6 +165,8 @@ describe("ActivityDetail (Corsia)", () => {
     state.invalidateList.mockReset();
     state.invalidateFeed.mockReset();
     state.invalidateUnshared.mockReset();
+    state.invalidatePostById.mockReset();
+    state.invalidateLatestSwim.mockReset();
     state.toggleShareCalls = [];
     state.toggleShareOptions = null;
   });
@@ -248,49 +258,50 @@ describe("ActivityDetail (Corsia)", () => {
     expect(within(pace).getByText("Più veloce: rip. 2 · 1:40")).toBeInTheDocument();
   });
 
-  it("the feed switch toggles sharing of this activity and refreshes it", async () => {
+  it("«Condividi» opens the share sheet with text and photos on this swim", async () => {
     render(<ActivityDetail />);
 
-    const toggle = screen.getByRole("switch", { name: "Condividi nel feed" });
-    expect(toggle).not.toBeChecked();
-    await userEvent.click(toggle);
-    expect(state.toggleShareCalls).toEqual([{ activityId: 5, share: true }]);
-
-    await state.toggleShareOptions.onSuccess(undefined, { activityId: 5, share: true });
-    expect(state.invalidateGet).toHaveBeenCalledWith({ id: 5 });
-    expect(state.invalidateList).toHaveBeenCalled();
-    expect(state.invalidateFeed).toHaveBeenCalled();
-    expect(state.invalidateUnshared).toHaveBeenCalled();
-  });
-
-  it("a shared activity can be un-shared from the switch", async () => {
-    state.activity = session({ shareToFeed: true });
-
-    render(<ActivityDetail />);
-
-    const toggle = screen.getByRole("switch", { name: "Condividi nel feed" });
-    expect(toggle).toBeChecked();
-    await userEvent.click(toggle);
-    expect(state.toggleShareCalls).toEqual([{ activityId: 5, share: false }]);
-  });
-
-  it("«Condividi con foto o commento» opens the picker on this activity, only when not shared", async () => {
-    render(<ActivityDetail />);
-
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Modifica post" })).not.toBeInTheDocument();
     expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:false|id:5");
-    await userEvent.click(screen.getByRole("button", { name: "Condividi con foto o commento" }));
+    await userEvent.click(screen.getByRole("button", { name: "Condividi" }));
     expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:true|id:5");
 
     await userEvent.click(screen.getByRole("button", { name: "simulate-shared" }));
     expect(state.invalidateGet).toHaveBeenCalledWith({ id: 5 });
     expect(state.invalidateList).toHaveBeenCalled();
+  });
 
-    cleanup();
+  it("a shared swim offers «Modifica post» and «Rimuovi dal feed», not «Condividi»", async () => {
     state.activity = session({ shareToFeed: true });
     render(<ActivityDetail />);
-    expect(
-      screen.queryByRole("button", { name: "Condividi con foto o commento" })
-    ).not.toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: "Condividi" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Modifica post" }));
+    expect(screen.getByTestId("edit-post")).toHaveTextContent('{"activityId":5}');
+  });
+
+  it("«Rimuovi dal feed» asks first, then removes the post and refreshes the swim", async () => {
+    state.activity = session({ shareToFeed: true });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render(<ActivityDetail />);
+
+    const remove = screen.getByRole("button", { name: "Rimuovi dal feed" });
+    await userEvent.click(remove);
+    expect(state.toggleShareCalls).toEqual([]);
+    await userEvent.click(remove);
+    expect(confirm).toHaveBeenLastCalledWith("Rimuovere questa nuotata dal feed? Il post sparisce per tutti.");
+    expect(state.toggleShareCalls).toEqual([{ activityId: 5, share: false }]);
+
+    await state.toggleShareOptions.onSuccess(undefined, { activityId: 5, share: false });
+    expect(state.invalidateGet).toHaveBeenCalledWith({ id: 5 });
+    expect(state.invalidateList).toHaveBeenCalled();
+    expect(state.invalidateFeed).toHaveBeenCalled();
+    expect(state.invalidateUnshared).toHaveBeenCalled();
+    // The post page and «Condividi l'ultima nuotata» do not keep showing the removed post.
+    expect(state.invalidatePostById).toHaveBeenCalled();
+    expect(state.invalidateLatestSwim).toHaveBeenCalled();
+    confirm.mockRestore();
   });
 
   it("«Coach AI» is a labelled link to the coach, not to a session it would not analyse", () => {

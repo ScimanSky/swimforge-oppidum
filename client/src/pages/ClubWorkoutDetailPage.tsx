@@ -5,15 +5,16 @@
 
 import { useId, useMemo } from "react";
 import { useRoute } from "wouter";
-import { CalendarDays, CheckCircle2, Clock3, Printer, Ruler } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, Printer, Ruler, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
 import { clubAccess } from "@/lib/club-access";
 import { formatSessionDay, planFact } from "@/lib/club-workouts";
-import { NO_VALUE } from "@/lib/format";
+import { NO_VALUE, formatTimeAgo, getInitials } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
@@ -35,12 +36,31 @@ export default function ClubWorkoutDetailPage() {
     { clubId, workoutId: hasValidWorkoutId ? workoutId : 0, source: "club_workout_detail_page" },
     { enabled: match && Number.isFinite(clubId) && hasValidWorkoutId, retry: 1, refetchOnWindowFocus: false }
   );
+  const isMember = clubAccess(clubQuery) === "member";
+  const completionQuery = trpc.community.clubs.workouts.completion.useQuery(
+    { clubId, workoutId: hasValidWorkoutId ? workoutId : 0 },
+    { enabled: match && isMember && hasValidWorkoutId && Number.isFinite(clubId), retry: 1 }
+  );
+  const utils = trpc.useUtils();
   const markCompletedMutation = trpc.community.clubs.workouts.markCompleted.useMutation({
-    onSuccess: () => {
-      toast.success("Allenamento segnato come completato.");
+    onSuccess: async (data, vars) => {
+      // The answer is the new state: the button changes at once (and keeps the focus).
+      utils.community.clubs.workouts.completion.setData(
+        { clubId, workoutId },
+        { completed: data.completed, completedAt: data.completedAt, coach: data.coach }
+      );
+      await utils.community.clubs.workouts.completion.invalidate({ clubId, workoutId });
+      toast.success(vars.completed === false ? "Completamento annullato." : "Allenamento segnato come completato.");
     },
-    onError: (error) => {
-      toast.error(errorToastMessage(error, "Non riesco a segnare l'allenamento come completato."));
+    onError: (error, vars) => {
+      toast.error(
+        errorToastMessage(
+          error,
+          vars.completed === false
+            ? "Non riesco ad annullare il completamento."
+            : "Non riesco a segnare l'allenamento come completato."
+        )
+      );
     },
   });
 
@@ -52,14 +72,12 @@ export default function ClubWorkoutDetailPage() {
     window.print();
   };
 
-  const handleMarkCompleted = () => {
+  const setCompleted = (completed: boolean) => {
     if (!hasValidWorkoutId) return;
-    markCompletedMutation.mutate({
-      clubId,
-      workoutId,
-      completionStatus: "completed",
-    });
+    markCompletedMutation.mutate({ clubId, workoutId, completed });
   };
+  const completion = completionQuery.data;
+  const completionPending = markCompletedMutation.isPending || completionQuery.isPending;
 
   if (!match || !Number.isFinite(clubId)) return null;
 
@@ -255,21 +273,71 @@ export default function ClubWorkoutDetailPage() {
             <p className="mt-3 text-sm text-foreground workout-print-description">{String(detailPlan?.description)}</p>
           ) : null}
 
-          <div className="mt-4 flex flex-wrap gap-2 workout-print-hide">
+          <div className="mt-4 flex flex-wrap items-center gap-2 workout-print-hide">
+            {/* Announced when it changes; empty until the athlete has done it. */}
+            <p role="status" className="inline-flex items-center gap-1.5 text-sm font-semibold text-success empty:hidden">
+              {completion?.completed ? (
+                <>
+                  <CheckCircle2 className="size-4" aria-hidden />
+                  {completion.completedAt ? `Completato ${formatTimeAgo(completion.completedAt)}` : "Completato"}
+                </>
+              ) : null}
+            </p>
+            {/* One button that changes label, so the focus stays on it after the tap; while saving
+                it is aria-disabled, not disabled (a disabled button would drop the focus). */}
             <Button
               type="button"
               size="sm"
-              onClick={handleMarkCompleted}
-              disabled={markCompletedMutation.isPending}
+              variant={completion?.completed ? "ghost" : "default"}
+              onClick={() => {
+                if (completionPending) return;
+                setCompleted(!completion?.completed);
+              }}
+              aria-disabled={completionPending || undefined}
+              className={completionPending ? "opacity-50" : undefined}
             >
-              <CheckCircle2 aria-hidden />
-              {markCompletedMutation.isPending ? "Salvataggio…" : "Segna completato"}
+              {completion?.completed ? <Undo2 aria-hidden /> : <CheckCircle2 aria-hidden />}
+              {markCompletedMutation.isPending
+                ? "Salvataggio…"
+                : completion?.completed
+                  ? "Annulla completamento"
+                  : "Segna completato"}
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={handlePrintWorkout}>
               <Printer aria-hidden />
               Stampa
             </Button>
           </div>
+
+          {completion?.coach ? (
+            <section
+              aria-labelledby={`${titleId}-done`}
+              className="mt-4 border-t border-border pt-4 workout-print-hide"
+            >
+              <h3 id={`${titleId}-done`} className="text-[17px] font-bold">
+                Fatto da {completion.coach.completedCount} su {completion.coach.memberCount}
+              </h3>
+              {completion.coach.members.length > 0 ? (
+                <ul className="mt-2 space-y-2">
+                  {completion.coach.members.map((member) => {
+                    const name = member.name || member.username || "Nuotatore";
+                    return (
+                      <li key={member.userId} className="flex items-center gap-3">
+                        <Avatar className="size-9">
+                          <AvatarImage src={member.avatarUrl || undefined} alt="" />
+                          <AvatarFallback className="text-xs font-semibold">{getInitials(name)}</AvatarFallback>
+                        </Avatar>
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</span>
+                        <span className="text-sm text-muted-foreground">{formatTimeAgo(member.completedAt)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">Nessuno l'ha ancora segnato come completato.</p>
+              )}
+            </section>
+          ) : null}
 
           {blocks.length > 0 ? (
             blocks.map((block: any, blockIndex: number) => (

@@ -11,7 +11,6 @@ vi.mock("@/lib/trpc", () => ({
     auth: {
       me: { useQuery: () => ({ data: { id: 1, name: "Mario Rossi", role: "user" } }) },
       logout: { useMutation: () => ({ mutateAsync: vi.fn() }) },
-      heartbeat: { useMutation: () => ({ mutate: vi.fn() }) },
     },
     profile: { get: { useQuery: () => ({ data: { avatarUrl: null } }) } },
   },

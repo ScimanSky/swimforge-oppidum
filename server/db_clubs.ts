@@ -2,7 +2,6 @@ import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, ilike, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getDb } from "./db";
-import { ensureUserPresenceSchema, getOnlineIntervalSql } from "./user_presence";
 import { deleteClubRows } from "./account_clubs";
 import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
 
@@ -157,7 +156,6 @@ export async function getClubMemberRole(userId: number, clubId: number) {
 export async function getClubFeed(userId: number, clubId: number, limit = 20) {
   const db = await getDb();
   if (!db) return [];
-  await ensureUserPresenceSchema();
 
   const result = await db.execute(sql`
     SELECT
@@ -169,17 +167,11 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
       p.media_url,
       p.media_urls,
       p.tagged_user_ids,
-      p.hashtags,
       p.visibility,
       p.created_at,
       u.name AS user_name,
       sp.username AS user_username,
       sp.avatar_url AS user_avatar,
-      EXISTS(
-        SELECT 1 FROM user_presence up
-        WHERE up.user_id = p.user_id
-          AND up.last_seen_at >= ${getOnlineIntervalSql()}
-      ) AS user_is_online,
       a.distance_meters AS activity_distance_meters,
       a.duration_seconds AS activity_duration_seconds,
       a.activity_date AS activity_date,
@@ -237,7 +229,6 @@ export async function createClubPost(
     mediaUrl?: string | null;
     mediaUrls?: string[] | null;
     taggedUserIds?: number[] | null;
-    hashtags?: string[] | null;
   }
 ) {
   const db = await getDb();
@@ -266,7 +257,6 @@ export async function createClubPost(
       mediaUrl: input.mediaUrl ?? null,
       mediaUrls: input.mediaUrls ?? [],
       taggedUserIds: input.taggedUserIds ?? [],
-      hashtags: input.hashtags ?? [],
       visibility: "public",
       isDeleted: false,
       createdAt: new Date(),
@@ -519,7 +509,12 @@ export async function unbanMember(actorId: number, clubId: number, userId: numbe
   return { unbanned: true };
 }
 
-export async function updateMemberRole(actorId: number, clubId: number, userId: number, role: "member" | "moderator" | "admin") {
+/** Roles the owner can assign; «owner» is never assigned. */
+export type AssignableClubRole = "member" | "coach" | "moderator" | "admin";
+/** Roles an invite can carry; anything above «member» needs an owner or admin invite. */
+export type InviteClubRole = "member" | "coach" | "moderator";
+
+export async function updateMemberRole(actorId: number, clubId: number, userId: number, role: AssignableClubRole) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
@@ -596,7 +591,7 @@ export async function listClubInvites(actorId: number, clubId: number) {
   return result.rows;
 }
 
-export async function createClubInvite(actorId: number, clubId: number, input: { role?: "member" | "moderator"; maxUses?: number; expiresAt?: Date | null }) {
+export async function createClubInvite(actorId: number, clubId: number, input: { role?: InviteClubRole; maxUses?: number; expiresAt?: Date | null }) {
   const db = await getDb();
   if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
@@ -605,7 +600,8 @@ export async function createClubInvite(actorId: number, clubId: number, input: {
     throw new Error("Forbidden");
   }
 
-  if (input.role === "moderator" && actor.role !== "owner" && actor.role !== "admin") {
+  // A moderator invites members only: coach and moderator links come from owner or admin.
+  if (input.role && input.role !== "member" && actor.role !== "owner" && actor.role !== "admin") {
     throw new Error("Forbidden");
   }
 
@@ -620,7 +616,8 @@ export async function createClubInvite(actorId: number, clubId: number, input: {
       code,
       role: input.role ?? "member",
       status: "active",
-      maxUses: input.maxUses ?? 1,
+      // A coach or moderator link gives a role: it works once, whatever the client asked.
+      maxUses: input.role && input.role !== "member" ? 1 : (input.maxUses ?? 1),
       usedCount: 0,
       expiresAt: input.expiresAt ?? null,
       createdAt: new Date(),
@@ -790,12 +787,14 @@ export async function getClubWeeklyStats(clubId: number) {
         SELECT COUNT(*)::int
         FROM social_posts p
         WHERE p.club_id = ${clubId}
+          AND p.is_deleted = false
           AND p.created_at >= ${oneWeekAgo.toISOString()}
       ), 0) AS posts_this_week,
       COALESCE((
         SELECT COUNT(DISTINCT p.user_id)::int
         FROM social_posts p
         WHERE p.club_id = ${clubId}
+          AND p.is_deleted = false
           AND p.created_at >= ${oneWeekAgo.toISOString()}
       ), 0) AS active_members,
       COALESCE((

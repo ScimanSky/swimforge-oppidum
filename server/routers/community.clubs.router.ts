@@ -1,10 +1,8 @@
+import { CLUB_POST_CONTENT_MAX_LENGTH } from "@shared/const";
 import { ENV } from "../_core/env";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import {
-  awardActionXp,
   detectImageType,
-  invalidateLeaderboardCache,
-  invalidateUserCache,
   logger,
   protectedProcedure,
   router,
@@ -12,6 +10,7 @@ import {
   z,
 } from "./_shared";
 import { trackProductEvent } from "../product_analytics";
+import { notifyMentionedUsers, resolveMentionedUserIds } from "../lib/mentions";
 import type { ClubAnnouncementInsert, ClubEventInsert } from "./_shared";
 
 const ROUTE_GEOJSON_SCHEMA = z.object({
@@ -43,22 +42,12 @@ const CLUB_POOL_WORKOUT_DIRECTIVES_SCHEMA = z.object({
     notes: z.string().max(1000).optional().nullable(),
 });
 
-type NotifyTaggedUsersInput = {
-  authorUserId: number;
-  taggedUserIds: number[];
-  postId: number;
-  clubId?: number | null;
-};
-
 type CommunityClubsDeps = {
   requireClubMemberRole: (userId: number, clubId: number) => Promise<{ role: string; status: string } | { role: string }>;
   requireClubStaffRole: (userId: number, clubId: number) => Promise<unknown>;
   requireClubReadable: (userId: number, clubId: number) => Promise<unknown>;
   normalizeExternalWebsiteUrl: (raw?: string | null) => string | null;
   normalizeMediaUrls: (mediaUrls?: string[] | null, mediaUrl?: string | null) => string[];
-  normalizeTaggedUserIds: (authorUserId: number, taggedUserIds?: number[] | null) => number[];
-  normalizeHashtags: (content?: string | null, hashtags?: string[] | null) => string[];
-  notifyTaggedUsers: (input: NotifyTaggedUsersInput) => Promise<void>;
   routeDistanceMeters: (routeGeoJson?: { coordinates: Array<[number, number]> } | null) => number | null;
   isClubStaffRole: (role: string) => boolean;
 };
@@ -70,9 +59,6 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
     requireClubReadable,
     normalizeExternalWebsiteUrl,
     normalizeMediaUrls,
-    normalizeTaggedUserIds,
-    normalizeHashtags,
-    notifyTaggedUsers,
     routeDistanceMeters,
     isClubStaffRole,
   } = deps;
@@ -286,7 +272,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
         createInvite: protectedProcedure
             .input(z.object({
                 clubId: z.number(),
-                role: z.enum(["member", "moderator"]).optional(),
+                role: z.enum(["member", "coach", "moderator"]).optional(),
                 maxUses: z.number().min(1).max(100).optional(),
                 expiresAt: z.date().optional().nullable(),
             }))
@@ -337,11 +323,11 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
         createPost: protectedProcedure
             .input(z.object({
                 clubId: z.number(),
-                content: z.string().max(1000).optional().nullable(),
+                content: z.string().max(CLUB_POST_CONTENT_MAX_LENGTH).optional().nullable(),
                 mediaUrl: z.string().url().optional().nullable(),
                 mediaUrls: z.array(z.string().url()).max(6).optional(),
-                taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
-                hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
+                /** Users picked after «@» in the composer; kept only if still written in the text. */
+                taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
             }))
             .mutation(async ({ ctx, input }) => {
                 const { getClubById, createClubPost } = await import("../db_clubs");
@@ -357,22 +343,20 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 }
                 const content = input.content?.trim() ?? null;
                 const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
-                const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
-                const hashtags = normalizeHashtags(content, input.hashtags);
                 if (!content && mediaUrls.length === 0) {
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
                 }
+                const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, input.taggedUserIds);
                 const postId = await createClubPost(ctx.user.id, input.clubId, {
                     content,
                     mediaUrl: mediaUrls[0] ?? null,
                     mediaUrls,
                     taggedUserIds,
-                    hashtags,
                 });
                 if (postId) {
-                    await notifyTaggedUsers({
+                    await notifyMentionedUsers({
                         authorUserId: ctx.user.id,
-                        taggedUserIds,
+                        mentionedUserIds: taggedUserIds,
                         postId,
                         clubId: input.clubId,
                     });
@@ -388,16 +372,8 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         },
                     });
                 }
-                const actionXp = await awardActionXp({
-                    userId: ctx.user.id,
-                    actionType: "club_post",
-                    entityId: Number(postId ?? input.clubId),
-                });
-                if (actionXp.awardedXp > 0) {
-                    await invalidateUserCache(String(ctx.user.id));
-                    await invalidateLeaderboardCache();
-                }
-                return { success: true, postId, actionXp };
+                // XP comes only from swimming: a club post gives none.
+                return { success: true, postId };
             }),
 
         update: protectedProcedure
@@ -475,7 +451,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             }),
 
         updateMemberRole: protectedProcedure
-            .input(z.object({ clubId: z.number(), userId: z.number(), role: z.enum(["member", "moderator", "admin"]) }))
+            .input(z.object({ clubId: z.number(), userId: z.number(), role: z.enum(["member", "coach", "moderator", "admin"]) }))
             .mutation(async ({ ctx, input }) => {
                 const { updateMemberRole } = await import("../db_clubs");
                 return updateMemberRole(ctx.user.id, input.clubId, input.userId, input.role);
@@ -1048,37 +1024,72 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     }
                 }),
 
-            markCompleted: protectedProcedure
-                .input(z.object({
-                    clubId: z.number(),
-                    workoutId: z.number(),
-                    completionStatus: z.enum(["completed", "partial", "skipped"]).optional(),
-                }))
-                .mutation(async ({ ctx, input }) => {
-                    const { getPublishedClubWorkoutById } = await import("../db_club_workouts");
+            /** The athlete's «Segna completato»; staff and coaches also get «fatto da N su M». */
+            completion: protectedProcedure
+                .input(z.object({ clubId: z.number(), workoutId: z.number() }))
+                .query(async ({ ctx, input }) => {
+                    const { getClubWorkoutCompletion } = await import("../db_club_workouts");
                     try {
-                        const workout = await getPublishedClubWorkoutById({
+                        return await getClubWorkoutCompletion({
                             userId: ctx.user.id,
                             clubId: input.clubId,
                             workoutId: input.workoutId,
                         });
-                        await trackProductEvent({
-                            userId: ctx.user.id,
-                            eventName: "club_workout_complete",
-                            source: "club_workout_detail",
-                            entityType: "club_workout",
-                            entityId: workout.id,
-                            metadata: {
-                                clubId: input.clubId,
-                                status: input.completionStatus ?? "completed",
-                            },
-                        });
-                        return { success: true, workoutId: workout.id };
                     } catch (error) {
-                        const message = error instanceof Error ? error.message : "Impossibile registrare completamento workout";
+                        const message = error instanceof Error ? error.message : "";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
-                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND" });
-                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND", message: "Allenamento non trovato." });
+                        logger.error("[club_workouts] completion read failed", {
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                            error: message || String(error),
+                        });
+                        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Impossibile leggere il completamento. Riprova." });
+                    }
+                }),
+
+            markCompleted: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    workoutId: z.number(),
+                    // Older app builds send it; only «completed» is stored.
+                    completionStatus: z.enum(["completed", "partial", "skipped"]).optional(),
+                    completed: z.boolean().optional(),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    const { setClubWorkoutCompletion } = await import("../db_club_workouts");
+                    const completed = input.completed ?? (input.completionStatus ?? "completed") === "completed";
+                    try {
+                        const state = await setClubWorkoutCompletion({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                            completed,
+                        });
+                        if (completed) {
+                            await trackProductEvent({
+                                userId: ctx.user.id,
+                                eventName: "club_workout_complete",
+                                source: "club_workout_detail",
+                                entityType: "club_workout",
+                                entityId: input.workoutId,
+                                metadata: {
+                                    clubId: input.clubId,
+                                    status: "completed",
+                                },
+                            });
+                        }
+                        return { success: true, workoutId: input.workoutId, ...state };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND", message: "Allenamento non trovato." });
+                        logger.error("[club_workouts] completion write failed", {
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                            error: message || String(error),
+                        });
+                        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Impossibile salvare il completamento. Riprova." });
                     }
                 }),
 
@@ -1841,19 +1852,8 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         userId: ctx.user.id,
                         status: input.status,
                     });
-                    let actionXp = null;
-                    if (input.status === "going" || input.status === "maybe") {
-                        actionXp = await awardActionXp({
-                            userId: ctx.user.id,
-                            actionType: "rsvp",
-                            entityId: input.eventId,
-                        });
-                        if (actionXp.awardedXp > 0) {
-                            await invalidateUserCache(String(ctx.user.id));
-                            await invalidateLeaderboardCache();
-                        }
-                    }
-                    return { success: true, attendee, actionXp };
+                    // XP comes only from swimming: an RSVP gives none.
+                    return { success: true, attendee };
                 }),
 
             attendees: protectedProcedure

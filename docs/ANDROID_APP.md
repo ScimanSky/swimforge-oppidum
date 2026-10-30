@@ -114,7 +114,6 @@ all'app solo dopo gli App Links verificati (fase successiva).
 ## Limiti noti
 
 - App Links https non ancora verificati: i link del sito si aprono nel browser.
-- Collegamento Strava non disponibile nell'app (si usa il sito); rinviato a una fase successiva.
 - L'app punta solo alla produzione; nessun selettore di ambiente.
 - Solo APK debug; keystore di rilascio e Play Console sono fasi successive.
 

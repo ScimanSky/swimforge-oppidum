@@ -440,6 +440,47 @@ async function insertDirectMessage(params: {
   }
 }
 
+type DirectMessageType = "text" | "forward_post"
+
+/** The stored type: a forwarded post, else plain text (also for anything unknown). */
+function toMessageType(value: unknown): DirectMessageType {
+  return value === "forward_post" ? "forward_post" : "text"
+}
+
+/** The stored jsonb metadata as an object (a JSON string is parsed), else null. */
+function toMessageMetadata(value: unknown): Record<string, unknown> | null {
+  let parsed = value
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      return null
+    }
+  }
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null
+}
+
+/** One `direct_messages` row (aliased in camelCase) as the client's message. */
+function toDirectMessage(row: any) {
+  return {
+    id: Number(row.id),
+    senderId: Number(row.senderId),
+    receiverId: Number(row.receiverId),
+    content: String(row.content ?? ""),
+    messageType: toMessageType(row.messageType),
+    metadata: toMessageMetadata(row.metadata),
+    isRead: Boolean(row.isRead),
+    readAt: row.readAt ? new Date(row.readAt) : null,
+    createdAt: row.createdAt ? new Date(row.createdAt) : new Date(0),
+  }
+}
+
+/** Name, else username, else «Utente #id». */
+function displayName(id: number, name: unknown, username: unknown) {
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "")
+  return text(name) || text(username) || `Utente #${id}`
+}
+
 /**
  * Ottiene conversazione tra due utenti
  */
@@ -453,14 +494,14 @@ export async function getConversation(params: {
   const normalizedLimit = Math.max(1, Math.min(params.limit ?? 50, 100))
   const normalizedOffset = Math.max(0, params.offset ?? 0)
 
-  // We intentionally avoid selecting advanced DM columns here to keep
-  // conversation loading resilient even if production schema lags behind.
   const result = await db.execute(sql`
     SELECT
       dm.id,
       dm.sender_id AS "senderId",
       dm.receiver_id AS "receiverId",
       dm.content,
+      dm.message_type AS "messageType",
+      dm.metadata,
       dm.is_read AS "isRead",
       dm.read_at AS "readAt",
       dm.created_at AS "createdAt",
@@ -475,36 +516,19 @@ export async function getConversation(params: {
       (dm.sender_id = ${params.userId1} AND dm.receiver_id = ${params.userId2})
       OR
       (dm.sender_id = ${params.userId2} AND dm.receiver_id = ${params.userId1})
-    ORDER BY dm.created_at DESC
+    ORDER BY dm.created_at DESC, dm.id DESC
     LIMIT ${normalizedLimit}
     OFFSET ${normalizedOffset}
   `)
 
-  const messages = result.rows.map((row: any) => {
-    const senderDisplayName =
-      (typeof row.userName === "string" && row.userName.trim().length > 0 ? row.userName.trim() : null) ||
-      (typeof row.userUsername === "string" && row.userUsername.trim().length > 0 ? row.userUsername.trim() : null) ||
-      `Utente #${row.userId}`
-
-    return {
-      message: {
-        id: Number(row.id),
-        senderId: Number(row.senderId),
-        receiverId: Number(row.receiverId),
-        content: String(row.content ?? ""),
-        messageType: "text" as "text" | "forward_post",
-        metadata: null,
-        isRead: Boolean(row.isRead),
-        readAt: row.readAt ? new Date(row.readAt) : null,
-        createdAt: row.createdAt ? new Date(row.createdAt) : new Date(0),
-      },
-      sender: {
-        id: Number(row.userId),
-        username: senderDisplayName,
-        profilePicture: row.profilePicture ?? null,
-      },
-    }
-  })
+  const messages = result.rows.map((row: any) => ({
+    message: toDirectMessage(row),
+    sender: {
+      id: Number(row.userId),
+      username: displayName(Number(row.userId), row.userName, row.userUsername),
+      profilePicture: row.profilePicture ?? null,
+    },
+  }))
 
   return messages.reverse() // Ordine cronologico
 }
@@ -531,111 +555,65 @@ export async function markMessagesAsRead(params: {
 }
 
 /**
- * Ottiene elenco conversazioni recenti di un utente
+ * The conversation list, in one query: the latest message with each person (newest first) and
+ * how many of theirs are still unread.
  */
 export async function getRecentConversations(userId: number, limit: number = 20) {
   const db = await requireDb()
   const normalizedLimit = Math.max(1, Math.min(limit, 50))
-  const scanLimit = Math.max(200, normalizedLimit * 80)
 
-  // NOTE:
-  // We intentionally avoid complex DISTINCT ON / CTE SQL here because some
-  // production environments were failing this endpoint with 500.
-  // We fetch recent messages ordered by createdAt and reduce in application code.
-  const recentMessages = await db
-    .select({
-      id: directMessages.id,
-      senderId: directMessages.senderId,
-      receiverId: directMessages.receiverId,
-      content: directMessages.content,
-      isRead: directMessages.isRead,
-      readAt: directMessages.readAt,
-      createdAt: directMessages.createdAt,
-    })
-    .from(directMessages)
-    .where(or(eq(directMessages.senderId, userId), eq(directMessages.receiverId, userId)))
-    .orderBy(desc(directMessages.createdAt))
-    .limit(scanLimit)
+  const result = await db.execute(sql`
+    WITH latest AS (
+      SELECT DISTINCT ON (other_user_id) *
+      FROM (
+        SELECT
+          dm.*,
+          CASE WHEN dm.sender_id = ${userId} THEN dm.receiver_id ELSE dm.sender_id END AS other_user_id
+        FROM direct_messages dm
+        WHERE dm.sender_id = ${userId} OR dm.receiver_id = ${userId}
+      ) mine
+      ORDER BY other_user_id, created_at DESC, id DESC
+    )
+    SELECT
+      latest.id,
+      latest.sender_id AS "senderId",
+      latest.receiver_id AS "receiverId",
+      latest.content,
+      latest.message_type AS "messageType",
+      latest.metadata,
+      latest.is_read AS "isRead",
+      latest.read_at AS "readAt",
+      latest.created_at AS "createdAt",
+      latest.other_user_id AS "otherUserId",
+      u.name AS "otherName",
+      sp.username AS "otherUsername",
+      sp.avatar_url AS "otherAvatarUrl",
+      (
+        SELECT count(*)::int
+        FROM direct_messages unread
+        WHERE unread.receiver_id = ${userId}
+          AND unread.sender_id = latest.other_user_id
+          AND unread.is_read = false
+      ) AS "unreadCount"
+    FROM latest
+    LEFT JOIN users u ON u.id = latest.other_user_id
+    LEFT JOIN swimmer_profiles sp ON sp.user_id = latest.other_user_id
+    ORDER BY latest.created_at DESC, latest.id DESC
+    LIMIT ${normalizedLimit}
+  `)
 
-  const unreadRows = await db
-    .select({
-      otherUserId: directMessages.senderId,
-      unreadCount: sql<number>`count(*)`,
-    })
-    .from(directMessages)
-    .where(and(eq(directMessages.receiverId, userId), eq(directMessages.isRead, false)))
-    .groupBy(directMessages.senderId)
-
-  const unreadByUserId = new Map<number, number>(
-    unreadRows.map((row) => [Number(row.otherUserId), Number(row.unreadCount ?? 0)]),
-  )
-
-  const latestByOtherUser = new Map<number, (typeof recentMessages)[number]>()
-  for (const message of recentMessages) {
-    const otherUserId = Number(message.senderId === userId ? message.receiverId : message.senderId)
-    if (!otherUserId || latestByOtherUser.has(otherUserId)) continue
-    latestByOtherUser.set(otherUserId, message)
-    if (latestByOtherUser.size >= normalizedLimit) break
-  }
-
-  const otherUserIds = Array.from(latestByOtherUser.keys())
-  const userRows =
-    otherUserIds.length > 0
-      ? await db
-          .select({
-            id: users.id,
-            name: users.name,
-            username: swimmerProfiles.username,
-            profilePicture: swimmerProfiles.avatarUrl,
-          })
-          .from(users)
-          .leftJoin(swimmerProfiles, eq(users.id, swimmerProfiles.userId))
-          .where(inArray(users.id, otherUserIds))
-      : []
-
-  const usersById = new Map(
-    userRows.map((row) => [
-      Number(row.id),
-      {
-        name: row.name,
-        username: row.username,
-        profilePicture: row.profilePicture,
+  return result.rows.map((row: any) => {
+    const otherUserId = Number(row.otherUserId)
+    return {
+      lastMessage: toDirectMessage(row),
+      otherUser: {
+        id: otherUserId,
+        username: displayName(otherUserId, row.otherName, row.otherUsername),
+        profilePicture: row.otherAvatarUrl ?? null,
       },
-    ]),
-  )
-
-  return otherUserIds
-    .map((otherUserId) => {
-      const row = latestByOtherUser.get(otherUserId)
-      if (!row) return null
-      const user = usersById.get(otherUserId)
-      const displayName =
-        user?.name?.trim() ||
-        user?.username?.trim() ||
-        `Utente #${otherUserId}`
-
-      return {
-        lastMessage: {
-          id: Number(row.id),
-          senderId: Number(row.senderId),
-          receiverId: Number(row.receiverId),
-          content: String(row.content ?? ""),
-          messageType: "text" as "text" | "forward_post",
-          metadata: null,
-          isRead: Boolean(row.isRead),
-          readAt: row.readAt ? new Date(row.readAt) : null,
-          createdAt: row.createdAt ? new Date(row.createdAt) : new Date(0),
-        },
-        otherUser: {
-          id: Number(otherUserId),
-          username: displayName,
-          profilePicture: user?.profilePicture ?? null,
-        },
-        unreadCount: unreadByUserId.get(otherUserId) ?? 0,
-      }
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null)
-    .sort((a, b) => b.lastMessage.createdAt.getTime() - a.lastMessage.createdAt.getTime())
+      unreadCount: Math.max(0, Number(row.unreadCount) || 0),
+    }
+  })
 }
 
 /**

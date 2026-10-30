@@ -35,13 +35,13 @@ Non è stato nominato un Responsabile della protezione dei dati (DPO).
 - **Accesso con Google:** se scegli «Accedi con Google», Google ci comunica il tuo nome, la tua email e un identificativo del tuo account Google.
 - **Accettazione alla registrazione:** per creare l'account spunti due caselle, «Accetto i Termini di Servizio e la Privacy Policy» e «Dichiaro di avere almeno 14 anni». Con l'email le spunti nel modulo di registrazione: finché non confermi l'indirizzo, la tua accettazione resta salvata presso Supabase insieme alla registrazione. Con Google le spunti dopo l'accesso, prima che l'account SwimForge venga creato. Registriamo l'accettazione come descritto nella sezione 2.7 prima di aprire qualsiasi sessione: senza accettazione non ti facciamo entrare. Se con Google annulli, l'account SwimForge non viene creato, ma Supabase conserva il nome, l'email e l'identificativo Google ricevuti all'accesso: scrivici e li cancelliamo.
 - **Sessione:** quando accedi apriamo una sessione che dura fino a 30 giorni. Sul sito è il cookie `app_session_id`, nell'app Android un token salvato sul telefono.
-- **Date e presenza:** la data di creazione dell'account, quella dell'ultimo accesso e il momento in cui sei stato attivo l'ultima volta. Quest'ultimo serve a mostrare agli altri se sei online.
+- **Date:** la data di creazione dell'account e quella dell'ultimo accesso. Fino al 30 ottobre 2026 registravamo anche il momento in cui eri stato attivo l'ultima volta, per mostrare agli altri se eri online: non lo registriamo e non lo mostriamo più, e il dato già salvato viene cancellato con l'account.
 
 ### 2.2 Profilo
 
 I dati che scegli di inserire: foto del profilo e di copertina, username, biografia, località (testo libero), data di nascita, categoria master, stile e lunghezza della vasca preferiti. Ci sono anche le preferenze (unità di misura, lingua, fuso orario) e le impostazioni di notifica e di privacy.
 
-Dalle tue nuotate calcoliamo livello, XP, badge, record personali e statistiche settimanali. Conserviamo anche gli obiettivi che crei.
+Dalle tue nuotate calcoliamo livello, XP, badge, record personali e statistiche settimanali. Conserviamo anche gli obiettivi che crei. Dal 30 ottobre 2026 gli XP arrivano solo dal nuoto (oltre a badge e sfide vinte): quelli dati prima per commenti, splash, reazioni, partecipazioni agli eventi e post nei club sono stati tolti dal tuo totale e conservati a parte, collegati al tuo account.
 
 ### 2.3 Nuotate e dati di allenamento
 
@@ -67,9 +67,9 @@ Da questi dati e dalle nuotate calcoliamo metriche come passo soglia (CSS), zone
 
 ### 2.4 Contenuti social e club
 
-- **Post:** testo, foto, video, hashtag, persone taggate e l'eventuale nuotata collegata. Inoltre commenti, reazioni («splash»), chi segui e chi ti segue, i post che nascondi e le segnalazioni che invii.
+- **Post:** testo, foto, video, le persone che menzioni con «@» e l'eventuale nuotata collegata; i post meno recenti possono avere anche hashtag e persone taggate a parte. Chi menzioni riceve una notifica con il tuo nome, se può vedere il post. Inoltre commenti, reazioni («splash»), chi segui e chi ti segue, i post che nascondi e le segnalazioni che invii.
 - **Messaggi diretti**, compresi i post che inoltri in privato.
-- **Club:** iscrizione e ruolo, inviti, eventi (luogo, eventuali coordinate e percorso), partecipazioni, annunci, foto, video e PDF del club, allenamenti del club.
+- **Club:** iscrizione e ruolo, il club che scegli come «Club principale», inviti, eventi (luogo, eventuali coordinate e percorso), partecipazioni, annunci, foto, video e PDF del club, allenamenti del club e quelli che segni come completati, con data e ora.
 - **Gare e storico del club**, se il club usa queste funzioni: iscrizioni alle gare, tempi di iscrizione e risultati (nome dell'atleta, società, tempi, punteggi). I responsabili del club possono importarli anche da file o da siti pubblici di risultati.
 - **Notifiche nell'app** che ricevi.
 
@@ -166,10 +166,10 @@ Google tratta questi dati come nostro fornitore, per generare la risposta, secon
 
 ## 6. Chi può vedere i tuoi dati
 
-- **Altri utenti registrati:** il tuo profilo (nome, username, foto, copertina, biografia, località, livello, XP, numero di follower e di persone seguite). Puoi rendere il profilo non pubblico da **Impostazioni > Privacy**.
-- **Feed:** i post che pubblichi. Se condividi una nuotata, gli altri ne vedono distanza, durata, data, stile, tipo (vasca o acque libere), calorie, frequenza cardiaca media e SWOLF. Vicino al tuo nome può comparire il tuo club e l'indicazione «online».
+- **Altri utenti registrati:** il tuo profilo (nome, username, foto, copertina, biografia, località, club, livello, XP, numero di follower e di persone seguite). Puoi rendere il profilo non pubblico da **Impostazioni > Privacy**.
+- **Feed:** i post che pubblichi. Se condividi una nuotata, gli altri ne vedono distanza, durata, passo, data, stile, tipo (vasca o acque libere), calorie, frequenza cardiaca media, SWOLF e i record personali fatti in quella nuotata, con il tempo precedente. Vicino al tuo nome può comparire il tuo club: quello che scegli come «Club principale», altrimenti l'ultimo in cui sei entrato, e solo se chi guarda può vedere il club.
 - **Classifiche:** nome, foto, livello e XP sono visibili a tutti gli utenti. Per essere escluso dalle classifiche scrivici.
-- **Club:** iscritti e responsabili vedono i contenuti del club; i responsabili gestiscono iscrizioni ed eventi.
+- **Club:** iscritti e responsabili vedono i contenuti del club; i responsabili gestiscono iscrizioni ed eventi. I coach e i responsabili del club vedono chi ha segnato come completato un allenamento del club e quando.
 - **Messaggi diretti:** il destinatario. I messaggi non hanno la cifratura end-to-end.
 - **Foto, video e PDF** caricati hanno un indirizzo web diretto: chi ha il link può aprirli anche senza account.
 - **Il titolare**, come amministratore, può accedere ai dati per far funzionare il servizio, per l'assistenza e per gestire le segnalazioni.
@@ -236,8 +236,8 @@ Puoi eliminare l'account da **Impostazioni > Privacy > Dati e account > Elimina 
 - post, storie, commenti, reazioni e splash, chi segui e chi ti segue, post nascosti e segnalazioni che hai inviato. Con i tuoi post spariscono anche i commenti e le reazioni degli altri;
 - messaggi diretti, inviati e ricevuti: spariscono anche per l'altra persona;
 - notifiche;
-- iscrizioni ai club, partecipazioni agli eventi, annunci e foto, video e PDF che hai pubblicato nei club;
-- badge, XP, record, statistiche e obiettivi;
+- iscrizioni ai club, partecipazioni agli eventi, allenamenti del club segnati come completati, annunci e foto, video e PDF che hai pubblicato nei club;
+- badge, XP (compresi quelli delle azioni social conservati a parte), record, statistiche e obiettivi;
 - analisi e allenamenti generati dall'IA;
 - token Garmin nel database, consensi e token per le notifiche push;
 - gli eventi delle statistiche d'uso interne che riguardano te, il tuo profilo o i tuoi post, e il dato sulla tua presenza online.
@@ -266,7 +266,7 @@ Il GDPR ti riconosce questi diritti: accesso ai dati, rettifica, cancellazione, 
 
 Nelle impostazioni puoi:
 
-- **scaricare i tuoi dati:** dal sito swimforge.it, in **Impostazioni > Privacy > Dati e account > Esporta i dati**. Nell'app Android trovi un messaggio che ti rimanda al sito. Ottieni un file JSON con account, profilo, test CSS e zone di passo, nuotate (compresi i dati completi ricevuti da Garmin) con giri e vasche, record, statistiche settimanali, obiettivi, badge, XP, analisi delle nuotate, consigli e allenamenti generati dall'IA, post, storie, commenti, splash, reazioni, chi segui e chi ti segue, notifiche, messaggi diretti inviati e ricevuti, iscrizioni ai club, segnalazioni che hai inviato, post nascosti e consensi. Il file non contiene la chat con il coach, che è solo sul tuo dispositivo, né i token Garmin. Puoi scaricarlo al massimo 5 volte all'ora. Per il resto, per esempio i contenuti dei club oltre all'iscrizione o l'email Garmin collegata, scrivici;
+- **scaricare i tuoi dati:** dal sito swimforge.it, in **Impostazioni > Privacy > Dati e account > Esporta i dati**. Nell'app Android trovi un messaggio che ti rimanda al sito. Ottieni un file JSON con account, profilo, test CSS e zone di passo, nuotate (compresi i dati completi ricevuti da Garmin) con giri e vasche, record, statistiche settimanali, obiettivi, badge, XP (compresi quelli delle azioni social conservati a parte), analisi delle nuotate, consigli e allenamenti generati dall'IA, post, storie, commenti, splash, reazioni, chi segui e chi ti segue, notifiche, messaggi diretti inviati e ricevuti, iscrizioni ai club, allenamenti del club segnati come completati, segnalazioni che hai inviato, post nascosti e consensi. Il file non contiene la chat con il coach, che è solo sul tuo dispositivo, né i token Garmin. Puoi scaricarlo al massimo 5 volte all'ora. Per il resto, per esempio i contenuti dei club oltre all'iscrizione o l'email Garmin collegata, scrivici;
 - **correggere i dati del profilo:** **Impostazioni > Profilo**;
 - **dare o revocare i consensi:** **Impostazioni > Privacy > Consensi GDPR**. Termini di Servizio e Privacy Policy sono necessari per usare SwimForge;
 - **scegliere chi vede cosa:** **Impostazioni > Privacy** (profilo pubblico, inoltri privati);

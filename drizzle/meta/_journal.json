@@ -36,6 +36,13 @@
       "when": 1793355770723,
       "tag": "0036_keep_clubs_and_challenges_on_account_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793355830723,
+      "tag": "0037_add_club_workout_completions",
+      "breakpoints": true
     }
   ]
 }

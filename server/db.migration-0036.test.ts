@@ -27,10 +27,10 @@ const TARGETS = [
 ] as const;
 
 describe(`migration ${TAG}`, () => {
-  it("is the last entry of the drizzle journal, with a snapshot", () => {
+  it("is entry 36 of the drizzle journal, with a snapshot", () => {
     const journal = JSON.parse(fs.readFileSync(path.join(root, "drizzle", "meta", "_journal.json"), "utf8"));
-    const last = journal.entries[journal.entries.length - 1];
-    expect(last).toMatchObject({ idx: 36, tag: TAG, breakpoints: true });
+    const entry = journal.entries.find((item: { idx: number }) => item.idx === 36);
+    expect(entry).toMatchObject({ idx: 36, tag: TAG, breakpoints: true });
     const snapshot = JSON.parse(fs.readFileSync(path.join(root, "drizzle", "meta", "0036_snapshot.json"), "utf8"));
     const previous = JSON.parse(fs.readFileSync(path.join(root, "drizzle", "meta", "0035_snapshot.json"), "utf8"));
     expect(snapshot.prevId).toBe(previous.id);
