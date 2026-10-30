@@ -2,7 +2,6 @@ import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, ilike, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getDb } from "./db";
-import { ensureUserPresenceSchema, getOnlineIntervalSql } from "./user_presence";
 import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
 
 export type ClubScope = "all" | "mine";
@@ -156,7 +155,6 @@ export async function getClubMemberRole(userId: number, clubId: number) {
 export async function getClubFeed(userId: number, clubId: number, limit = 20) {
   const db = await getDb();
   if (!db) return [];
-  await ensureUserPresenceSchema();
 
   const result = await db.execute(sql`
     SELECT
@@ -174,11 +172,6 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
       u.name AS user_name,
       sp.username AS user_username,
       sp.avatar_url AS user_avatar,
-      EXISTS(
-        SELECT 1 FROM user_presence up
-        WHERE up.user_id = p.user_id
-          AND up.last_seen_at >= ${getOnlineIntervalSql()}
-      ) AS user_is_online,
       a.distance_meters AS activity_distance_meters,
       a.duration_seconds AS activity_duration_seconds,
       a.activity_date AS activity_date,

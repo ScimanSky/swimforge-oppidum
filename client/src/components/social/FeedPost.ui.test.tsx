@@ -99,6 +99,13 @@ describe("FeedPost Corsia", () => {
     expect(await screen.findByTestId("edit-post")).toHaveTextContent('{"postId":9}')
   })
 
+  it("nessun pallino «online» sull'avatar: la presenza non c'è più", () => {
+    // An old server could still send the flag: it is ignored.
+    renderPost({ ...activityPost, user_is_online: true } as FeedPostRecord)
+    const avatarLink = screen.getByRole("link", { name: "Profilo di Giulia Bianchi" })
+    expect(avatarLink.querySelector(".bg-success")).toBeNull()
+  })
+
   it("senza club: la fonte della nuotata", () => {
     renderPost({ ...activityPost, user_club_name: null })
     expect(screen.getByText("Garmin · 2h fa")).toBeInTheDocument()

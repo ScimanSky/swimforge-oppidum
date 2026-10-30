@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Column, is, sql, SQL } from "drizzle-orm";
+import { Column, is, SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
 // Endpoints that show other users (feed, comments, club members, DMs, public
@@ -43,10 +43,6 @@ const m = vi.hoisted(() => {
 });
 
 vi.mock("./db", () => ({ getDb: async () => m.db }));
-vi.mock("./user_presence", () => ({
-  ensureUserPresenceSchema: async () => {},
-  getOnlineIntervalSql: () => sql`now()`,
-}));
 
 function render(query: unknown): string {
   return dialect.sqlToQuery(query as SQL).sql;
@@ -103,6 +99,8 @@ describe("feed and comments", () => {
       const text = render(query);
       expect(text).not.toMatch(/email/i);
       expect(text).toMatch(/AS user_username/);
+      // No online presence: no green dot, no subquery per post.
+      expect(text).not.toMatch(/user_presence|user_is_online/);
     }
   });
 });
@@ -119,6 +117,8 @@ describe("clubs", () => {
       const text = render(query);
       expect(text).not.toMatch(/email/i);
       expect(text).toMatch(/AS user_username/);
+      // No online presence: no green dot, no subquery per post.
+      expect(text).not.toMatch(/user_presence|user_is_online/);
     }
   });
 });

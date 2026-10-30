@@ -15,7 +15,6 @@ import { ENV } from "../_core/env";
 import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
-import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
 import { activityCardSql, authorClubNameSql } from "../db_social";
 import { createCommunityClubsRouter } from "./community.clubs.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
@@ -224,7 +223,6 @@ export const communityRouter = router({
         .input(z.object({ postId: z.number() }))
         .query(async ({ ctx, input }) => {
             await requirePostReadable(ctx.user.id, input.postId);
-            await ensureUserPresenceSchema();
 
             const { getDb } = await import("../db");
             const { sql } = await import("drizzle-orm");
@@ -249,11 +247,6 @@ export const communityRouter = router({
                   sp.username AS user_username,
                   sp.avatar_url AS user_avatar,
                   ${authorClubNameSql(ctx.user.id)} AS user_club_name,
-                  EXISTS(
-                    SELECT 1 FROM user_presence up
-                    WHERE up.user_id = p.user_id
-                      AND up.last_seen_at >= ${getOnlineIntervalSql()}
-                  ) AS user_is_online,
                   a.distance_meters AS activity_distance_meters,
                   a.duration_seconds AS activity_duration_seconds,
                   a.activity_date AS activity_date,

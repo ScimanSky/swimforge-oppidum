@@ -38,7 +38,6 @@ interface FeedPostHeaderProps {
     activity_date?: string | null
     created_at: string
     user_level?: number | null
-    user_is_online?: boolean | null
   }
   isOwner: boolean
   isFollowing?: boolean
@@ -103,17 +102,11 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
 
   return (
     <div className="flex items-center gap-3 pb-1 pt-4">
-      <Link href={`/u/${post.user_id}`} aria-label={`Profilo di ${baseName}`} className="relative shrink-0">
+      <Link href={`/u/${post.user_id}`} aria-label={`Profilo di ${baseName}`} className="shrink-0">
         <Avatar className="size-11">
           <AvatarImage src={post.user_avatar || ""} alt="" />
           <AvatarFallback className="text-sm font-semibold">{initials}</AvatarFallback>
         </Avatar>
-        {post.user_is_online ? (
-          <span
-            className="absolute -left-0.5 -top-0.5 size-3 rounded-full border-2 border-background bg-success"
-            aria-hidden
-          />
-        ) : null}
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">

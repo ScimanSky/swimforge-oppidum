@@ -30,7 +30,6 @@ vi.mock("@/lib/trpc", () => ({
           },
         }),
       },
-      heartbeat: { useMutation: () => ({ mutate: vi.fn() }) },
     },
     profile: { get: { useQuery: () => ({ data: { avatarUrl: null } }) } },
     community: {

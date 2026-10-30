@@ -42,4 +42,11 @@ describe("deleteUserAccount", () => {
     const tables = m.deleteFromIfExists.mock.calls.map((call) => (call as unknown[])[1]);
     expect(tables).toContain("public.club_workout_completions");
   });
+
+  it("deletes the user's presence row (the table stays, nothing writes it any more)", async () => {
+    const { deleteUserAccount } = await import("./db");
+    await deleteUserAccount(9);
+    const tables = m.deleteFromIfExists.mock.calls.map((call) => (call as unknown[])[1]);
+    expect(tables).toContain("public.user_presence");
+  });
 });

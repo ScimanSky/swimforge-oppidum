@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import React, { Suspense, useCallback, useEffect, useState } from "react"
 import { useLocation } from "wouter"
 import { motion, useReducedMotion } from "framer-motion"
 
@@ -39,49 +39,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [railCreateMenuOpen, setRailCreateMenuOpen] = useState(false)
   const [latestSwimOpen, setLatestSwimOpen] = useState(false)
   const logoutMutation = trpc.auth.logout.useMutation()
-  const heartbeatMutation = trpc.auth.heartbeat.useMutation()
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 120_000 })
   const garminSync = useGarminQuickSync()
   const reduceMotion = useReducedMotion()
   const isAdmin = meQuery.data?.role === "admin"
-  const heartbeatPendingRef = useRef(false)
-  const heartbeatLastSentAtRef = useRef(0)
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof document === "undefined") return
-
-    const sendHeartbeat = () => {
-      if (document.visibilityState !== "visible") return
-      if (!meQuery.data?.id) return
-      if (heartbeatPendingRef.current) return
-      const now = Date.now()
-      if (now - heartbeatLastSentAtRef.current < 10_000) return
-      heartbeatPendingRef.current = true
-      heartbeatLastSentAtRef.current = now
-      heartbeatMutation.mutate(undefined, {
-        onSettled: () => {
-          heartbeatPendingRef.current = false
-        },
-        onError: () => {
-          // Presence updates are best-effort.
-        },
-      })
-    }
-
-    sendHeartbeat()
-    const intervalId = window.setInterval(sendHeartbeat, 60_000)
-    const onVisibilityOrFocus = () => sendHeartbeat()
-    document.addEventListener("visibilitychange", onVisibilityOrFocus)
-    window.addEventListener("focus", onVisibilityOrFocus)
-
-    return () => {
-      window.clearInterval(intervalId)
-      document.removeEventListener("visibilitychange", onVisibilityOrFocus)
-      window.removeEventListener("focus", onVisibilityOrFocus)
-    }
-  }, [heartbeatMutation.mutate, meQuery.data?.id])
-
   useEffect(() => {
     setMobileCreateMenuOpen(false)
     setRailCreateMenuOpen(false)

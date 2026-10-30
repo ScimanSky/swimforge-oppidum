@@ -11,7 +11,6 @@ import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { ensureRequiredLegalConsents } from "../consent";
-import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
 import type { User } from "../../drizzle/schema";
@@ -114,27 +113,10 @@ export const authRouter = router({
         }),
 
     logout: publicProcedure.mutation(async ({ ctx }) => {
-        if (ctx.user?.id) {
-            try {
-                await markUserOffline(ctx.user.id);
-            } catch {
-                // Non-blocking: logout should still succeed even if presence update fails.
-            }
-        }
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
         ctx.res.clearCookie(CSRF_COOKIE_NAME, { ...cookieOptions, httpOnly: false });
         return { success: true } as const;
-    }),
-
-    heartbeat: protectedProcedure.mutation(async ({ ctx }) => {
-        try {
-            await touchUserPresence(ctx.user.id);
-            return { ok: true } as const;
-        } catch {
-            // Presence is best-effort in production; never fail the client request.
-            return { ok: false } as const;
-        }
     }),
 
     // Sync Supabase OAuth user
