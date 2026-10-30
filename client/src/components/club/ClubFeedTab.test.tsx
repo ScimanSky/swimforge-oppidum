@@ -96,7 +96,8 @@ describe("ClubFeedTab (Corsia)", () => {
     expect(post.querySelector("p.whitespace-pre-wrap")).toHaveTextContent("Bella sessione");
     expect(within(post).getByText("Anna")).toBeTruthy();
     expect(within(post).getByRole("button", { name: "Commenti: 2" })).toBeTruthy();
-    expect(within(post).getByRole("button", { name: "Elimina post" })).toBeTruthy();
+    expect(within(post).getByRole("button", { name: /^Elimina il post di \w{3} \d+ \w{3} · \d\d:\d\d$/ })).toBeTruthy();
+    expect(within(post).getByRole("button", { name: /^Modifica il post di \w{3} \d+ \w{3} · \d\d:\d\d$/ })).toBeTruthy();
   });
 
   it("menzioni con «@» nel testo, senza campo «Tagga amici»; i post collegano le menzioni al profilo", async () => {

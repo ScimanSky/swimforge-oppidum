@@ -2,6 +2,7 @@
  * Club feed: composer and the club's posts (Corsia cards).
  */
 
+import { CLUB_POST_CONTENT_MAX_LENGTH } from "@shared/const";
 import { useId, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import {
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload";
 import { extractFirstUrl, LinkPreviewCard, renderSocialText } from "@/lib/social-content";
 import { pickedMentionIds, taggedUsersNotInText, type MentionUser } from "@/lib/mentions";
-import { formatTimeAgo } from "@/lib/format";
+import { NO_VALUE, formatSessionDate, formatTimeAgo } from "@/lib/format";
 
 interface ClubFeedTabProps {
   clubId: number;
@@ -290,6 +291,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
           onValueChange={setPostText}
           mentions={mentions}
           onMentionsChange={setMentions}
+          maxLength={CLUB_POST_CONTENT_MAX_LENGTH}
           className="min-h-[100px]"
         />
 
@@ -375,6 +377,10 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
             // Mentions are links in the text; people tagged apart (older posts) stay as chips.
             const taggedApartForPost = taggedUsersNotInText(post.content, taggedUsersForPost);
             const firstLinkForPost = post.content ? extractFirstUrl(post.content) : null;
+            // Each post's buttons say which post («Modifica il post di lun 26 ott · 10:47»).
+            const postWhen = formatSessionDate(post.created_at);
+            const postLabel = (action: string) =>
+              postWhen === NO_VALUE ? `${action} post` : `${action} il post di ${postWhen}`;
 
             return (
               <motion.div
@@ -399,7 +405,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label="Modifica post"
+                        aria-label={postLabel("Modifica")}
                         className="text-muted-foreground hover:text-foreground"
                         onClick={() => setEditingPostId(post.id)}
                       >
@@ -410,7 +416,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label="Elimina post"
+                        aria-label={postLabel("Elimina")}
                         className="text-muted-foreground hover:text-danger"
                         disabled={deletePostMutation.isPending && deletingPostId === post.id}
                         onClick={() => {
