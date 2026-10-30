@@ -33,6 +33,9 @@ export function ActivityShareActions({
         utils.activities.list.invalidate(),
         utils.community.feed.invalidate(),
         utils.community.unsharedActivities.invalidate(),
+        // The swim's post (its id is not known here) and «Condividi l'ultima nuotata».
+        utils.community.postById.invalidate(),
+        utils.community.latestSwim.invalidate(),
       ]);
       toast.success("Nuotata rimossa dal feed.");
     },

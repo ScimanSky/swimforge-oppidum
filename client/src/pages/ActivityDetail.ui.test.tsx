@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   invalidateList: vi.fn(),
   invalidateFeed: vi.fn(),
   invalidateUnshared: vi.fn(),
+  invalidatePostById: vi.fn(),
+  invalidateLatestSwim: vi.fn(),
   toggleShareCalls: [] as Array<{ activityId: number; share: boolean }>,
   toggleShareOptions: null as any,
 }));
@@ -57,6 +59,8 @@ vi.mock("@/lib/trpc", () => ({
       community: {
         feed: { invalidate: state.invalidateFeed },
         unsharedActivities: { invalidate: state.invalidateUnshared },
+        postById: { invalidate: state.invalidatePostById },
+        latestSwim: { invalidate: state.invalidateLatestSwim },
       },
     }),
   },
@@ -161,6 +165,8 @@ describe("ActivityDetail (Corsia)", () => {
     state.invalidateList.mockReset();
     state.invalidateFeed.mockReset();
     state.invalidateUnshared.mockReset();
+    state.invalidatePostById.mockReset();
+    state.invalidateLatestSwim.mockReset();
     state.toggleShareCalls = [];
     state.toggleShareOptions = null;
   });
@@ -292,6 +298,9 @@ describe("ActivityDetail (Corsia)", () => {
     expect(state.invalidateList).toHaveBeenCalled();
     expect(state.invalidateFeed).toHaveBeenCalled();
     expect(state.invalidateUnshared).toHaveBeenCalled();
+    // The post page and «Condividi l'ultima nuotata» do not keep showing the removed post.
+    expect(state.invalidatePostById).toHaveBeenCalled();
+    expect(state.invalidateLatestSwim).toHaveBeenCalled();
     confirm.mockRestore();
   });
 

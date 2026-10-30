@@ -11,19 +11,37 @@ import type { FeedPostRecord } from "./feed-types"
 const state = vi.hoisted(() => ({
   reactions: [] as Array<{ reactionType: string; count: number }>,
   userReaction: null as { reactionType: string } | null,
+  invalidated: [] as Array<[string, unknown]>,
+  deleteOptions: null as null | { onSuccess?: () => void },
 }))
 
 const { mutation } = vi.hoisted(() => ({
   mutation: () => ({ mutate: () => {}, isPending: false }),
 }))
 
-vi.mock("@/lib/trpc", () => ({
+vi.mock("@/lib/trpc", () => {
+  const cache = (name: string) => ({ invalidate: (input?: unknown) => state.invalidated.push([name, input]) })
+  return {
   trpc: {
-    useUtils: () => ({}),
+    useUtils: () => ({
+      community: {
+        feed: cache("feed"),
+        clubs: { feed: cache("clubs.feed") },
+        postById: cache("postById"),
+        unsharedActivities: cache("unsharedActivities"),
+        latestSwim: cache("latestSwim"),
+      },
+      activities: { list: cache("activities.list"), get: cache("activities.get") },
+    }),
     community: {
       users: { toggleFollow: { useMutation: mutation } },
       hidePost: { useMutation: mutation },
-      deletePost: { useMutation: mutation },
+      deletePost: {
+        useMutation: (options: { onSuccess?: () => void }) => {
+          state.deleteOptions = options
+          return { mutate: () => options.onSuccess?.(), isPending: false }
+        },
+      },
       reactions: {
         list: { useQuery: () => ({ data: state.reactions }) },
         userReaction: { useQuery: () => ({ data: state.userReaction }) },
@@ -33,7 +51,8 @@ vi.mock("@/lib/trpc", () => ({
       addComment: { useMutation: mutation },
     },
   },
-}))
+  }
+})
 
 vi.mock("./EditPostSheet", () => ({
   EditPostSheet: ({ postRef }: any) => <div data-testid="edit-post">{JSON.stringify(postRef)}</div>,
@@ -61,12 +80,14 @@ const activityPost: FeedPostRecord = {
   user_club_name: "Nuoto Oppidum",
 }
 
-function renderPost(post: FeedPostRecord, currentUserId = 1) {
-  return render(
-    <Router hook={memoryLocation({ path: "/home" }).hook}>
+function renderPost(post: FeedPostRecord, currentUserId = 1, path = "/home") {
+  const location = memoryLocation({ path, record: true })
+  const result = render(
+    <Router hook={location.hook}>
       <FeedPost post={post} currentUserId={currentUserId} autoplayVideos={false} />
     </Router>
   )
+  return { ...result, location }
 }
 
 describe("FeedPost Corsia", () => {
@@ -97,6 +118,37 @@ describe("FeedPost Corsia", () => {
     expect(screen.queryByRole("menuitem", { name: "Segnala" })).toBeNull()
     await userEvent.click(screen.getByRole("menuitem", { name: "Modifica" }))
     expect(await screen.findByTestId("edit-post")).toHaveTextContent('{"postId":9}')
+  })
+
+  it("eliminare un post aggiorna feed, pagina del post e nuotata; sulla pagina del post si torna al feed", async () => {
+    vi.useRealTimers()
+    state.invalidated = []
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true)
+    const { location } = renderPost(activityPost, 2, "/post/9")
+    await userEvent.click(screen.getByRole("button", { name: "Menu post" }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Elimina" }))
+    expect(state.invalidated).toEqual(
+      expect.arrayContaining([
+        ["feed", undefined],
+        ["postById", { postId: 9 }],
+        ["unsharedActivities", undefined],
+        ["latestSwim", undefined],
+        ["activities.get", { id: 41 }],
+      ]),
+    )
+    // Replaced, not pushed: «Indietro» does not open the deleted post again.
+    expect(location.history).toEqual(["/home"])
+    confirm.mockRestore()
+  })
+
+  it("eliminare dal feed resta sul feed", async () => {
+    vi.useRealTimers()
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true)
+    const { location } = renderPost(activityPost, 2, "/home")
+    await userEvent.click(screen.getByRole("button", { name: "Menu post" }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Elimina" }))
+    expect(location.history).toEqual(["/home"])
+    confirm.mockRestore()
   })
 
   it("nessun pallino «online» sull'avatar: la presenza non c'è più", () => {

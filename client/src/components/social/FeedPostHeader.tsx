@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { formatTimeAgo, getInitials } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
+import { errorToastMessage } from "@/lib/trpc-errors"
 import { toast } from "sonner"
 import { EditPostSheet } from "./EditPostSheet"
 
@@ -82,15 +83,21 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const deletePost = trpc.community.deletePost.useMutation({
     onSuccess: () => {
       toast.success("Post eliminato")
+      // On the post's own page there is nothing left to show: back to the feed (replacing the
+      // entry, so «Indietro» does not open the deleted post again).
+      if (location === `/post/${post.id}`) setLocation("/home", { replace: true })
       utils.community.feed.invalidate()
       utils.community.clubs.feed.invalidate()
+      utils.community.postById.invalidate({ postId: post.id })
       // A shared swim goes back to «Condividi».
       if (post.activity_id) {
         utils.activities.list.invalidate()
         utils.activities.get.invalidate({ id: post.activity_id })
+        utils.community.unsharedActivities.invalidate()
+        utils.community.latestSwim.invalidate()
       }
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error(errorToastMessage(err, "Non riesco a eliminare il post.")),
   })
 
   // «{club or source} · {time ago}» (Corsia feed): the club first, otherwise the sync source.
