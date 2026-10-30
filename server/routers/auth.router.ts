@@ -1,7 +1,7 @@
 import {
     publicProcedure, protectedProcedure, router, z, db,
     TRPCError, sdk, verifySupabaseAccessToken,
-    loginLimiter, registrationLimiter,
+    registrationLimiter,
     COOKIE_NAME, getSessionCookieOptions, issueCsrfCookie,
     applyRateLimit, sql, logger,
 } from "./_shared";
@@ -92,37 +92,6 @@ export const authRouter = router({
                 });
                 await db.deleteUserAccount(result.user.id).catch(() => null);
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: ACCEPTANCE_NOT_RECORDED_MESSAGE });
-            }
-
-            // Create session token
-            const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
-                name: result.user.name || "",
-                expiresInMs: ENV.sessionMaxAgeMs,
-                tokenVersion: result.user.sessionTokenVersion ?? 1,
-            });
-
-            const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
-            issueCsrfCookie(ctx.req, ctx.res);
-
-            return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
-        }),
-
-    // Login with email and password
-    login: publicProcedure
-        .input(z.object({
-            email: z.string().email(),
-            password: z.string().min(1, "Password is required"),
-        }))
-        .mutation(async ({ ctx, input }) => {
-            await applyRateLimit(loginLimiter, ctx.req, ctx.res);
-            const result = await db.loginUser(input.email, input.password);
-
-            if (!result.success || !result.user) {
-                throw new TRPCError({
-                    code: "UNAUTHORIZED",
-                    message: result.error || "Invalid credentials"
-                });
             }
 
             // Create session token

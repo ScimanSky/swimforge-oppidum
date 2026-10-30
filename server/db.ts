@@ -248,44 +248,6 @@ export async function registerUser(email: string, password: string, name?: strin
   }
 }
 
-// Login with email and password
-export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
-  }
-
-  try {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (result.length === 0) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    const user = result[0];
-    if (!user.passwordHash) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return { success: false, error: "Invalid email or password" };
-    }
-
-    // Update last signed in
-    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
-
-    return { success: true, user };
-  } catch (error) {
-    const { kind, message } = classifyAsyncError(error);
-    logger.error(`[Database] Failed to login user (${kind}): ${message}`, {
-      event: "auth:login_failed",
-      kind,
-      message,
-    });
-    return { success: false, error: "Login failed" };
-  }
-}
-
 // Get user by ID
 export async function getUserById(id: number): Promise<User | undefined> {
   const db = await getDb();
@@ -319,70 +281,6 @@ export async function updateUser(
   await db.update(users).set(updatePayload).where(eq(users.id, userId));
 }
 
-// Legacy: upsert user (for OAuth compatibility)
-export async function upsertUser(user: InsertUser): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    logger.warn("[Database] Cannot upsert user: database not available", {
-      event: "db:upsert_skipped",
-    });
-    return;
-  }
-
-  try {
-    await db.transaction(async (tx) => {
-      const values: InsertUser = { email: user.email || '' };
-      const updateSet: Record<string, unknown> = {};
-
-      if (user.openId) values.openId = user.openId;
-      if (user.name) {
-        values.name = user.name;
-        updateSet.name = user.name;
-      }
-      if (user.loginMethod) {
-        values.loginMethod = user.loginMethod;
-        updateSet.loginMethod = user.loginMethod;
-      }
-      if (user.lastSignedIn !== undefined) {
-        values.lastSignedIn = user.lastSignedIn;
-        updateSet.lastSignedIn = user.lastSignedIn;
-      }
-      if (user.role !== undefined) {
-        values.role = user.role;
-        updateSet.role = user.role;
-      }
-
-      if (!values.lastSignedIn) {
-        values.lastSignedIn = new Date();
-      }
-
-      if (Object.keys(updateSet).length === 0) {
-        updateSet.lastSignedIn = new Date();
-      }
-
-      const upserted = await tx.insert(users).values(values).onConflictDoUpdate({
-        target: users.email,
-        set: updateSet,
-      }).returning({ id: users.id });
-
-      const userId = upserted[0]?.id;
-      if (!userId) {
-        throw new Error("Failed to upsert user");
-      }
-
-      await tx.insert(swimmerProfiles).values({ userId }).onConflictDoNothing({
-        target: swimmerProfiles.userId,
-      });
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error(`[Database] Failed to upsert user: ${message}`, {
-      event: "db:upsert_failed",
-      message,
-    });
-    throw error;
-  }
-}
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
