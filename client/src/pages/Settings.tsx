@@ -143,18 +143,15 @@ const consentItems = [
   {
     type: "health_data_processing",
     title: "Trattamento dati salute",
-    description: "Necessario per frequenza cardiaca, VO2max, stress, calorie e sync completo Garmin/Strava.",
+    description: "Necessario per frequenza cardiaca, VO2max, stress, calorie e sync completo Garmin.",
   },
   {
     type: "garmin_sync",
     title: "Sincronizzazione Garmin",
     description: "Autorizza l'importazione e il trattamento dei dati da Garmin Connect.",
   },
-  {
-    type: "strava_sync",
-    title: "Sincronizzazione Strava",
-    description: "Autorizza l'importazione e il trattamento dei dati da Strava.",
-  },
+  // No «Sincronizzazione Strava»: Strava is gone. The server still accepts the strava_sync
+  // consent from old app builds.
   {
     type: "marketing_communications",
     title: "Comunicazioni marketing",

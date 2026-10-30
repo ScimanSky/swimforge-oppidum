@@ -217,6 +217,9 @@ describe("Settings (Corsia)", () => {
     expect(screen.getByRole("switch", { name: "Profilo pubblico" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Attività pubbliche" })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: "Sincronizzazione Garmin" })).toBeChecked();
+    // Strava is gone: no switch for its consent.
+    expect(screen.queryByRole("switch", { name: /Strava/ })).toBeNull();
+    expect(screen.queryByText(/Strava/)).toBeNull();
     expect(screen.getByRole("link", { name: "Apri la Privacy Policy" })).toHaveAttribute("href", "/privacy");
   });
 
