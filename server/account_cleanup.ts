@@ -22,8 +22,19 @@ import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 import type { SqlExecutor } from "./lib/relation-exists";
 import { withTimeout } from "./lib/with-timeout";
 import { logger } from "./middleware/logger";
+import { captureError } from "./middleware/rollbar-init";
 
 const log = logger.child({ component: "account_cleanup" });
+
+/**
+ * A part of an account deletion that did not complete (a media file, the Garmin session, the
+ * Supabase Auth user). The privacy policy promises it is finished by hand within 30 days, so it is
+ * logged at error level and sent to Rollbar: the logger itself forwards nothing to Rollbar.
+ */
+export function reportAccountCleanupFailure(event: string, message: string, context: Record<string, unknown>): void {
+  log.error(message, { event, ...context });
+  captureError(new Error(message), { event, ...context });
+}
 
 const PROVIDER_TIMEOUT_MS = 15_000;
 /** ImageKit answers 429 to bursts: a user with hundreds of club uploads is deleted 4 files at a time. */
@@ -322,13 +333,16 @@ async function runAll(
   const results = await settleWithConcurrency(tasks, concurrency);
   const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
   if (failures.length > 0) {
-    log.warn(`[Account cleanup] ${failures.length}/${tasks.length} ${provider} deletions failed`, {
-      event: "account:media_cleanup_partial_failure",
-      provider,
-      userId,
-      failedCount: failures.length,
-      messages: failures.slice(0, 5).map((failure) => String(failure.reason?.message ?? failure.reason)),
-    });
+    reportAccountCleanupFailure(
+      "account:media_cleanup_partial_failure",
+      `[Account cleanup] ${failures.length}/${tasks.length} ${provider} deletions failed`,
+      {
+        provider,
+        userId,
+        failedCount: failures.length,
+        messages: failures.slice(0, 5).map((failure) => String(failure.reason?.message ?? failure.reason)),
+      },
+    );
   }
   return { attempted: tasks.length, failed: failures.length };
 }
@@ -398,8 +412,7 @@ async function logoutGarmin(userId: number): Promise<AccountCleanupReport["garmi
     await withTimeout(logoutGarminService(userId), PROVIDER_TIMEOUT_MS, "garmin-service logout");
     return "logged_out";
   } catch (error) {
-    log.warn("[Account cleanup] Garmin service logout failed", {
-      event: "account:garmin_logout_failed",
+    reportAccountCleanupFailure("account:garmin_logout_failed", "[Account cleanup] Garmin service logout failed", {
       userId,
       message: error instanceof Error ? error.message : String(error),
     });
@@ -415,8 +428,7 @@ async function logoutGarmin(userId: number): Promise<AccountCleanupReport["garmi
 export async function cleanupDeletedAccount(refs: UserMediaRefs): Promise<AccountCleanupReport> {
   const [media, garmin] = await Promise.all([
     deleteUserMedia(refs).catch((error: unknown) => {
-      log.warn("[Account cleanup] Media cleanup failed", {
-        event: "account:media_cleanup_failed",
+      reportAccountCleanupFailure("account:media_cleanup_failed", "[Account cleanup] Media cleanup failed", {
         userId: refs.userId,
         message: error instanceof Error ? error.message : String(error),
       });

@@ -22,6 +22,7 @@ const m = vi.hoisted(() => {
     relationExists: vi.fn(async () => true),
     collectUserMediaRefs: vi.fn(),
     cleanupDeletedAccount: vi.fn(),
+    reportAccountCleanupFailure: vi.fn(),
   };
 });
 
@@ -37,6 +38,7 @@ vi.mock("./lib/relation-exists", () => ({ deleteFromIfExists: m.deleteFromIfExis
 vi.mock("./account_cleanup", () => ({
   collectUserMediaRefs: m.collectUserMediaRefs,
   cleanupDeletedAccount: m.cleanupDeletedAccount,
+  reportAccountCleanupFailure: m.reportAccountCleanupFailure,
 }));
 
 const previousUrl = process.env.DATABASE_URL;
@@ -188,6 +190,12 @@ describe("deleteUserAccount", () => {
     await expect(deleteUserAccount(9)).resolves.toMatchObject({ id: 9 });
     // Let the detached rejection settle: it must not surface as an unhandled rejection.
     await new Promise((resolve) => setTimeout(resolve, 0));
+    // Reported (error level and Rollbar), never thrown.
+    expect(m.reportAccountCleanupFailure).toHaveBeenCalledWith(
+      "account:external_cleanup_failed",
+      expect.any(String),
+      expect.objectContaining({ userId: 9, message: "imagekit down" }),
+    );
   });
 
   it("touches no provider when the transaction fails", async () => {

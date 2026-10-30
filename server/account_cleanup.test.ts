@@ -18,12 +18,22 @@ const m = vi.hoisted(() => {
     storage,
     from: vi.fn(() => storage),
     logoutGarminService: vi.fn(),
+    captureError: vi.fn(),
+    logs: [] as Array<{ level: string; event?: string }>,
   };
 });
 
 vi.mock("./_core/env", () => ({ ENV: m.env }));
 vi.mock("./_core/supabase_admin", () => ({ getSupabaseAdminClient: () => ({ storage: { from: m.from } }) }));
 vi.mock("./garmin", () => ({ logoutGarminService: m.logoutGarminService }));
+vi.mock("./middleware/rollbar-init", () => ({ captureError: m.captureError }));
+vi.mock("./middleware/logger", () => {
+  const at = (level: string) => (_message: string, meta?: { event?: string }) => void m.logs.push({ level, event: meta?.event });
+  const log: any = { error: at("error"), warn: at("warn"), info: at("info"), debug: at("debug") };
+  log.log = (level: string, message: string, meta?: { event?: string }) => at(level)(message, meta);
+  log.child = () => log;
+  return { logger: log };
+});
 
 import {
   cleanupDeletedAccount,
@@ -248,6 +258,29 @@ describe("cleanupDeletedAccount", () => {
     expect(report.garmin).toBe("failed");
     expect(report.imagekit.failed + report.cloudinary.failed).toBeGreaterThanOrEqual(1);
     expect(report.supabase.failed).toBe(1);
+  });
+
+  it("reports every failure to Rollbar, at error level: the 30-day promise needs someone to see it", async () => {
+    m.captureError.mockClear();
+    m.logs.length = 0;
+    m.storage.list.mockResolvedValueOnce({ data: null, error: { message: "denied" } });
+    m.logoutGarminService.mockRejectedValueOnce(new Error("HTTP 503"));
+    await cleanupDeletedAccount(refs());
+    const events = m.captureError.mock.calls.map((call) => (call[1] as { event: string }).event);
+    expect(events).toEqual(expect.arrayContaining(["account:media_cleanup_partial_failure", "account:garmin_logout_failed"]));
+    for (const call of m.captureError.mock.calls) {
+      expect(call[0]).toBeInstanceOf(Error);
+      expect(call[1]).toMatchObject({ userId: 9 });
+    }
+    for (const event of ["account:media_cleanup_partial_failure", "account:garmin_logout_failed"]) {
+      expect(m.logs.filter((entry) => entry.event === event).map((entry) => entry.level)).toEqual(["error"]);
+    }
+  });
+
+  it("reports nothing when the cleanup went through", async () => {
+    m.captureError.mockClear();
+    await cleanupDeletedAccount(refs());
+    expect(m.captureError).not.toHaveBeenCalled();
   });
 
   describe("never hangs", () => {

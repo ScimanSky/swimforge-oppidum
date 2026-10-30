@@ -967,7 +967,7 @@ export async function deleteUserAccount(
   // Media references (avatar, posts, stories, club uploads) are read before the rows go: the
   // files are deleted from the providers after the transaction. The logo and cover of a club
   // deleted with the account are not kept.
-  const { collectUserMediaRefs, cleanupDeletedAccount } = await import("./account_cleanup");
+  const { collectUserMediaRefs, cleanupDeletedAccount, reportAccountCleanupFailure } = await import("./account_cleanup");
   let mediaRefs: Awaited<ReturnType<typeof collectUserMediaRefs>>;
   try {
     mediaRefs = await collectUserMediaRefs(db, userId, ownedClubs.map((club) => club.id));
@@ -1171,8 +1171,7 @@ export async function deleteUserAccount(
   // ImageKit, Cloudinary and Supabase Storage, and the Garmin session on the garmin-service.
   // Every provider call is bounded in time; failures are logged, never thrown.
   void cleanupDeletedAccount(mediaRefs).catch((error: unknown) => {
-    logger.warn("[Database] External cleanup of the deleted account failed", {
-      event: "account:external_cleanup_failed",
+    reportAccountCleanupFailure("account:external_cleanup_failed", "[Database] External cleanup of the deleted account failed", {
       userId,
       message: error instanceof Error ? error.message : String(error),
     });
