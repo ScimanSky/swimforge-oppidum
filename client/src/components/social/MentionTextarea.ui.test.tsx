@@ -104,6 +104,29 @@ describe("MentionTextarea", () => {
     state.people = []
     render(<Harness />)
     await userEvent.type(screen.getByRole("textbox", { name: "Testo del post" }), "@zz")
-    await waitFor(() => expect(screen.getByText("Nessun nuotatore trovato.")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText("Nessun nuotatore trovato.")).toHaveAttribute("aria-live", "polite"))
+  })
+
+  it("a screen reader hears how many swimmers are suggested", async () => {
+    render(<Harness />)
+    await userEvent.type(screen.getByRole("textbox", { name: "Testo del post" }), "@ad")
+    await screen.findByRole("listbox")
+    expect(screen.getByText("2 nuotatori suggeriti")).toHaveAttribute("aria-live", "polite")
+  })
+
+  it("ten mentions at most, counting only those still in the text", async () => {
+    const ten = Array.from({ length: 10 }, (_, index) => ({ userId: 100 + index, name: null, username: `u${index}` }))
+    const written = ten.map((user) => `@${user.username}`).join(" ")
+    render(<Harness initial={`${written} `} initialMentions={ten} />)
+    const field = screen.getByRole("textbox", { name: "Testo del post" })
+    await userEvent.type(field, "@ad")
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(screen.queryByRole("listbox")).toBeNull()
+
+    // One of the ten deleted from the text: suggestions come back and a new pick is kept.
+    await userEvent.clear(field)
+    await userEvent.type(field, `${ten.slice(1).map((user) => `@${user.username}`).join(" ")} @ad`)
+    await userEvent.click(await screen.findByRole("option", { name: /Ada Rossi/ }))
+    expect(latest.mentions.map((user) => user.userId)).toContain(5)
   })
 })

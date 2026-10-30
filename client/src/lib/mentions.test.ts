@@ -30,10 +30,14 @@ describe("addMention / pickedMentionIds", () => {
   const ada = { userId: 5, name: "Ada Rossi", username: "ada" };
   const bea = { userId: 6, name: "Bea", username: null };
 
-  it("adds once, at most ten", () => {
-    expect(addMention([ada], ada)).toEqual([ada]);
+  it("adds once, at most ten still written in the text", () => {
+    expect(addMention([ada], ada, "@ada")).toEqual([ada]);
     const many = Array.from({ length: 10 }, (_, index) => ({ userId: index + 10, name: null, username: `u${index}` }));
-    expect(addMention(many, ada)).toHaveLength(10);
+    const allWritten = many.map((user) => `@${user.username}`).join(" ");
+    expect(addMention(many, ada, allWritten)).toHaveLength(10);
+    // Two of the ten deleted from the text: their places are free again.
+    const eightWritten = many.slice(2).map((user) => `@${user.username}`).join(" ");
+    expect(addMention(many, ada, eightWritten)).toEqual([...many, ada]);
   });
 
   it("sends only the picked users still written in the text", () => {

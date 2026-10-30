@@ -35,10 +35,13 @@ export function insertMention(text: string, range: { start: number; end: number 
   };
 }
 
-/** `user` added to the picked ones: once each, at most ten. */
-export function addMention(mentions: MentionUser[], user: MentionUser): MentionUser[] {
+/**
+ * `user` added to the picked ones: once each, at most ten counting only the picks still written
+ * in `text` (one deleted from the text frees its place).
+ */
+export function addMention(mentions: MentionUser[], user: MentionUser, text: string): MentionUser[] {
   if (mentions.some((item) => item.userId === user.userId)) return mentions;
-  return mentions.length >= MAX_MENTIONS ? mentions : [...mentions, user];
+  return pickedMentionIds(text, mentions).length >= MAX_MENTIONS ? mentions : [...mentions, user];
 }
 
 /** The ids to send: picked users whose `@username`/`@name` is still in the text. */

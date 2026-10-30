@@ -1,10 +1,17 @@
-import { useEffect, useId, useRef, useState, type ComponentProps, type KeyboardEvent } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent } from "react"
 import { mentionToken } from "@shared/mentions"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { getInitials } from "@/lib/format"
-import { activeMentionQuery, addMention, insertMention, MAX_MENTIONS, type MentionUser } from "@/lib/mentions"
+import {
+  activeMentionQuery,
+  addMention,
+  insertMention,
+  MAX_MENTIONS,
+  pickedMentionIds,
+  type MentionUser,
+} from "@/lib/mentions"
 import { trpc } from "@/lib/trpc"
 import { cn } from "@/lib/utils"
 
@@ -48,7 +55,9 @@ export function MentionTextarea({
   const pendingCaret = useRef<number | null>(null)
 
   const active = caret === null ? null : activeMentionQuery(value, caret)
-  const open = active !== null && active.start !== dismissedAt && mentions.length < MAX_MENTIONS
+  // Ten at most, counting only the picks still written in the text.
+  const writtenCount = useMemo(() => pickedMentionIds(value, mentions).length, [value, mentions])
+  const open = active !== null && active.start !== dismissedAt && writtenCount < MAX_MENTIONS
   const query = useDebouncedValue(open ? active.query : "", SEARCH_DEBOUNCE_MS)
   const searchQuery = trpc.community.users.search.useQuery(
     { query, limit: 6 },
@@ -81,7 +90,7 @@ export function MentionTextarea({
     pendingCaret.current = next.caret
     setCaret(next.caret)
     setActiveIndex(0)
-    onMentionsChange(addMention(mentions, user))
+    onMentionsChange(addMention(mentions, user, value))
     onValueChange(next.text)
   }
 
@@ -175,7 +184,17 @@ export function MentionTextarea({
           })}
         </ul>
       ) : null}
-      {noMatch ? <p className="text-xs text-muted-foreground">Nessun nuotatore trovato.</p> : null}
+      {/* Says how many swimmers are suggested (a screen reader does not see the list appear), or
+          that none was found (shown too). */}
+      <p aria-live="polite" className={noMatch ? "text-xs text-muted-foreground" : "sr-only"}>
+        {noMatch
+          ? "Nessun nuotatore trovato."
+          : showList
+            ? people.length === 1
+              ? "1 nuotatore suggerito"
+              : `${people.length} nuotatori suggeriti`
+            : ""}
+      </p>
       {hint ? (
         <p id={hintId} className="text-xs text-muted-foreground">
           {hint}
