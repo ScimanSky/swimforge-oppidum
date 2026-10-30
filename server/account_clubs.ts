@@ -49,13 +49,15 @@ const toOwnedClubs = (rows: unknown[]): OwnedClub[] =>
     otherActiveMembers: Number(row.other_members ?? 0),
   }));
 
-/** The clubs the user owns, with how many other active members each has. */
+/** The clubs the user owns, with how many other active members each has (none without clubs). */
 export async function listOwnedClubs(db: SqlExecutor, userId: number): Promise<OwnedClub[]> {
+  if (!(await relationExists(db, "public.community_clubs"))) return [];
   return toOwnedClubs((await db.execute(ownedClubsQuery(userId, false))).rows);
 }
 
 /** Same, locking the club rows for the deletion transaction. */
 export async function lockOwnedClubs(tx: SqlExecutor, userId: number): Promise<OwnedClub[]> {
+  if (!(await relationExists(tx, "public.community_clubs"))) return [];
   return toOwnedClubs((await tx.execute(ownedClubsQuery(userId, true))).rows);
 }
 
