@@ -124,6 +124,23 @@ describe("deleteUserAccount", () => {
     expect(m.order).toEqual(["collect", "transaction", "cleanup"]);
   });
 
+  it("answers without waiting for the provider cleanup, which runs detached", async () => {
+    m.cleanupDeletedAccount.mockImplementation(() => new Promise(() => {}));
+    const { deleteUserAccount } = await import("./db");
+    await expect(deleteUserAccount(9)).resolves.toMatchObject({ id: 9 });
+    expect(m.cleanupDeletedAccount).toHaveBeenCalledWith(m.refs);
+  });
+
+  it("logs a failed provider cleanup instead of throwing it", async () => {
+    m.cleanupDeletedAccount.mockImplementation(async () => {
+      throw new Error("imagekit down");
+    });
+    const { deleteUserAccount } = await import("./db");
+    await expect(deleteUserAccount(9)).resolves.toMatchObject({ id: 9 });
+    // Let the detached rejection settle: it must not surface as an unhandled rejection.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
   it("touches no provider when the transaction fails", async () => {
     m.db.transaction.mockRejectedValueOnce(new Error("deadlock"));
     const { deleteUserAccount } = await import("./db");

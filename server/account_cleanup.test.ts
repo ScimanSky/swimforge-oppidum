@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => {
   const storage = {
@@ -37,7 +37,7 @@ import {
 
 type FetchCall = { url: string; method: string; body?: string };
 const fetchCalls: FetchCall[] = [];
-const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+const defaultFetch = async (input: string | URL, init?: RequestInit) => {
   const url = String(input);
   fetchCalls.push({ url, method: init?.method ?? "GET", body: typeof init?.body === "string" ? init.body : undefined });
   if (url.startsWith("https://api.imagekit.io/v1/files?")) {
@@ -49,7 +49,8 @@ const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
     return new Response(JSON.stringify({ deleted: {}, partial: false }), { status: 200 });
   }
   return new Response(null, { status: 204 });
-});
+};
+const fetchMock = vi.fn(defaultFetch);
 vi.stubGlobal("fetch", fetchMock);
 
 const previousGarminSecret = process.env.GARMIN_SERVICE_SECRET;
@@ -223,6 +224,63 @@ describe("cleanupDeletedAccount", () => {
     expect(report.garmin).toBe("failed");
     expect(report.imagekit.failed + report.cloudinary.failed).toBeGreaterThanOrEqual(1);
     expect(report.supabase.failed).toBe(1);
+  });
+
+  describe("never hangs", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("gives up a Supabase Storage list that never answers after 15 s", async () => {
+      vi.useFakeTimers();
+      m.storage.list.mockReturnValue(new Promise(() => {}));
+      const pending = cleanupDeletedAccount(refs());
+      await vi.advanceTimersByTimeAsync(14_999);
+      let settled = false;
+      void pending.then(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      const report = await pending;
+      // The profile folder (list never answered) failed; the club document removal went through.
+      expect(report.supabase).toEqual({ attempted: 2, failed: 1 });
+    });
+
+    it("gives up a Supabase Storage remove that never answers after 15 s", async () => {
+      vi.useFakeTimers();
+      m.storage.remove.mockReturnValue(new Promise(() => {}));
+      const pending = cleanupDeletedAccount(refs());
+      await vi.advanceTimersByTimeAsync(15_000);
+      const report = await pending;
+      expect(report.supabase).toEqual({ attempted: 2, failed: 2 });
+    });
+
+    it("sends at most 4 ImageKit requests at a time", async () => {
+      const uploads = Array.from({ length: 12 }, (_, i) => `https://ik.imagekit.io/swimforge/clubs/3/9/photo-${i}.jpg`);
+      let inFlight = 0;
+      let maxInFlight = 0;
+      fetchMock.mockImplementation(async (input: string | URL, init?: RequestInit) => {
+        const url = String(input);
+        fetchCalls.push({ url, method: init?.method ?? "GET" });
+        if (!url.startsWith("https://api.imagekit.io/")) return new Response(JSON.stringify({ partial: false }), { status: 200 });
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        if (url.startsWith("https://api.imagekit.io/v1/files?")) return new Response("[]", { status: 200 });
+        return new Response(null, { status: 204 });
+      });
+      try {
+        const report = await cleanupDeletedAccount(refs({ urls: uploads, keepUrls: [] }));
+        // 1 story file + 2 folders + 12 club uploads.
+        expect(report.imagekit).toEqual({ attempted: 15, failed: 0 });
+        expect(maxInFlight).toBe(4);
+      } finally {
+        fetchMock.mockImplementation(defaultFetch);
+      }
+    });
   });
 
   it("skips the providers and the garmin-service that are not configured", async () => {

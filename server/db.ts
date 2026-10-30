@@ -1236,9 +1236,16 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
 
-  // Outside the transaction, best effort: media on ImageKit, Cloudinary and Supabase Storage,
-  // and the Garmin session on the garmin-service. Failures are logged, never thrown.
-  await cleanupDeletedAccount(mediaRefs);
+  // Outside the transaction, best effort and detached (the answer does not wait for it): media on
+  // ImageKit, Cloudinary and Supabase Storage, and the Garmin session on the garmin-service.
+  // Every provider call is bounded in time; failures are logged, never thrown.
+  void cleanupDeletedAccount(mediaRefs).catch((error: unknown) => {
+    logger.warn("[Database] External cleanup of the deleted account failed", {
+      event: "account:external_cleanup_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   return {
     id: user.id,
