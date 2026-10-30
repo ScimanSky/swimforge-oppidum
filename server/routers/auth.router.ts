@@ -13,6 +13,8 @@ import { hasRequiredLegalConsents, recordLegalAcceptance } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
 import { AccountDeletionBlockedError, accountDeletionBlockedMessage } from "../account_clubs";
+import { reportAccountCleanupFailure } from "../account_cleanup";
+import { withTimeout } from "../lib/with-timeout";
 import { deleteUserDeviceTokens } from "../db_device_tokens";
 import { DATA_EXPORT_RATE_LIMIT_MESSAGE, dataExportRateLimit } from "../lib/data-export-rate-limit";
 import type { User } from "../../drizzle/schema";
@@ -43,6 +45,9 @@ function pgErrorCode(error: unknown): string | undefined {
     const code = shaped?.code ?? shaped?.cause?.code;
     return typeof code === "string" ? code : undefined;
 }
+
+const SUPABASE_AUTH_DELETE_TIMEOUT_MS = 15_000;
+const DELETION_EMAIL_TIMEOUT_MS = 10_000;
 
 /** The request comes from the Android app (header set by its tRPC client). */
 function isNativeClient(req: { headers: Record<string, string | string[] | undefined> }): boolean {
@@ -465,21 +470,34 @@ export const authRouter = router({
                 });
             }
 
-            // Best effort: delete Supabase Auth user when open_id is a UUID.
-            if (isSupabaseUserId(deletedUser.openId)) {
+            // The rows are gone. Side by side and bounded in time: the Supabase Auth user (when
+            // open_id is one) and the confirmation email. A Supabase failure is reported (error
+            // level and Rollbar) to be finished by hand; a slow email is answered as not sent.
+            const supabaseId = deletedUser.openId;
+            const deleteSupabaseUser = async () => {
+                if (!isSupabaseUserId(supabaseId)) return;
                 try {
-                    const supabaseAdmin = getSupabaseAdminClient();
-                    await supabaseAdmin.auth.admin.deleteUser(deletedUser.openId);
-                } catch {
-                    // ignore: local deletion already completed
+                    const { error } = await withTimeout(
+                        getSupabaseAdminClient().auth.admin.deleteUser(supabaseId),
+                        SUPABASE_AUTH_DELETE_TIMEOUT_MS,
+                        "supabase auth deleteUser",
+                    );
+                    if (error) throw new Error(error.message);
+                } catch (error) {
+                    reportAccountCleanupFailure(
+                        "account:supabase_auth_delete_failed",
+                        "[Account deletion] Supabase Auth user not deleted",
+                        { userId: deletedUser.id, message: error instanceof Error ? error.message : String(error) },
+                    );
                 }
-            }
-
-            const emailSent = await sendAccountDeletionConfirmationEmail({
-                to: deletedUser.email,
-                displayName: deletedUser.name,
-                deletedAt,
-            });
+            };
+            const sendConfirmation = () =>
+                withTimeout(
+                    sendAccountDeletionConfirmationEmail({ to: deletedUser.email, displayName: deletedUser.name, deletedAt }),
+                    DELETION_EMAIL_TIMEOUT_MS,
+                    "account deletion email",
+                ).catch(() => false);
+            const [, emailSent] = await Promise.all([deleteSupabaseUser(), sendConfirmation()]);
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.clearCookie(COOKIE_NAME, cookieOptions);

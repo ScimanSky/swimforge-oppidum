@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // A club the user owns with other active members blocks the account deletion until it is
 // transferred: the server refuses with PRECONDITION_FAILED and an Italian message.
@@ -9,6 +9,8 @@ const m = vi.hoisted(() => ({
   deleteUserAccount: vi.fn(),
   getAccountDeletionBlockers: vi.fn(),
   sendAccountDeletionConfirmationEmail: vi.fn(),
+  deleteAuthUser: vi.fn(),
+  captureError: vi.fn(),
 }));
 
 vi.mock("./_shared", async () => {
@@ -25,6 +27,10 @@ vi.mock("./_shared", async () => {
   };
 });
 vi.mock("../_core/email", () => ({ sendAccountDeletionConfirmationEmail: m.sendAccountDeletionConfirmationEmail }));
+vi.mock("../_core/supabase_admin", () => ({
+  getSupabaseAdminClient: () => ({ auth: { admin: { deleteUser: m.deleteAuthUser } } }),
+}));
+vi.mock("../middleware/rollbar-init", () => ({ captureError: m.captureError }));
 
 import { AccountDeletionBlockedError } from "../account_clubs";
 import { authRouter } from "./auth.router";
@@ -104,6 +110,66 @@ describe("auth.deleteAccount with owned clubs", () => {
       await expect(caller().deleteAccount({})).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(m.deleteUserAccount).not.toHaveBeenCalled();
       await expect(caller().deleteAccountStatus()).resolves.toMatchObject({ requiresPassword: true });
+    });
+  });
+
+  describe("after the rows are gone", () => {
+    const SUPABASE_ID = "3f0c1d9e-6a4b-4c2d-9e8f-1a2b3c4d5e6f";
+    const never = () => new Promise<never>(() => {});
+
+    beforeEach(() => {
+      m.deleteUserAccount.mockResolvedValue({ id: 9, email: "a@b.it", name: "A", openId: SUPABASE_ID });
+      m.deleteAuthUser.mockResolvedValue({ data: {}, error: null });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("deletes the Supabase Auth user", async () => {
+      await expect(caller().deleteAccount({})).resolves.toEqual({ success: true, emailSent: true });
+      expect(m.deleteAuthUser).toHaveBeenCalledWith(SUPABASE_ID);
+      expect(m.captureError).not.toHaveBeenCalled();
+    });
+
+    it("gives up a Supabase Auth delete that never answers after 15 s, and reports it to Rollbar", async () => {
+      vi.useFakeTimers();
+      m.deleteAuthUser.mockReturnValue(never());
+      const pending = caller().deleteAccount({});
+      await vi.advanceTimersByTimeAsync(15_000);
+      await expect(pending).resolves.toMatchObject({ success: true });
+      expect(m.captureError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ event: "account:supabase_auth_delete_failed", userId: 9 }),
+      );
+    });
+
+    it("reports a Supabase Auth delete answered with an error", async () => {
+      m.deleteAuthUser.mockResolvedValue({ data: null, error: { message: "User not allowed" } });
+      await expect(caller().deleteAccount({})).resolves.toMatchObject({ success: true });
+      expect(m.captureError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ event: "account:supabase_auth_delete_failed", message: "User not allowed" }),
+      );
+    });
+
+    it("waits at most 10 s for the confirmation email, then answers without it", async () => {
+      vi.useFakeTimers();
+      m.sendAccountDeletionConfirmationEmail.mockReturnValue(never());
+      const pending = caller().deleteAccount({});
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(pending).resolves.toEqual({ success: true, emailSent: false });
+    });
+
+    it("runs the two side by side: the answer waits at most 15 s in all", async () => {
+      vi.useFakeTimers();
+      m.deleteAuthUser.mockReturnValue(never());
+      m.sendAccountDeletionConfirmationEmail.mockReturnValue(never());
+      const pending = caller().deleteAccount({});
+      let settled = false;
+      void pending.then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(settled).toBe(true);
+      await expect(pending).resolves.toEqual({ success: true, emailSent: false });
     });
   });
 });
