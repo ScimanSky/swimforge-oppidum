@@ -1,4 +1,6 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { Link } from "wouter";
+import { findMentions } from "@shared/mentions";
 import { apiUrl } from "@/lib/api-base";
 import { authenticatedApiInit } from "@/lib/api-auth";
 import { isNativePlatform } from "@/lib/platform";
@@ -27,10 +29,6 @@ function isSafeHttpUrl(value: string) {
   } catch {
     return false;
   }
-}
-
-export function normalizeTagSearchQuery(value: string) {
-  return stripInvisibleChars(value).trim().replace(/^@+/, "").replace(/\s+/g, " ");
 }
 
 function toNormalizedUrl(rawToken: string) {
@@ -66,61 +64,39 @@ export function extractFirstUrl(value: string) {
   return extractUrls(value)[0] ?? null;
 }
 
-/** Hashtags, mentions and links in the action colour (Corsia: one accent). */
+/** Mentions and links in the action colour (Corsia: one accent). */
 const DEFAULT_CLASSES = {
-  hashtag: "font-medium text-action-text",
-  mention: "font-medium text-action-text",
+  mention: "font-medium text-action-text hover:underline",
   link: "font-medium text-action-text underline decoration-dotted underline-offset-2 hover:opacity-85",
 } as const;
 
+/** A user mentioned in the post, as stored (`tagged_users` of the feed). */
+export type SocialTextMention = { user_id: number; name?: string | null; username?: string | null };
+
 type SocialTextRenderOptions = {
-  hashtagClassName?: string;
+  /** The post's mentioned users: their `@username`/`@name` link to their profile, by id. */
+  mentions?: SocialTextMention[] | null;
   mentionClassName?: string;
   linkClassName?: string;
 };
 
-export function renderSocialText(content: string, options?: SocialTextRenderOptions): ReactNode[] {
+/** Plain text with its web addresses as links. */
+function renderLinks(content: string, keyPrefix: string, linkClassName?: string): ReactNode[] {
   const parts = content.split(CONTENT_TOKEN_SPLIT);
   return parts.map((part, index) => {
+    const key = `${keyPrefix}-${index}`;
     if (/^\s+$/.test(part)) {
-      return <span key={`space-${index}`}>{part}</span>;
+      return <span key={key}>{part}</span>;
     }
 
     const leading = part.match(/^[([{"']+/)?.[0] ?? "";
     const trailing = part.match(/[),.;!?]+$/)?.[0] ?? "";
-    const core = trimUrlTrailingPunctuation(trimUrlLeadingPunctuation(part));
-
-    if (/^#[A-Za-z0-9_]{2,40}$/.test(core)) {
-      return (
-        <Fragment key={`hash-${core}-${index}`}>
-          {leading}
-          <span className={options?.hashtagClassName ?? DEFAULT_CLASSES.hashtag}>{core}</span>
-          {trailing}
-        </Fragment>
-      );
-    }
-
-    if (/^@[A-Za-z0-9_]{2,40}$/.test(core)) {
-      return (
-        <Fragment key={`mention-${core}-${index}`}>
-          {leading}
-          <span className={options?.mentionClassName ?? DEFAULT_CLASSES.mention}>{core}</span>
-          {trailing}
-        </Fragment>
-      );
-    }
-
     const normalized = toNormalizedUrl(part);
     if (normalized) {
       return (
-        <Fragment key={`url-${normalized.href}-${index}`}>
+        <Fragment key={key}>
           {leading}
-          <a
-            href={normalized.href}
-            target="_blank"
-            rel="noreferrer"
-            className={options?.linkClassName ?? DEFAULT_CLASSES.link}
-          >
+          <a href={normalized.href} target="_blank" rel="noreferrer" className={linkClassName ?? DEFAULT_CLASSES.link}>
             {normalized.display}
           </a>
           {trailing}
@@ -128,8 +104,39 @@ export function renderSocialText(content: string, options?: SocialTextRenderOpti
       );
     }
 
-    return <span key={`text-${index}`}>{part}</span>;
+    return <span key={key}>{part}</span>;
   });
+}
+
+/**
+ * Post text: the mentions of the post's stored users link to their profile (an «@» of anyone
+ * else stays plain text), web addresses are links, hashtags are plain text.
+ */
+export function renderSocialText(content: string, options?: SocialTextRenderOptions): ReactNode[] {
+  const candidates = (options?.mentions ?? [])
+    .map((user) => ({ id: Number(user.user_id), name: user.name ?? null, username: user.username ?? null }))
+    .filter((user) => Number.isInteger(user.id) && user.id > 0);
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  for (const match of findMentions(content, candidates)) {
+    if (match.start > cursor) {
+      nodes.push(...renderLinks(content.slice(cursor, match.start), `text-${cursor}`, options?.linkClassName));
+    }
+    nodes.push(
+      <Link
+        key={`mention-${match.start}`}
+        href={`/u/${match.id}`}
+        className={options?.mentionClassName ?? DEFAULT_CLASSES.mention}
+      >
+        {content.slice(match.start, match.end)}
+      </Link>
+    );
+    cursor = match.end;
+  }
+  if (cursor < content.length) {
+    nodes.push(...renderLinks(content.slice(cursor), `text-${cursor}`, options?.linkClassName));
+  }
+  return nodes;
 }
 
 type ParsedLinkPreview = {

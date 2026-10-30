@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   onOpenChange: vi.fn(),
   toastSuccess: vi.fn(),
   invalidate: vi.fn(),
+  people: [] as any[],
 }))
 
 vi.mock("sonner", () => ({
@@ -31,6 +32,13 @@ vi.mock("@/lib/trpc", () => {
       }),
       community: {
         ownPost: { useQuery: () => ({ data: state.post, isError: state.isError }) },
+        users: {
+          search: {
+            useQuery: (_input: unknown, options?: { enabled?: boolean }) => ({
+              data: options?.enabled === false ? undefined : state.people,
+            }),
+          },
+        },
         postImageKitAuth: { useMutation: mutation },
         postUploadImage: { useMutation: mutation },
         cloudinaryVideoAuth: { useMutation: mutation },
@@ -59,6 +67,7 @@ describe("EditPostSheet", () => {
     }
     state.isError = false
     state.updateCalls = []
+    state.people = []
     state.onOpenChange.mockReset()
     state.toastSuccess.mockReset()
     state.invalidate.mockReset()
@@ -79,11 +88,30 @@ describe("EditPostSheet", () => {
 
     await waitFor(() =>
       expect(state.updateCalls).toEqual([
-        { postId: 7, content: "Soglia 10×200, ottima", mediaUrls: ["https://cdn.example/due.jpg"] },
+        { postId: 7, content: "Soglia 10×200, ottima", mediaUrls: ["https://cdn.example/due.jpg"], taggedUserIds: [] },
       ]),
     )
     expect(state.toastSuccess).toHaveBeenCalledWith("Post aggiornato.")
     expect(state.onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it("keeps the post's mentions still in the text and adds the new ones picked after «@»", async () => {
+    state.post = {
+      ...state.post,
+      content: "Con @ada e @Bea",
+      taggedUsers: [
+        { userId: 5, name: "Ada Rossi", username: "ada" },
+        { userId: 6, name: "Bea", username: null },
+      ],
+    }
+    state.people = [{ userId: 8, name: "Carlo", username: "carlo", avatarUrl: null }]
+    render(<EditPostSheet open onOpenChange={state.onOpenChange} postRef={{ postId: 7 }} />)
+    const text = await screen.findByRole("textbox", { name: "Testo del post" })
+    await userEvent.clear(text)
+    await userEvent.type(text, "Con @ada e @ca")
+    await userEvent.click(await screen.findByRole("option", { name: /Carlo/ }))
+    await userEvent.click(screen.getByRole("button", { name: "Salva modifiche" }))
+    await waitFor(() => expect(state.updateCalls[0]).toMatchObject({ content: "Con @ada e @carlo", taggedUserIds: [5, 8] }))
   })
 
   it("a post that no longer exists says so", () => {

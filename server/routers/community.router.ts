@@ -16,6 +16,7 @@ import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { activityCardSql, authorClubNameSql } from "../db_social";
+import { notifyMentionedUsers, resolveMentionedUserIds } from "../lib/mentions";
 import { createCommunityClubsRouter } from "./community.clubs.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
@@ -24,36 +25,12 @@ import { communityUsersRouter } from "./community.users.router";
 import { PRODUCT_ANALYTICS_EVENT_NAMES, trackProductEvent } from "../product_analytics";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
-const HASHTAG_REGEX = /(^|\s)#([A-Za-z0-9_]{2,40})/g;
 function normalizeMediaUrls(mediaUrls?: string[] | null, mediaUrl?: string | null) {
     const values = [...(mediaUrls ?? []), mediaUrl ?? ""]
         .map((item) => item.trim())
         .filter((item) => item.length > 0)
         .slice(0, 6);
     return Array.from(new Set(values));
-}
-
-function normalizeTaggedUserIds(authorUserId: number, taggedUserIds?: number[] | null) {
-    if (!taggedUserIds?.length) return [];
-    const unique = Array.from(new Set(taggedUserIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
-    return unique.filter((id) => id !== authorUserId).slice(0, 10);
-}
-
-function extractHashtagsFromContent(content?: string | null) {
-    if (!content) return [] as string[];
-    const matches = content.matchAll(HASHTAG_REGEX);
-    const tags = Array.from(matches)
-        .map((entry) => (entry?.[2] ?? "").trim().toLowerCase())
-        .filter((tag) => tag.length >= 2 && tag.length <= 40);
-    return Array.from(new Set(tags));
-}
-
-function normalizeHashtags(content?: string | null, hashtags?: string[] | null) {
-    const explicit = (hashtags ?? [])
-        .map((raw) => raw.replace(/^#+/, "").trim().toLowerCase())
-        .filter((tag) => tag.length >= 2 && tag.length <= 40);
-    const all = [...extractHashtagsFromContent(content), ...explicit];
-    return Array.from(new Set(all)).slice(0, 20);
 }
 
 function normalizeExternalWebsiteUrl(raw?: string | null) {
@@ -107,43 +84,6 @@ function routeDistanceMeters(routeGeoJson?: { coordinates: Array<[number, number
         total += haversineMeters(prevLat, prevLng, currLat, currLng);
     }
     return Math.round(total);
-}
-
-async function notifyTaggedUsers(input: {
-    authorUserId: number;
-    taggedUserIds: number[];
-    postId: number;
-    clubId?: number | null;
-}) {
-    if (!input.taggedUserIds.length) return;
-
-    try {
-        const { getDb } = await import("../db");
-        const { sql } = await import("drizzle-orm");
-        const { createNotification } = await import("../db_social_enhanced");
-        const db = await getDb();
-        if (!db) return;
-
-        const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${input.authorUserId} LIMIT 1`);
-        const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
-        const link = input.clubId ? `/community/club/${input.clubId}` : `/post/${input.postId}`;
-
-        await Promise.all(
-            input.taggedUserIds.map((taggedUserId) =>
-                createNotification({
-                    userId: taggedUserId,
-                    type: "mention",
-                    title: "Sei stato taggato",
-                    message: `${actorName} ti ha taggato in un post.`,
-                    link,
-                    referenceId: input.postId,
-                    actorId: input.authorUserId,
-                })
-            )
-        );
-    } catch {
-        // Best-effort: tagging notification should not block post creation
-    }
 }
 
 async function requireClubMemberRole(userId: number, clubId: number) {
@@ -239,7 +179,6 @@ export const communityRouter = router({
                   p.media_url,
                   p.media_urls,
                   p.tagged_user_ids,
-                  p.hashtags,
                   p.visibility,
                   p.created_at,
                   p.updated_at,
@@ -334,27 +273,25 @@ export const communityRouter = router({
             content: z.string().max(2000).optional().nullable(),
             mediaUrl: z.string().url().optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
-            taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
-            hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
+            /** Users picked after «@» in the composer; kept only if still written in the text. */
+            taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
             visibility: z.enum(["public", "private"]).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             const content = input.content?.trim() ?? null;
             const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
-            const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
-            const hashtags = normalizeHashtags(content, input.hashtags);
+            const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, input.taggedUserIds);
             const postId = await upsertActivityPost(ctx.user.id, input.activityId, {
                 content,
                 mediaUrl: mediaUrls[0] ?? null,
                 mediaUrls,
                 taggedUserIds,
-                hashtags,
                 visibility: input.visibility ?? "public",
             });
             if (postId) {
-                await notifyTaggedUsers({
+                await notifyMentionedUsers({
                     authorUserId: ctx.user.id,
-                    taggedUserIds,
+                    mentionedUserIds: taggedUserIds,
                     postId,
                     clubId: null,
                 });
@@ -488,12 +425,29 @@ export const communityRouter = router({
             postId: z.number().int().positive(),
             content: z.string().max(2000).optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
+            /** Users picked after «@»; an old build sends none: the post's own are checked again. */
+            taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             try {
+                const content = input.content ?? null;
+                const pickedIds =
+                    input.taggedUserIds ??
+                    ((await getOwnPostForEdit(ctx.user.id, { postId: input.postId }))?.taggedUsers ?? []).map(
+                        (user) => user.userId,
+                    );
+                const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, pickedIds);
                 const result = await updateOwnPost(ctx.user.id, input.postId, {
-                    content: input.content ?? null,
+                    content,
                     mediaUrls: normalizeMediaUrls(input.mediaUrls, null),
+                    taggedUserIds,
+                });
+                // Only the mentions added by this edit are told.
+                await notifyMentionedUsers({
+                    authorUserId: ctx.user.id,
+                    mentionedUserIds: result.addedTaggedUserIds,
+                    postId: result.postId,
+                    clubId: result.clubId,
                 });
                 return { success: true, postId: result.postId };
             } catch (error) {
@@ -537,8 +491,8 @@ export const communityRouter = router({
             content: z.string().max(2000).optional().nullable(),
             mediaUrl: z.string().url().optional().nullable(),
             mediaUrls: z.array(z.string().url()).max(6).optional(),
-            taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
-            hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
+            /** Users picked after «@» in the composer; kept only if still written in the text. */
+            taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             const { getDb } = await import("../db");
@@ -547,11 +501,10 @@ export const communityRouter = router({
 
             const content = input.content?.trim() ?? null;
             const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
-            const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
-            const hashtags = normalizeHashtags(content, input.hashtags);
             if (!content && mediaUrls.length === 0) {
                 throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
             }
+            const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, input.taggedUserIds);
 
             const inserted = await db
                 .insert(socialPosts)
@@ -563,7 +516,6 @@ export const communityRouter = router({
                     mediaUrl: mediaUrls[0] ?? null,
                     mediaUrls,
                     taggedUserIds,
-                    hashtags,
                     visibility: "public",
                     isDeleted: false,
                     createdAt: new Date(),
@@ -572,9 +524,9 @@ export const communityRouter = router({
                 .returning({ id: socialPosts.id });
             const postId = inserted[0]?.id ?? null;
             if (postId) {
-                await notifyTaggedUsers({
+                await notifyMentionedUsers({
                     authorUserId: ctx.user.id,
-                    taggedUserIds,
+                    mentionedUserIds: taggedUserIds,
                     postId,
                     clubId: null,
                 });
@@ -876,9 +828,6 @@ export const communityRouter = router({
         requireClubReadable,
         normalizeExternalWebsiteUrl,
         normalizeMediaUrls,
-        normalizeTaggedUserIds,
-        normalizeHashtags,
-        notifyTaggedUsers,
         routeDistanceMeters,
         isClubStaffRole: (role) => CLUB_STAFF_ROLES.has(role),
     }),

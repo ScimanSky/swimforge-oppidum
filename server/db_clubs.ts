@@ -166,7 +166,6 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
       p.media_url,
       p.media_urls,
       p.tagged_user_ids,
-      p.hashtags,
       p.visibility,
       p.created_at,
       u.name AS user_name,
@@ -229,7 +228,6 @@ export async function createClubPost(
     mediaUrl?: string | null;
     mediaUrls?: string[] | null;
     taggedUserIds?: number[] | null;
-    hashtags?: string[] | null;
   }
 ) {
   const db = await getDb();
@@ -258,7 +256,6 @@ export async function createClubPost(
       mediaUrl: input.mediaUrl ?? null,
       mediaUrls: input.mediaUrls ?? [],
       taggedUserIds: input.taggedUserIds ?? [],
-      hashtags: input.hashtags ?? [],
       visibility: "public",
       isDeleted: false,
       createdAt: new Date(),

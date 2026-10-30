@@ -103,7 +103,6 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       p.media_url,
       p.media_urls,
       p.tagged_user_ids,
-      p.hashtags,
       p.visibility,
       p.created_at,
       p.updated_at,
@@ -548,7 +547,6 @@ export async function upsertActivityPost(
     mediaUrl?: string | null;
     mediaUrls?: string[] | null;
     taggedUserIds?: number[] | null;
-    hashtags?: string[] | null;
     visibility?: string | null;
   }
 ) {
@@ -602,7 +600,6 @@ export async function upsertActivityPost(
     mediaUrl: data.mediaUrl ?? null,
     mediaUrls: normalizedMediaUrls,
     taggedUserIds: data.taggedUserIds ?? [],
-    hashtags: data.hashtags ?? [],
     visibility: data.visibility ?? "public",
     isDeleted: false,
     updatedAt: new Date(),
@@ -716,7 +713,6 @@ export async function setActivityShare(userId: number, activityId: number, share
     mediaUrl: null,
     mediaUrls: [],
     taggedUserIds: [],
-    hashtags: [],
     visibility: "public",
   });
 }

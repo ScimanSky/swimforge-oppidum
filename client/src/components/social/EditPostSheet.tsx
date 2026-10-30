@@ -1,13 +1,14 @@
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ImagePlus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Textarea } from "@/components/ui/textarea"
 import { uploadActivityShareMedia } from "@/lib/activity-share-media-upload"
+import { pickedMentionIds, type MentionUser } from "@/lib/mentions"
 import { isVideoUrl, MAX_POST_MEDIA_ITEMS, validatePostMediaFile, type PostMediaKind } from "@/lib/post-media"
 import { trpc } from "@/lib/trpc"
+import { MentionTextarea } from "./MentionTextarea"
 
 export type EditPostRef = { postId: number } | { activityId: number }
 
@@ -32,6 +33,7 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
   const updatePost = trpc.community.updatePost.useMutation()
 
   const [content, setContent] = useState("")
+  const [mentions, setMentions] = useState<MentionUser[]>([])
   const [media, setMedia] = useState<MediaItem[]>([])
   const [loadedPostId, setLoadedPostId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -42,6 +44,7 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
   useEffect(() => {
     if (!open || !post || loadedPostId === post.id) return
     setContent(post.content ?? "")
+    setMentions(post.taggedUsers ?? [])
     setMedia(post.mediaUrls.map((url, index) => ({ id: `saved-${index}`, source: "saved", url })))
     setLoadedPostId(post.id)
   }, [open, post, loadedPostId])
@@ -51,6 +54,7 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
       if (item.source === "new") URL.revokeObjectURL(item.previewUrl)
     })
     setContent("")
+    setMentions([])
     setMedia([])
     setLoadedPostId(null)
   }
@@ -116,7 +120,12 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
           })
         )
       }
-      await updatePost.mutateAsync({ postId: post.id, content: content.trim() || null, mediaUrls })
+      await updatePost.mutateAsync({
+        postId: post.id,
+        content: content.trim() || null,
+        mediaUrls,
+        taggedUserIds: pickedMentionIds(content, mentions),
+      })
       await Promise.all([
         utils.community.feed.invalidate(),
         utils.community.postById.invalidate({ postId: post.id }),
@@ -132,8 +141,6 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
     }
   }
 
-  const textId = useId()
-
   return (
     <Sheet open={open} onOpenChange={close}>
       <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl">
@@ -148,13 +155,12 @@ export function EditPostSheet({ open, onOpenChange, postRef }: EditPostSheetProp
           <p className="px-4 pb-4 text-sm text-muted-foreground">Caricamento del post…</p>
         ) : (
           <div className="flex flex-col gap-4 px-4 pb-4">
-            <label htmlFor={textId} className="sr-only">
-              Testo del post
-            </label>
-            <Textarea
-              id={textId}
+            <MentionTextarea
+              aria-label="Testo del post"
               value={content}
-              onChange={(event) => setContent(event.target.value)}
+              onValueChange={setContent}
+              mentions={mentions}
+              onMentionsChange={setMentions}
               maxLength={2000}
               rows={5}
               className="min-h-[120px] resize-none"

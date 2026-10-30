@@ -12,6 +12,7 @@ import {
   z,
 } from "./_shared";
 import { trackProductEvent } from "../product_analytics";
+import { notifyMentionedUsers, resolveMentionedUserIds } from "../lib/mentions";
 import type { ClubAnnouncementInsert, ClubEventInsert } from "./_shared";
 
 const ROUTE_GEOJSON_SCHEMA = z.object({
@@ -43,22 +44,12 @@ const CLUB_POOL_WORKOUT_DIRECTIVES_SCHEMA = z.object({
     notes: z.string().max(1000).optional().nullable(),
 });
 
-type NotifyTaggedUsersInput = {
-  authorUserId: number;
-  taggedUserIds: number[];
-  postId: number;
-  clubId?: number | null;
-};
-
 type CommunityClubsDeps = {
   requireClubMemberRole: (userId: number, clubId: number) => Promise<{ role: string; status: string } | { role: string }>;
   requireClubStaffRole: (userId: number, clubId: number) => Promise<unknown>;
   requireClubReadable: (userId: number, clubId: number) => Promise<unknown>;
   normalizeExternalWebsiteUrl: (raw?: string | null) => string | null;
   normalizeMediaUrls: (mediaUrls?: string[] | null, mediaUrl?: string | null) => string[];
-  normalizeTaggedUserIds: (authorUserId: number, taggedUserIds?: number[] | null) => number[];
-  normalizeHashtags: (content?: string | null, hashtags?: string[] | null) => string[];
-  notifyTaggedUsers: (input: NotifyTaggedUsersInput) => Promise<void>;
   routeDistanceMeters: (routeGeoJson?: { coordinates: Array<[number, number]> } | null) => number | null;
   isClubStaffRole: (role: string) => boolean;
 };
@@ -70,9 +61,6 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
     requireClubReadable,
     normalizeExternalWebsiteUrl,
     normalizeMediaUrls,
-    normalizeTaggedUserIds,
-    normalizeHashtags,
-    notifyTaggedUsers,
     routeDistanceMeters,
     isClubStaffRole,
   } = deps;
@@ -340,8 +328,8 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 content: z.string().max(1000).optional().nullable(),
                 mediaUrl: z.string().url().optional().nullable(),
                 mediaUrls: z.array(z.string().url()).max(6).optional(),
-                taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
-                hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
+                /** Users picked after «@» in the composer; kept only if still written in the text. */
+                taggedUserIds: z.array(z.number().int().positive()).max(20).optional(),
             }))
             .mutation(async ({ ctx, input }) => {
                 const { getClubById, createClubPost } = await import("../db_clubs");
@@ -357,22 +345,20 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 }
                 const content = input.content?.trim() ?? null;
                 const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
-                const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
-                const hashtags = normalizeHashtags(content, input.hashtags);
                 if (!content && mediaUrls.length === 0) {
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
                 }
+                const taggedUserIds = await resolveMentionedUserIds(ctx.user.id, content, input.taggedUserIds);
                 const postId = await createClubPost(ctx.user.id, input.clubId, {
                     content,
                     mediaUrl: mediaUrls[0] ?? null,
                     mediaUrls,
                     taggedUserIds,
-                    hashtags,
                 });
                 if (postId) {
-                    await notifyTaggedUsers({
+                    await notifyMentionedUsers({
                         authorUserId: ctx.user.id,
-                        taggedUserIds,
+                        mentionedUserIds: taggedUserIds,
                         postId,
                         clubId: input.clubId,
                     });

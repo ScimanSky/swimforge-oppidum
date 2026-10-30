@@ -66,6 +66,7 @@ describe("community.updatePost", () => {
     expect(m.updateOwnPost).toHaveBeenCalledWith(42, 7, {
       content: "Testo corretto",
       mediaUrls: ["https://cdn.example/a.jpg"],
+      taggedUserIds: [],
     });
   });
 

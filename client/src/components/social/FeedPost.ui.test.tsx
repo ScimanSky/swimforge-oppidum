@@ -151,7 +151,7 @@ describe("FeedPost Corsia", () => {
     expect(within(card).queryByText("SWOLF")).toBeNull()
   })
 
-  it("post di solo testo: nessuna card attività, hashtag in colore azione", () => {
+  it("post di solo testo: nessuna card attività; gli hashtag sono testo normale", () => {
     const { container } = renderPost({
       ...activityPost,
       content: "Finalmente sotto l'1:50 sui 200. #soglia",
@@ -165,7 +165,22 @@ describe("FeedPost Corsia", () => {
     expect(container.querySelector("article p.whitespace-pre-wrap")).toHaveTextContent(
       "Finalmente sotto l'1:50 sui 200. #soglia"
     )
-    expect(screen.getByText("#soglia")).toHaveClass("text-action-text")
+    expect(screen.getByText("#soglia")).not.toHaveClass("text-action-text")
+  })
+
+  it("menzioni: collegate al profilo nel testo; chi era taggato a parte resta come chip", () => {
+    renderPost({
+      ...activityPost,
+      content: "Vasca con @ada",
+      tagged_users: [
+        { user_id: 5, name: "Ada Rossi", username: "ada" },
+        { user_id: 6, name: "Carlo", username: "carlo" },
+      ],
+    })
+    const text = document.querySelector("article p.whitespace-pre-wrap") as HTMLElement
+    expect(within(text).getByRole("link", { name: "@ada" })).toHaveAttribute("href", "/u/5")
+    expect(screen.getAllByRole("link", { name: "@ada" })).toHaveLength(1)
+    expect(screen.getByRole("link", { name: "@carlo" })).toHaveAttribute("href", "/u/6")
   })
 
   it("azioni: cuore con il totale, commenti, condividi; cuore pieno blu azione (non arancio XP) se hai reagito", () => {

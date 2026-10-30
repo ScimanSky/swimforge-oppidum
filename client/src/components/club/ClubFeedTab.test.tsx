@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   posts: [] as any[],
   feedStatus: "success" as "success" | "loading" | "error",
   createCalls: [] as any[],
+  people: [] as any[],
   refetch: vi.fn(),
 }));
 
@@ -36,7 +37,7 @@ vi.mock("@/lib/trpc", () => {
           feed: query(() => state.posts, () => state.feedStatus),
           createPost: mutation(state.createCalls),
         },
-        users: { search: query(() => []) },
+        users: { search: query(() => state.people) },
         comments: query(() => []),
         addComment: mutation(),
         deletePost: mutation(),
@@ -51,11 +52,10 @@ vi.mock("@/lib/trpc", () => {
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/components/PostReactions", () => ({ default: () => null }));
-vi.mock("@/lib/social-content", () => ({
+vi.mock("@/lib/social-content", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/social-content")>()),
   extractFirstUrl: () => null,
   LinkPreviewCard: () => null,
-  normalizeTagSearchQuery: (value: string) => value.trim(),
-  renderSocialText: (value: string) => value,
 }));
 
 describe("ClubFeedTab (Corsia)", () => {
@@ -64,6 +64,7 @@ describe("ClubFeedTab (Corsia)", () => {
     state.posts = [];
     state.feedStatus = "success";
     state.createCalls.length = 0;
+    state.people = [];
     state.refetch.mockClear();
   });
 
@@ -82,7 +83,6 @@ describe("ClubFeedTab (Corsia)", () => {
         content: "Bella sessione",
         created_at: new Date().toISOString(),
         comment_count: 2,
-        hashtags: ["soglia"],
       },
     ];
     const user = userEvent.setup({ delay: null });
@@ -92,10 +92,46 @@ describe("ClubFeedTab (Corsia)", () => {
     await user.click(screen.getByRole("button", { name: "Pubblica" }));
     expect(state.createCalls).toMatchObject([{ clubId: 7, content: "Ciao club" }]);
 
-    const post = screen.getByText("Bella sessione").closest("article")!;
+    const post = screen.getByText(/Bella/).closest("article")!;
+    expect(post.querySelector("p.whitespace-pre-wrap")).toHaveTextContent("Bella sessione");
     expect(within(post).getByText("Anna")).toBeTruthy();
     expect(within(post).getByRole("button", { name: "Commenti: 2" })).toBeTruthy();
     expect(within(post).getByRole("button", { name: "Elimina post" })).toBeTruthy();
+  });
+
+  it("menzioni con «@» nel testo, senza campo «Tagga amici»; i post collegano le menzioni al profilo", async () => {
+    state.people = [{ userId: 5, name: "Ada Rossi", username: "ada", avatarUrl: null }];
+    state.posts = [
+      {
+        id: 11,
+        user_id: 2,
+        user_name: "Bea",
+        content: "Grazie @ada!",
+        created_at: new Date().toISOString(),
+        tagged_users: [
+          { user_id: 5, name: "Ada Rossi", username: "ada" },
+          // Tagged apart in an older post: still a chip.
+          { user_id: 6, name: "Carlo", username: "carlo" },
+        ],
+        hashtags: ["vecchio"],
+      },
+    ];
+    const user = userEvent.setup({ delay: null });
+    render(<ClubFeedTab clubId={7} isMember />);
+    expect(screen.queryByText("Tagga amici")).toBeNull();
+
+    const post = screen.getByText(/Grazie/).closest("article")!;
+    expect(within(post).getByRole("link", { name: "@ada" })).toHaveAttribute("href", "/u/5");
+    expect(within(post).getByRole("link", { name: "@carlo" })).toHaveAttribute("href", "/u/6");
+    expect(within(post).getAllByRole("link")).toHaveLength(2);
+    expect(within(post).queryByText("#vecchio")).toBeNull();
+
+    await user.type(screen.getByRole("textbox", { name: "Testo del post" }), "Domani con @ad");
+    await user.click(await screen.findByRole("option", { name: /Ada Rossi/ }));
+    await user.click(screen.getByRole("button", { name: "Pubblica" }));
+    expect(state.createCalls).toEqual([
+      { clubId: 7, content: "Domani con @ada", mediaUrls: [], mediaUrl: null, taggedUserIds: [5] },
+    ]);
   });
 
   it("in caricamento: scheletri, non «Nessun post ancora.»", () => {

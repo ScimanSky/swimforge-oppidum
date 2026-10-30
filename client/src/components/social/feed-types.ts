@@ -13,7 +13,6 @@ export interface FeedPostRecord {
   media_url?: string | null
   media_urls?: string[] | string | null
   tagged_users?: FeedTaggedUser[] | string | null
-  hashtags?: string[] | string | null
   is_following?: boolean
   created_at: string
   activity_date?: string | null

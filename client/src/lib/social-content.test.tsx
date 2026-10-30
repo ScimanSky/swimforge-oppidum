@@ -1,15 +1,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { extractFirstUrl, LinkPreviewCard, normalizeTagSearchQuery, renderSocialText } from "./social-content";
+import { Router } from "wouter";
+import { memoryLocation } from "wouter/memory-location";
+import { extractFirstUrl, LinkPreviewCard, renderSocialText } from "./social-content";
 
 afterEach(cleanup);
 
 describe("social-content helpers", () => {
-  it("normalizes tag search query with leading @", () => {
-    expect(normalizeTagSearchQuery("@valdaster")).toBe("valdaster");
-    expect(normalizeTagSearchQuery("  @@val daster  ")).toBe("val daster");
-  });
-
   it("extracts first valid http url and trims trailing punctuation", () => {
     const text = "Guarda questo link https://swimforge.app/path/to/page). e poi dimmi";
     expect(extractFirstUrl(text)).toBe("https://swimforge.app/path/to/page");
@@ -29,6 +26,29 @@ describe("social-content helpers", () => {
     render(<p>{renderSocialText("Link https://swimforge.app ora")}</p>);
     const link = screen.getByRole("link", { name: "https://swimforge.app" });
     expect(link).toHaveAttribute("href", "https://swimforge.app");
+  });
+
+  it("links a mention to the stored user's profile, by id: never a lookup of the text", () => {
+    const mentions = [
+      { user_id: 5, name: "Ada Rossi", username: "ada" },
+      { user_id: 6, name: "Bea", username: null },
+    ];
+    render(
+      <Router hook={memoryLocation({ path: "/" }).hook}>
+        <p>{renderSocialText("Vasca con @ada, @Bea e @carlo su swimforge.it", { mentions })}</p>
+      </Router>
+    );
+    expect(screen.getByRole("link", { name: "@ada" })).toHaveAttribute("href", "/u/5");
+    expect(screen.getByRole("link", { name: "@Bea" })).toHaveAttribute("href", "/u/6");
+    // Not among the post's mentions: plain text, not a link and not styled as one.
+    expect(screen.queryByRole("link", { name: "@carlo" })).toBeNull();
+    expect(screen.getByText(/@carlo/)).not.toHaveClass("text-action-text");
+    expect(screen.getByRole("link", { name: "swimforge.it" })).toHaveAttribute("href", "https://swimforge.it");
+  });
+
+  it("hashtags are plain text", () => {
+    render(<p>{renderSocialText("Oggi #soglia")}</p>);
+    expect(screen.getByText(/#soglia/)).not.toHaveClass("text-action-text");
   });
 
   it("renders bare-domain links as clickable anchors", () => {

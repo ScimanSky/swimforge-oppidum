@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   cloudinaryMutateAsync: vi.fn(),
   createTextPostMutateAsync: vi.fn(),
   trackCelebrationMutate: vi.fn(),
+  people: [] as any[],
 }));
 
 vi.mock("sonner", () => ({
@@ -53,8 +54,8 @@ vi.mock("@/lib/trpc", () => ({
       },
       users: {
         search: {
-          useQuery: () => ({
-            data: [],
+          useQuery: (_input: unknown, options?: { enabled?: boolean }) => ({
+            data: options?.enabled === false ? undefined : mocks.people,
           }),
         },
       },
@@ -82,6 +83,7 @@ vi.mock("./ShareActivityPicker", () => ({
 describe("CreatePostSheet mobile media interactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.people = [];
     vi.stubGlobal("URL", {
       ...URL,
       createObjectURL: vi.fn(() => "blob:preview-media"),
@@ -123,5 +125,29 @@ describe("CreatePostSheet mobile media interactions", () => {
     expect(mocks.toastError).toHaveBeenCalledWith(
       "Formato non supportato. Usa JPG, PNG, WEBP, MP4, WEBM o MOV."
     );
+  });
+
+  it("mentions with «@» in the text: no separate tag field, no hashtags; the picked ids are sent", async () => {
+    mocks.people = [{ userId: 5, name: "Ada Rossi", username: "ada", avatarUrl: null }];
+    mocks.createTextPostMutateAsync.mockResolvedValue({ success: true, postId: 1 });
+    render(<CreatePostSheet open onOpenChange={() => {}} />);
+    expect(screen.getByText("Testo, foto, video e menzioni con @")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /nuovo post/i }));
+    expect(screen.queryByText("Tagga amici")).toBeNull();
+    expect(screen.queryByPlaceholderText("Cerca per nome o username")).toBeNull();
+
+    const field = screen.getByRole("textbox", { name: "Testo del post" });
+    await userEvent.type(field, "Bella vasca con @ad");
+    await userEvent.click(await screen.findByRole("option", { name: /Ada Rossi/ }));
+    await userEvent.type(field, "#soglia");
+    expect(screen.queryByText("Hashtag rilevati")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Pubblica" }));
+    expect(mocks.createTextPostMutateAsync).toHaveBeenCalledWith({
+      content: "Bella vasca con @ada #soglia",
+      mediaUrls: [],
+      mediaUrl: null,
+      taggedUserIds: [5],
+    });
   });
 });

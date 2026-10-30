@@ -6,26 +6,26 @@ import { useId, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash, PencilLine, Trash2 } from "lucide-react";
+import { MessageCircle, Plus, ImagePlus, X, PencilLine, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import PostReactions from "@/components/PostReactions";
 import { EditPostSheet } from "@/components/social/EditPostSheet";
+import { MentionTextarea } from "@/components/social/MentionTextarea";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import {
-  extractHashtags,
   isVideoUrl,
   MAX_POST_MEDIA_ITEMS,
   validatePostMediaFile,
   type PostMediaKind,
 } from "@/lib/post-media";
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload";
-import { extractFirstUrl, LinkPreviewCard, normalizeTagSearchQuery, renderSocialText } from "@/lib/social-content";
+import { extractFirstUrl, LinkPreviewCard, renderSocialText } from "@/lib/social-content";
+import { pickedMentionIds, taggedUsersNotInText, type MentionUser } from "@/lib/mentions";
 import { formatTimeAgo } from "@/lib/format";
 
 interface ClubFeedTabProps {
@@ -38,13 +38,6 @@ type SelectedMedia = {
   file: File;
   previewUrl: string;
   kind: PostMediaKind;
-};
-
-type TaggedUser = {
-  userId: number;
-  name: string | null;
-  username: string | null;
-  avatarUrl: string | null;
 };
 
 function normalizeArrayField(raw: unknown): string[] {
@@ -76,19 +69,15 @@ function parseTaggedUsers(raw: unknown): Array<{ user_id: number; name?: string 
 
 export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
   const composerTitleId = useId();
-  const tagInputId = useId();
   const [postText, setPostText] = useState("");
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null);
   const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({});
   const [mediaItems, setMediaItems] = useState<SelectedMedia[]>([]);
   const [openMediaUrl, setOpenMediaUrl] = useState<string | null>(null);
-  const [tagQuery, setTagQuery] = useState("");
-  const [taggedUsers, setTaggedUsers] = useState<TaggedUser[]>([]);
+  const [mentions, setMentions] = useState<MentionUser[]>([]);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
-  const hashtags = useMemo(() => extractHashtags(postText), [postText]);
   const postFirstLink = useMemo(() => extractFirstUrl(postText), [postText]);
-  const normalizedTagQuery = useMemo(() => normalizeTagSearchQuery(tagQuery), [tagQuery]);
 
   const utils = trpc.useUtils();
 
@@ -107,11 +96,6 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
 
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation();
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation();
-  const tagSearchEnabled = isMember && normalizedTagQuery.length >= 2;
-  const tagSearchQuery = trpc.community.users.search.useQuery(
-    { query: normalizedTagQuery, limit: 8 },
-    { enabled: !!tagSearchEnabled }
-  );
 
   const createPostMutation = trpc.community.clubs.createPost.useMutation({
     onSuccess: (data: any) => {
@@ -169,8 +153,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
     clearMediaPreviews();
     setPostText("");
     setMediaItems([]);
-    setTagQuery("");
-    setTaggedUsers([]);
+    setMentions([]);
     if (mediaInputRef.current) mediaInputRef.current.value = "";
   };
 
@@ -211,25 +194,6 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
       if (target?.previewUrl.startsWith("blob:")) URL.revokeObjectURL(target.previewUrl);
       return prev.filter((item) => item.id !== id);
     });
-  };
-
-  const addTaggedUser = (user: any) => {
-    const normalized: TaggedUser = {
-      userId: Number(user.userId),
-      name: user.name ?? null,
-      username: user.username ?? null,
-      avatarUrl: user.avatarUrl ?? null,
-    };
-    if (!normalized.userId) return;
-    setTaggedUsers((prev) => {
-      if (prev.some((item) => item.userId === normalized.userId)) return prev;
-      return [...prev, normalized].slice(0, 10);
-    });
-    setTagQuery("");
-  };
-
-  const removeTaggedUser = (userId: number) => {
-    setTaggedUsers((prev) => prev.filter((item) => item.userId !== userId));
   };
 
   const uploadMediaToImageKit = async (file: File) => {
@@ -297,8 +261,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
         content: hasText ? postText.trim() : null,
         mediaUrls: uploadedMediaUrls,
         mediaUrl: uploadedMediaUrls[0] ?? null,
-        taggedUserIds: taggedUsers.map((user) => user.userId),
-        hashtags,
+        taggedUserIds: pickedMentionIds(postText, mentions),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Errore nella pubblicazione";
@@ -326,11 +289,13 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
         <h3 id={composerTitleId} className="sr-only">
           Nuovo post nel club
         </h3>
-        <Textarea
+        <MentionTextarea
           aria-label="Testo del post"
           placeholder="Condividi qualcosa con il club…"
           value={postText}
-          onChange={(e) => setPostText(e.target.value)}
+          onValueChange={setPostText}
+          mentions={mentions}
+          onMentionsChange={setMentions}
           className="min-h-[100px]"
         />
 
@@ -377,78 +342,6 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
           </div>
         )}
 
-        <div className="space-y-2">
-          <label htmlFor={tagInputId} className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
-            <AtSign className="size-4" aria-hidden />
-            Tagga amici
-          </label>
-          <Input
-            id={tagInputId}
-            placeholder="Cerca per nome o username"
-            value={tagQuery}
-            onChange={(e) => setTagQuery(e.target.value)}
-          />
-          {tagSearchQuery.data && normalizedTagQuery.length >= 2 ? (
-            <div className="max-h-36 overflow-y-auto rounded-xl border border-border bg-card">
-              {(tagSearchQuery.data as any[]).length === 0 ? (
-                <p className="px-3 py-2 text-sm text-muted-foreground">Nessun utente trovato.</p>
-              ) : (
-                (tagSearchQuery.data as any[]).map((user) => (
-                  <button
-                    key={user.userId}
-                    type="button"
-                    onClick={() => addTaggedUser(user)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-raised"
-                  >
-                    <Avatar className="size-7">
-                      <AvatarImage src={user.avatarUrl || undefined} />
-                      <AvatarFallback>{(user.name || user.username || "U").slice(0, 1).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{user.name || "Utente"}</p>
-                      <p className="truncate text-xs text-muted-foreground">@{user.username || `u${user.userId}`}</p>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          ) : null}
-
-          {taggedUsers.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {taggedUsers.map((user) => (
-                <span key={user.userId} className="inline-flex h-7 items-center gap-1 rounded-full bg-raised pl-3 pr-1.5 text-xs font-semibold">
-                  @{user.username || user.name || `u${user.userId}`}
-                  <button
-                    type="button"
-                    aria-label={`Togli @${user.username || user.name || `u${user.userId}`}`}
-                    onClick={() => removeTaggedUser(user.userId)}
-                    className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-3.5" aria-hidden />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {hashtags.length > 0 && (
-          <div className="rounded-xl bg-raised p-3">
-            <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-              <Hash className="size-3.5" aria-hidden />
-              Hashtag rilevati
-            </p>
-            <div className="flex flex-wrap gap-x-2 gap-y-1">
-              {hashtags.map((tag) => (
-                <span key={tag} className="text-sm font-medium text-action-text">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="flex justify-end">
           <Button
             onClick={() => void handlePostSubmit()}
@@ -485,7 +378,8 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
               ? mediaUrls
               : (post.media_url ? [String(post.media_url)] : []);
             const taggedUsersForPost = parseTaggedUsers(post.tagged_users);
-            const hashtagsForPost = normalizeArrayField(post.hashtags);
+            // Mentions are links in the text; people tagged apart (older posts) stay as chips.
+            const taggedApartForPost = taggedUsersNotInText(post.content, taggedUsersForPost);
             const firstLinkForPost = post.content ? extractFirstUrl(post.content) : null;
 
             return (
@@ -537,15 +431,15 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                     ) : null}
                   </div>
                   {post.content && (
-                    <p className="mb-3 whitespace-pre-wrap text-[15px]">{renderSocialText(post.content)}</p>
+                    <p className="mb-3 whitespace-pre-wrap text-[15px]">{renderSocialText(post.content, { mentions: taggedUsersForPost })}</p>
                   )}
                   {firstLinkForPost ? (
                     <LinkPreviewCard url={firstLinkForPost} className="mb-3" />
                   ) : null}
 
-                  {taggedUsersForPost.length > 0 && (
+                  {taggedApartForPost.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
-                      {taggedUsersForPost.map((user) => (
+                      {taggedApartForPost.map((user) => (
                         <Link
                           key={user.user_id}
                           href={`/u/${user.user_id}`}
@@ -587,16 +481,6 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                             </button>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {!post.content && hashtagsForPost.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-x-2 gap-y-1">
-                      {hashtagsForPost.map((tag) => (
-                        <span key={tag} className="text-sm font-medium text-action-text">
-                          #{tag}
-                        </span>
                       ))}
                     </div>
                   )}
