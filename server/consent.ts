@@ -226,7 +226,8 @@ export async function hasRequiredLegalConsents(userId: number): Promise<boolean>
 /**
  * Records the acceptance the user has just given (checkboxes Termini, Privacy and «Dichiaro di
  * avere almeno 14 anni»): only the ones not recorded yet, so the first date stays. Never called
- * without an explicit acceptance.
+ * without an explicit acceptance. Throws when they could not be stored: callers record it before
+ * issuing a session.
  */
 export async function recordLegalAcceptance(userId: number, req?: Request): Promise<void> {
   const granted = await Promise.all(REGISTRATION_CONSENTS.map((type) => hasGrantedConsent(userId, type)));
@@ -236,5 +237,7 @@ export async function recordLegalAcceptance(userId: number, req?: Request): Prom
     consentVersion: CONSENT_VERSION[consentType],
   }));
   if (items.length === 0) return;
-  await setManyConsents({ userId, req, items });
+  const recorded = await setManyConsents({ userId, req, items });
+  // No database answers null rows: the acceptance is not stored, so no session may follow.
+  if (recorded.length !== items.length) throw new Error("Legal acceptance not recorded");
 }

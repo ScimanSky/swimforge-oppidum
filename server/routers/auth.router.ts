@@ -3,7 +3,7 @@ import {
     TRPCError, sdk, verifySupabaseAccessToken,
     loginLimiter, registrationLimiter,
     COOKIE_NAME, getSessionCookieOptions, issueCsrfCookie,
-    applyRateLimit, sql,
+    applyRateLimit, sql, logger,
 } from "./_shared";
 import { CSRF_COOKIE_NAME } from "@shared/const";
 import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
@@ -48,6 +48,8 @@ const REGISTRATION_PASSWORD_SCHEMA = z
  * The registration checkboxes, ticked by the user: Termini, Privacy and «Dichiaro di avere almeno
  * 14 anni». Only this input records them.
  */
+const ACCEPTANCE_NOT_RECORDED_MESSAGE = "Non è stato possibile registrare l'accettazione di Termini e Privacy. Riprova.";
+
 const LEGAL_ACCEPTANCE_SCHEMA = z.object({
     terms: z.literal(true),
     privacy: z.literal(true),
@@ -76,6 +78,20 @@ export const authRouter = router({
                 });
             }
 
+            // The acceptance is recorded before any session exists. If it cannot be, the account
+            // just created goes away again: no account, no session without the acceptance.
+            try {
+                await recordLegalAcceptance(result.user.id, ctx.req);
+            } catch (error) {
+                logger.error("[Auth] Legal acceptance not recorded at registration", {
+                    event: "auth:legal_acceptance_record_failed",
+                    userId: result.user.id,
+                    message: error instanceof Error ? error.message : String(error),
+                });
+                await db.deleteUserAccount(result.user.id).catch(() => null);
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: ACCEPTANCE_NOT_RECORDED_MESSAGE });
+            }
+
             // Create session token
             const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
                 name: result.user.name || "",
@@ -86,8 +102,6 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
-
-            await recordLegalAcceptance(result.user.id, ctx.req);
 
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
@@ -232,6 +246,21 @@ export const authRouter = router({
                 await db.updateUserLastSignedIn(user.id);
             }
 
+            // Right after the account exists and before any session: if the acceptance cannot be
+            // recorded, no cookie and no token (the next sign-in asks for it again).
+            if (!hasAccepted) {
+                try {
+                    await recordLegalAcceptance(user.id, ctx.req);
+                } catch (error) {
+                    logger.error("[Auth] Legal acceptance not recorded at sign-in", {
+                        event: "auth:legal_acceptance_record_failed",
+                        userId: user.id,
+                        message: error instanceof Error ? error.message : String(error),
+                    });
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: ACCEPTANCE_NOT_RECORDED_MESSAGE });
+                }
+            }
+
             // Crea session token
             const sessionToken = await sdk.createSessionToken(user.id.toString(), {
                 name: user.name || "",
@@ -242,7 +271,6 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
-            if (!hasAccepted) await recordLegalAcceptance(user.id, ctx.req);
             const clientHeader = ctx.req.headers[NATIVE_CLIENT_HEADER];
             const isNativeClient = (Array.isArray(clientHeader) ? clientHeader[0] : clientHeader) === NATIVE_CLIENT_VALUE;
             return {
