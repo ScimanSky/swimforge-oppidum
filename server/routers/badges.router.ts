@@ -6,6 +6,7 @@ import {
     initializeAllUserProfileBadges,
 } from "./_shared";
 import type { BadgeDefinitionRow } from "./_shared";
+import { healLevel } from "../lib/levels";
 
 // Helper function to check and award badges
 export async function checkAndAwardBadges(userId: number): Promise<BadgeDefinitionRow[]> {
@@ -70,6 +71,8 @@ export async function checkAndAwardBadges(userId: number): Promise<BadgeDefiniti
         await db.updateSwimmerProfile(userId, {
             totalXp: updatedTotalXp,
         });
+        // The badge XP may reach a new level.
+        await healLevel(userId);
         await invalidateLeaderboardCache();
     }
 
@@ -216,6 +219,8 @@ export const badgesRouter = router({
             await db.updateSwimmerProfile(ctx.user.id, {
                 totalXp: updatedTotalXp,
             });
+            // The badge XP may reach a new level.
+            await healLevel(ctx.user.id);
         }
 
         return { success: true, newBadges: newBadgesCount };

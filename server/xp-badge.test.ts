@@ -52,50 +52,6 @@ describe("XP System", () => {
   });
 });
 
-describe("Level System", () => {
-  const levelThresholds = [
-    { level: 1, xp: 0, title: "Novizio" },
-    { level: 2, xp: 500, title: "Apprendista" },
-    { level: 3, xp: 1200, title: "Nuotatore" },
-    { level: 5, xp: 3000, title: "Atleta" },
-    { level: 10, xp: 11000, title: "Gran Maestro" },
-    { level: 20, xp: 60000, title: "Poseidone" },
-  ];
-
-  it("determines correct level for XP amount", () => {
-    const getLevelForXp = (xp: number) => {
-      let result = levelThresholds[0];
-      for (const threshold of levelThresholds) {
-        if (xp >= threshold.xp) {
-          result = threshold;
-        }
-      }
-      return result;
-    };
-
-    expect(getLevelForXp(0).level).toBe(1);
-    expect(getLevelForXp(0).title).toBe("Novizio");
-    
-    expect(getLevelForXp(500).level).toBe(2);
-    expect(getLevelForXp(500).title).toBe("Apprendista");
-    
-    expect(getLevelForXp(1199).level).toBe(2);
-    expect(getLevelForXp(1200).level).toBe(3);
-    
-    expect(getLevelForXp(60000).level).toBe(20);
-    expect(getLevelForXp(60000).title).toBe("Poseidone");
-  });
-
-  it("calculates XP to next level correctly", () => {
-    const currentXp = 2500;
-    const currentLevel = 3; // Nuotatore (1200 XP)
-    const nextLevelXp = 3000; // Atleta
-    
-    const xpToNextLevel = nextLevelXp - currentXp;
-    expect(xpToNextLevel).toBe(500);
-  });
-});
-
 describe("Badge System", () => {
   it("checks distance badge requirements", () => {
     const totalDistanceMeters = 42195; // Marathon distance

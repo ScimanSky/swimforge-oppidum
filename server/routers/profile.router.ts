@@ -5,6 +5,7 @@ import {
     logger, getUserPublicProfile,
 } from "./_shared";
 import { mergeSwimmerPreferences, preferencesPatch } from "../lib/preferences";
+import { healLevel, levelForXp } from "../lib/levels";
 import type { SwimmingActivityInsert } from "./_shared";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 
@@ -15,11 +16,14 @@ export const profileRouter = router({
             throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
         }
 
+        // The level always follows the total XP (level_thresholds); a stored level left over from
+        // an old table or a missed update is fixed here (self-heal).
+        const level = await levelForXp(profile.totalXp);
+        if (level !== profile.level) await healLevel(ctx.user.id);
         const [nextLevel, currentLevel] = await Promise.all([
-            db.getNextLevelThreshold(profile.level),
-            db.getLevelThreshold(profile.level),
+            db.getNextLevelThreshold(level),
+            db.getLevelThreshold(level),
         ]);
-        const currentLevelInfo = await db.getLevelForXp(profile.totalXp);
 
         // Get profile badge
         const { getUserProfileBadge, updateUserProfileBadge, updateUserProfileBadgeByLevel } = await import("../db_profile_badges");
@@ -45,12 +49,13 @@ export const profileRouter = router({
 
         return {
             ...ownProfile,
+            level,
             notificationSettings: normalizeBooleanRecord(profile.notificationSettings),
-            levelTitle: currentLevelInfo.title,
-            levelColor: currentLevelInfo.color,
-            xpLevelTitle: currentLevelInfo.title,
-            xpLevelColor: currentLevelInfo.color,
-            xpLevel: profile.level,
+            levelTitle: currentLevel?.title ?? null,
+            levelColor: currentLevel?.color ?? null,
+            xpLevelTitle: currentLevel?.title ?? null,
+            xpLevelColor: currentLevel?.color ?? null,
+            xpLevel: level,
             currentLevelXp: currentLevel?.xpRequired ?? 0,
             nextLevelXp: nextLevel?.xpRequired || null,
             xpToNextLevel: nextLevel ? nextLevel.xpRequired - profile.totalXp : 0,

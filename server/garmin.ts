@@ -29,6 +29,7 @@ import {
 } from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
+import { healLevel, levelForXp } from "./lib/levels";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
 import { invalidateSwimMetrics } from "./swim_metrics";
@@ -1479,7 +1480,7 @@ export async function syncGarminActivities(
       const aggregates = await getActivityAggregates(userId);
       
       const newTotalXp = (profile.totalXp || 0) + totalNewXp;
-      const newLevel = calculateLevel(newTotalXp);
+      const newLevel = await levelForXp(newTotalXp);
 
       await db
         .update(swimmerProfiles)
@@ -1537,6 +1538,19 @@ export async function syncGarminActivities(
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
+    }
+
+    // The stored level follows the total XP (level_thresholds), whatever changed it since the
+    // last sync (badges, challenges, an old level table): self-heal, a no-op when it matches.
+    try {
+      await healLevel(userId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`[Garmin Sync] Level self-heal failed for user ${userId}: ${message}`, {
+        event: "garmin:level_heal_failed",
+        userId,
+        message,
+      });
     }
 
     // Caches and Coach page insights, when this sync changed the user's swims.
@@ -1647,42 +1661,6 @@ export function notifyGarminSyncResult(
   if (recordPush) {
     send(userId, recordPush);
   }
-}
-
-/**
- * Calculate level from XP
- */
-function calculateLevel(totalXp: number): number {
-  // Level thresholds (cumulative XP needed)
-  const levelThresholds = [
-    0,      // Level 1
-    500,    // Level 2
-    1200,   // Level 3
-    2100,   // Level 4
-    3200,   // Level 5
-    4500,   // Level 6
-    6000,   // Level 7
-    7700,   // Level 8
-    9600,   // Level 9
-    11700,  // Level 10
-    14000,  // Level 11
-    16500,  // Level 12
-    19200,  // Level 13
-    22100,  // Level 14
-    25200,  // Level 15
-    28500,  // Level 16
-    32000,  // Level 17
-    35700,  // Level 18
-    39600,  // Level 19
-    43700,  // Level 20
-  ];
-
-  for (let i = levelThresholds.length - 1; i >= 0; i--) {
-    if (totalXp >= levelThresholds[i]) {
-      return i + 1;
-    }
-  }
-  return 1;
 }
 
 /**

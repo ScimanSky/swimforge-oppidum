@@ -109,6 +109,15 @@ describe("primitivi Corsia", () => {
     expect(screen.getByText("580 XP")).toBeInTheDocument();
     expect(screen.getByText("al livello 13")).toBeInTheDocument();
     expect(screen.getByText("8.420 XP totali")).toBeInTheDocument();
+    expect(screen.getByText("I livelli contano solo il nuoto.")).toBeInTheDocument();
+  });
+
+  it("LevelCard: il titolo del livello sotto il numero, se c'è", () => {
+    render(<LevelCard {...level12} title="Campione" />);
+    expect(screen.getByText("Campione")).toBeInTheDocument();
+    cleanup();
+    render(<LevelCard {...level12} title={null} />);
+    expect(screen.queryByText("Campione")).toBeNull();
   });
 
   it("LevelCard: avanzamento dentro il livello attuale, barra accessibile", () => {

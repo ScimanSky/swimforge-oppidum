@@ -854,20 +854,6 @@ export async function getAllLevelThresholds() {
   return await db.select().from(levelThresholds).orderBy(levelThresholds.level);
 }
 
-export async function getLevelForXp(xp: number) {
-  const db = await getDb();
-  if (!db) return { level: 1, title: 'Novizio', color: '#9ca3af' };
-  
-  const result = await db
-    .select()
-    .from(levelThresholds)
-    .where(sql`${levelThresholds.xpRequired} <= ${xp}`)
-    .orderBy(desc(levelThresholds.level))
-    .limit(1);
-  
-  return result.length > 0 ? result[0] : { level: 1, title: 'Novizio', color: '#9ca3af' };
-}
-
 export async function getLevelThreshold(level: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -883,16 +869,6 @@ export async function getLevelThreshold(level: number) {
 
 export async function getNextLevelThreshold(currentLevel: number) {
   return getLevelThreshold(currentLevel + 1);
-}
-
-export async function createLevelThreshold(level: number, xpRequired: number, title: string, color: string) {
-  const db = await getDb();
-  if (!db) return;
-  // PostgreSQL upsert
-  await db.insert(levelThresholds).values({ level, xpRequired, title, color }).onConflictDoUpdate({
-    target: levelThresholds.level,
-    set: { xpRequired, title, color }
-  });
 }
 
 // ============================================

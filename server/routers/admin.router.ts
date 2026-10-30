@@ -10,36 +10,11 @@ import { AppError } from "../lib/errors";
 import { cssTestSchema } from "../swim_metrics/css-test";
 import { paceZonesSchema } from "../swim_metrics/pace-zones";
 
-// Seed function for badges and levels
+/**
+ * Seeds the badge definitions when there are none. The level thresholds are not seeded here:
+ * level_thresholds (from supabase-init.sql) is the only level table, never rewritten by code.
+ */
 export async function seedBadgesAndLevels() {
-    // Seed level thresholds
-    const levels = [
-        { level: 1, xp: 0, title: "Novizio", color: "#9ca3af" },
-        { level: 2, xp: 500, title: "Apprendista", color: "#9ca3af" },
-        { level: 3, xp: 1200, title: "Nuotatore", color: "#22c55e" },
-        { level: 4, xp: 2000, title: "Nuotatore Esperto", color: "#22c55e" },
-        { level: 5, xp: 3000, title: "Atleta", color: "#3b82f6" },
-        { level: 6, xp: 4200, title: "Atleta Avanzato", color: "#3b82f6" },
-        { level: 7, xp: 5600, title: "Veterano", color: "#8b5cf6" },
-        { level: 8, xp: 7200, title: "Veterano Elite", color: "#8b5cf6" },
-        { level: 9, xp: 9000, title: "Maestro", color: "#f59e0b" },
-        { level: 10, xp: 11000, title: "Gran Maestro", color: "#f59e0b" },
-        { level: 11, xp: 13500, title: "Campione", color: "#ef4444" },
-        { level: 12, xp: 16500, title: "Campione Elite", color: "#ef4444" },
-        { level: 13, xp: 20000, title: "Leggenda", color: "#ec4899" },
-        { level: 14, xp: 24000, title: "Leggenda Vivente", color: "#ec4899" },
-        { level: 15, xp: 28500, title: "Mito", color: "#06b6d4" },
-        { level: 16, xp: 33500, title: "Mito Immortale", color: "#06b6d4" },
-        { level: 17, xp: 39000, title: "Titano", color: "#eab308" },
-        { level: 18, xp: 45000, title: "Titano Supremo", color: "#eab308" },
-        { level: 19, xp: 52000, title: "Divinità Acquatica", color: "#a855f7" },
-        { level: 20, xp: 60000, title: "Poseidone", color: "#1e40af" },
-    ];
-
-    for (const l of levels) {
-        await db.createLevelThreshold(l.level, l.xp, l.title, l.color);
-    }
-
     // Check if badges already exist
     const existingCount = await db.getBadgeDefinitionsCount();
     if (existingCount > 0) return;

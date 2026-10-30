@@ -87,6 +87,11 @@ describe("completeChallenges winner badge", () => {
     expect(m.state.committed).toBe(true);
     expect(m.state.executed.some((t) => /UPDATE challenges\s+SET status = 'completed'/.test(t))).toBe(true);
     expect(m.state.executed.some((t) => /INSERT INTO xp_transactions/.test(t))).toBe(true);
+    // The winner's level comes from the shared calculation on the new total (level_thresholds).
+    const xpUpdate = m.state.executed.find((t) => /total_xp = sp\.total_xp \+/.test(t));
+    expect(xpUpdate).toMatch(
+      /level = COALESCE\(\(SELECT max\(lt\.level\) FROM level_thresholds lt WHERE lt\.xp_required <= \(sp\.total_xp \+ \$\d+\)\), 1\)/,
+    );
   });
 
   it("still awards the badge when the insert works", async () => {

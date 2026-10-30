@@ -6,7 +6,6 @@ import { trpc } from "@/lib/trpc";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Chip } from "@/components/corsia/Chip";
 import { LevelCard } from "@/components/corsia/LevelCard";
 import { LoadError } from "@/components/corsia/LoadState";
 import { Metric, type MetricProps } from "@/components/corsia/Metric";
@@ -325,7 +324,6 @@ export default function Profile() {
     : null;
 
   const nameId = useId();
-  const profileBadgeName = profile?.profileBadge?.name;
 
   return (
     <AppLayout>
@@ -368,12 +366,6 @@ export default function Profile() {
                     </p>
                   </div>
                 </div>
-
-                {profileBadgeName ? (
-                  <div className="mt-3">
-                    <Chip>{profileBadgeName}</Chip>
-                  </div>
-                ) : null}
 
                 <p className="mt-3 text-[15px]">{bio}</p>
                 <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -429,6 +421,7 @@ export default function Profile() {
                 currentLevelXp={profile.currentLevelXp ?? 0}
                 nextLevelXp={profile.nextLevelXp ?? null}
                 xpToNextLevel={profile.xpToNextLevel ?? 0}
+                title={profile.levelTitle}
               />
             ) : null}
           </>
